@@ -1,0 +1,2126 @@
+import { useState, useEffect, useRef } from "react";
+
+// ═══════════════════════════════════════════
+//  ⚙️  KONFIGURATION
+// ═══════════════════════════════════════════
+const C = {
+  name: "Stellify",
+  tagline: "AI Career Copilot Schweiz",
+  domain: "stellify.ch",
+  email: "support@stellify.ch",
+  address: "6300 Zug, Schweiz",
+  owner: "JTSP",
+  stripeMonthly: "https://buy.stripe.com/MONTHLY_LINK",
+  stripeYearly:  "https://buy.stripe.com/YEARLY_LINK",
+  priceM: "19.90",   // CHF 19.90 / Monat
+  priceY: "14.90",   // CHF 14.90 / Monat (jährlich = CHF 178.80 / Jahr)
+  FREE_LIMIT: 1,     // 1 kostenlose Bewerbung, dann Pro erforderlich
+  PRO_LIMIT: 60,     // Max. 60 Generierungen/Monat für Pro-Nutzer
+  MODEL_FAST: "claude-haiku-4-5-20251001",   // Günstig – für einfache Tools & Gratis
+  MODEL_FULL: "claude-sonnet-4-20250514",    // Leistungsstark – für Pro-Bewerbungen
+  FREE_MAX_TOKENS: 500,   // Gratis: max 500 Tokens (~350 Wörter) – Kosten ~CHF 0.01
+};
+
+const getU   = () => { try { const d=JSON.parse(localStorage.getItem("stf_u")||"{}"),m=new Date().toISOString().slice(0,7); return d.month!==m?{month:m,count:0,proCount:0}:d; } catch { return {month:"",count:0,proCount:0}; }};
+const incU   = () => { const u=getU(); u.count++; localStorage.setItem("stf_u",JSON.stringify(u)); };
+const incPro = () => { const u=getU(); u.proCount=(u.proCount||0)+1; localStorage.setItem("stf_u",JSON.stringify(u)); };
+const getProCount = () => getU().proCount||0;
+const isPro  = () => { try { return localStorage.getItem("stf_pro")==="true"; } catch { return false; }};
+const actPro = () => { try { localStorage.setItem("stf_pro","true"); } catch {}};
+
+// 🧠 SMART MODEL ROUTING
+// Sonnet  → Bewerbungen, CV, Zeugnis, Coach, Excel, PowerPoint, ATS, LinkedIn, Job-Matching
+// Haiku   → E-Mail, Protokoll, Übersetzer, Networking, Kündigung, Lernplan, Zusammenfassung, Gehalt, 30-60-90, Referenz, Lehrstelle
+const HAIKU_TOOLS = ["free","email","protokoll","uebersetzer","networking","kuendigung","lernplan","zusammenfassung","gehalt","plan306090","referenz","lehrstelle"];
+const getModel = (toolId) => HAIKU_TOOLS.includes(toolId) ? C.MODEL_FAST : C.MODEL_FULL;
+const getTokens = (toolId, stream=false) => toolId==="free" ? C.FREE_MAX_TOKENS : HAIKU_TOOLS.includes(toolId) ? (stream?600:500) : (stream?1400:1200);
+
+async function callAI(prompt, system, toolId="") {
+  const body = { model: getModel(toolId), max_tokens: getTokens(toolId),
+    messages:[{role:"user",content:prompt}] };
+  if (system) body.system = system;
+  const r = await fetch("https://api.anthropic.com/v1/messages",
+    {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  return d.content?.[0]?.text || "";
+}
+
+async function streamAI(prompt, onChunk, system, toolId="") {
+  const body = { model: getModel(toolId), max_tokens: getTokens(toolId, true), stream:true,
+    messages:[{role:"user",content:prompt}] };
+  if (system) body.system = system;
+  const resp = await fetch("https://api.anthropic.com/v1/messages",
+    {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if (!resp.ok) { const e=await resp.json(); throw new Error(e.error?.message||"API Error"); }
+  const reader = resp.body.getReader(); const dec = new TextDecoder(); let full = "";
+  while(true) {
+    const {done,value} = await reader.read(); if(done) break;
+    for(const line of dec.decode(value,{stream:true}).split("\n")) {
+      if(!line.startsWith("data: ")) continue;
+      const data = line.slice(6).trim(); if(!data||data==="[DONE]") continue;
+      try { const ev=JSON.parse(data); if(ev.type==="content_block_delta"&&ev.delta?.type==="text_delta"){full+=ev.delta.text;onChunk(full);} } catch{}
+    }
+  }
+  return full;
+}
+
+async function callAIWithFile(file, prompt) {
+  const b64 = await new Promise((res,rej) => { const r=new FileReader(); r.onload=()=>res(r.result.split(",")[1]); r.onerror=rej; r.readAsDataURL(file); });
+  const part = file.type.startsWith("image/")
+    ? {type:"image",source:{type:"base64",media_type:file.type,data:b64}}
+    : {type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}};
+  const r = await fetch("https://api.anthropic.com/v1/messages",
+    {method:"POST",headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({model: C.MODEL_FULL, max_tokens:1200,
+       messages:[{role:"user",content:[part,{type:"text",text:prompt}]}]})});
+  const d = await r.json(); if(d.error) throw new Error(d.error.message);
+  return d.content?.[0]?.text||"";
+}
+
+const parseJSON = (raw) => JSON.parse(raw.replace(/```json|```/g,"").trim());
+
+// ── FONTS & CSS ──
+const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Figtree:wght@300;400;500;600&display=swap');`;
+const CSS = `
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#0b0b12;--bg:#f2f3f7;--em:#10b981;--em2:#059669;--em3:rgba(16,185,129,.11);--am:#f59e0b;--am2:rgba(245,158,11,.14);--bl:#3b82f6;--bl2:rgba(59,130,246,.12);--mu:rgba(11,11,18,.46);--bo:rgba(11,11,18,.1);--bos:rgba(11,11,18,.06);--dk:#07070e;--dk2:#0f0f1a;--dk3:#161624;--hd:'Bricolage Grotesque',system-ui,sans-serif;--bd:'Figtree',system-ui,sans-serif;--r:12px;--r2:20px}
+html{scroll-behavior:smooth}body{background:var(--bg);color:var(--ink);font-family:var(--bd);font-weight:300;-webkit-font-smoothing:antialiased}
+/* NAV */
+nav{position:sticky;top:0;z-index:200;background:rgba(242,243,247,.94);backdrop-filter:blur(20px);border-bottom:1px solid var(--bo)}
+.ni{max-width:1200px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;gap:10px}
+.logo{font-family:var(--hd);font-size:21px;font-weight:800;cursor:pointer;letter-spacing:-.5px;display:flex;align-items:center;color:var(--ink)}
+.logo-dot{width:8px;height:8px;background:var(--em);border-radius:50%;margin-left:2px;margin-bottom:8px;flex-shrink:0}
+.pb{font-size:10px;font-weight:700;background:linear-gradient(135deg,var(--em),var(--em2));color:white;padding:2px 8px;border-radius:20px;margin-left:8px;text-transform:uppercase;letter-spacing:.5px}
+.nl{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.nlk{font-size:13px;color:var(--mu);cursor:pointer;background:none;border:none;font-family:var(--bd);transition:color .18s;white-space:nowrap;padding:0}.nlk:hover{color:var(--ink)}
+.nc{background:var(--ink);color:white;padding:8px 18px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:var(--bd);transition:all .2s}.nc:hover{background:var(--em)}
+.ls{display:flex;background:rgba(11,11,18,.06);border:1.5px solid rgba(11,11,18,.08);border-radius:12px;padding:4px;gap:3px}
+.lb{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:var(--bd);color:var(--mu);transition:all .18s;letter-spacing:.3px}.lb.on{background:white;color:var(--ink);box-shadow:0 2px 8px rgba(11,11,18,.12);font-weight:700}
+/* HERO */
+.hero{background:var(--dk);overflow:hidden;position:relative;padding:100px 0 88px}
+.hbg{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 80% at 80% 20%,rgba(16,185,129,.14) 0%,transparent 60%),radial-gradient(ellipse 50% 60% at 5% 90%,rgba(59,130,246,.07) 0%,transparent 60%)}
+.hdots{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.04) 1px,transparent 1px);background-size:32px 32px;pointer-events:none}
+.con{max-width:1200px;margin:0 auto;padding:0 28px}.csm{max-width:820px;margin:0 auto;padding:0 28px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--em);background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);padding:5px 14px;border-radius:20px;margin-bottom:26px}
+h1.hh{font-family:var(--hd);font-size:clamp(48px,7vw,84px);font-weight:800;line-height:.98;letter-spacing:-3px;color:white;margin-bottom:22px;max-width:900px}
+h1.hh em{font-style:normal;color:var(--em)}
+.hsub{font-size:18px;font-weight:300;color:rgba(255,255,255,.5);max-width:580px;line-height:1.75;margin-bottom:38px}
+.hctas{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.hstats{margin-top:64px;display:flex;gap:40px;flex-wrap:wrap}
+.stat-n{font-family:var(--hd);font-size:30px;font-weight:800;color:white;letter-spacing:-1px;line-height:1}.stat-l{font-size:12px;color:rgba(255,255,255,.36);margin-top:4px}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;border-radius:10px;font-family:var(--bd);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .2s;white-space:nowrap;text-decoration:none}
+.b-em{background:var(--em);color:white}.b-em:hover{background:var(--em2);transform:translateY(-2px);box-shadow:0 10px 28px rgba(16,185,129,.28)}
+.b-dk{background:var(--ink);color:white}.b-dk:hover{background:#18182e;transform:translateY(-2px)}
+.b-bl{background:var(--bl);color:white}.b-bl:hover{background:#2563eb;transform:translateY(-2px);box-shadow:0 10px 28px rgba(59,130,246,.28)}
+.b-out{background:transparent;color:white;border:1.5px solid rgba(255,255,255,.2)}.b-out:hover{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.05)}
+.b-outd{background:transparent;color:var(--ink);border:1.5px solid var(--bo)}.b-outd:hover{border-color:var(--em);color:var(--em)}
+.b-sm{padding:8px 16px;font-size:13px}.b-lg{padding:15px 34px;font-size:15px}.b-w{width:100%}
+.btn:disabled{opacity:.35;cursor:not-allowed!important;transform:none!important;box-shadow:none!important}
+/* SECTIONS */
+.sec{padding:88px 0}.sec-dk{background:var(--dk)}.sec-dk2{background:var(--dk2)}.sec-w{background:white}.sec-bg{background:var(--bg)}
+.sh{margin-bottom:50px}.shc{text-align:center}.shc .ss{margin:0 auto}
+.seye{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--em);margin-bottom:12px}
+.st{font-family:var(--hd);font-size:clamp(32px,4vw,50px);font-weight:800;line-height:1.05;letter-spacing:-1.5px;margin-bottom:14px}
+.sec-dk .st,.sec-dk2 .st{color:white}
+.ss{font-size:16px;font-weight:300;line-height:1.75;color:var(--mu);max-width:560px}
+.sec-dk .ss,.sec-dk2 .ss{color:rgba(255,255,255,.42)}
+/* TOOLS GRID */
+.tools-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.tool-card{padding:28px;border-radius:var(--r2);border:1.5px solid var(--bo);background:white;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;text-align:left}
+.tool-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .2s;background:linear-gradient(135deg,rgba(16,185,129,.04),transparent)}
+.tool-card:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(11,11,18,.1);border-color:rgba(16,185,129,.35)}.tool-card:hover::before{opacity:1}
+.tool-card.bl:hover{border-color:rgba(59,130,246,.4)}.tool-card.am:hover{border-color:rgba(245,158,11,.4)}
+.tc-ico{font-size:30px;margin-bottom:12px}
+.tc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.tc-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;margin-top:2px}
+.tc-em{background:var(--em3);color:var(--em2)}.tc-bl{background:var(--bl2);color:var(--bl)}.tc-am{background:var(--am2);color:#92400e}
+.tc-t{font-family:var(--hd);font-size:17px;font-weight:700;margin-bottom:6px;color:var(--ink)}
+.tc-p{font-size:13px;line-height:1.7;color:var(--mu)}
+/* WHY VS */
+.why-vs{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:40px}
+.why-col{border-radius:var(--r2);padding:28px;border:1.5px solid var(--bo)}
+.why-col.bad{background:#fff8f8;border-color:rgba(239,68,68,.15)}.why-col.good{background:rgba(16,185,129,.04);border-color:rgba(16,185,129,.2)}
+.why-col h4{font-family:var(--hd);font-size:15px;font-weight:700;margin-bottom:13px}
+.why-col li{font-size:13px;line-height:1.7;color:var(--mu);padding:6px 0;border-bottom:1px solid rgba(11,11,18,.06);display:flex;align-items:flex-start;gap:8px;list-style:none}.why-col li:last-child{border:none}
+/* FEATURES */
+.feat-g6{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.fc{padding:24px;background:white;border:1.5px solid var(--bo);border-radius:var(--r2);position:relative;transition:all .22s}
+.fc:hover{border-color:var(--em);box-shadow:0 6px 28px rgba(16,185,129,.08);transform:translateY(-2px)}
+.fc-ico{font-size:24px;margin-bottom:10px}.fc h4{font-family:var(--hd);font-size:15px;font-weight:700;margin-bottom:6px}.fc p{font-size:13px;line-height:1.7;color:var(--mu)}
+.pp{position:absolute;top:13px;right:13px;font-size:10px;font-weight:700;background:linear-gradient(135deg,var(--em),var(--em2));color:white;padding:2px 8px;border-radius:20px}
+.pp-am{background:linear-gradient(135deg,var(--am),#d97706)}
+/* STEPS */
+.srow{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;position:relative}
+.srow::before{display:none}
+.sc{padding:28px 24px;background:var(--dk3);border:1.5px solid rgba(255,255,255,.07);border-radius:var(--r2)}
+.sn{width:48px;height:48px;background:rgba(16,185,129,.12);border:1.5px solid rgba(16,185,129,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--hd);font-size:16px;font-weight:800;color:var(--em);margin-bottom:16px}
+.sc h3{font-family:var(--hd);font-size:17px;font-weight:700;color:white;margin-bottom:8px}.sc p{font-size:13px;line-height:1.75;color:rgba(255,255,255,.42)}
+/* TESTI */
+.tg{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.tc2{padding:26px;background:var(--dk3);border:1.5px solid rgba(255,255,255,.07);border-radius:var(--r2)}
+.ts{color:var(--em);font-size:13px;margin-bottom:10px;letter-spacing:3px}.tq{font-size:14px;line-height:1.75;color:rgba(255,255,255,.7);margin-bottom:14px;font-style:italic}
+.tn{font-size:13px;font-weight:600;color:white}.tr{font-size:12px;color:rgba(255,255,255,.3);margin-top:2px}
+/* PRICING */
+.btog{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:40px}
+.bto{font-size:14px;font-weight:500;color:rgba(255,255,255,.4);cursor:pointer;transition:color .18s}.bto.on{color:white}
+.btsw{width:50px;height:27px;background:rgba(255,255,255,.1);border-radius:20px;cursor:pointer;position:relative;border:1.5px solid rgba(255,255,255,.14);transition:background .2s;flex-shrink:0}
+.btsw.yr{background:var(--em)}.btt{position:absolute;top:3px;left:3px;width:17px;height:17px;background:white;border-radius:50%;transition:transform .2s}.btsw.yr .btt{transform:translateX(23px)}
+.save-t{background:rgba(245,158,11,.15);color:var(--am);border:1px solid rgba(245,158,11,.3);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:980px;margin:0 auto}
+.pc{border-radius:var(--r2);padding:32px;border:1.5px solid rgba(255,255,255,.08);background:var(--dk3);position:relative}
+.pc.hl{border-color:var(--em);background:rgba(16,185,129,.06)}.pc.hl2{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.04)}
+.bst{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--em);color:white;font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;white-space:nowrap}
+.ppl{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:10px}
+.ppl.em{color:var(--em)}.ppl.am{color:var(--am)}
+.ppr{font-family:var(--hd);font-size:46px;font-weight:800;color:white;line-height:1;margin-bottom:4px;letter-spacing:-2px}
+.ppr span{font-size:16px;font-weight:400;color:rgba(255,255,255,.3);font-family:var(--bd);letter-spacing:0}
+.pper{font-size:12px;color:rgba(255,255,255,.3);margin-bottom:24px}
+.pfl{list-style:none;margin-bottom:24px}
+.pfl li{font-size:13px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:flex-start;gap:8px;color:rgba(255,255,255,.7);line-height:1.5}.pfl li:last-child{border:none}
+.pfl li.off{color:rgba(255,255,255,.2)}.pck{color:var(--em);flex-shrink:0}.pcx{color:rgba(255,255,255,.18);flex-shrink:0}
+.pay-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin-top:26px}
+.pay-chip{padding:7px 14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:9px;font-size:13px;font-weight:500;color:rgba(255,255,255,.58)}
+.vb{background:rgba(16,185,129,.06);border:1.5px solid rgba(16,185,129,.2);border-radius:var(--r2);padding:28px;margin:28px auto 0;max-width:860px;display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.vb h4{font-family:var(--hd);font-size:20px;font-weight:800;color:white;grid-column:1/-1;margin-bottom:4px}
+.vp{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:rgba(255,255,255,.56);line-height:1.6}
+/* CTA */
+.cta-sec{background:linear-gradient(135deg,var(--dk),#0a1810);padding:92px 0;text-align:center;position:relative;overflow:hidden}
+.cta-sec::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 50%,rgba(16,185,129,.1),transparent);pointer-events:none}
+/* TOOL PAGES */
+.page-hdr{padding:48px 28px 0;text-align:center}
+.page-hdr.dk{background:var(--dk)}.page-hdr.bl{background:linear-gradient(135deg,#0a66c2,#0077b5)}.page-hdr.am{background:linear-gradient(135deg,#92400e,#b45309)}.page-hdr.vi{background:linear-gradient(135deg,#4c1d95,#6d28d9)}
+.page-hdr h1{font-family:var(--hd);font-size:32px;font-weight:800;color:white;margin-bottom:7px;letter-spacing:-1px}.page-hdr p{font-size:14px;color:rgba(255,255,255,.4)}
+.asteps{max-width:640px;margin:28px auto 0;display:flex;border-bottom:2px solid rgba(255,255,255,.07)}
+.as{flex:1;text-align:center;padding:10px 5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.22);transition:all .25s}
+.as.on{color:var(--em);border-bottom:2px solid var(--em);margin-bottom:-2px}.as.done{color:rgba(255,255,255,.4)}
+.abody{max-width:740px;margin:0 auto;padding:38px 28px 80px}
+/* CARDS */
+.card{background:white;border:1.5px solid var(--bo);border-radius:var(--r2);padding:32px;box-shadow:0 4px 20px rgba(11,11,18,.06)}
+.ct{font-family:var(--hd);font-size:22px;font-weight:800;margin-bottom:4px;letter-spacing:-.5px}
+.cs{font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.6}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--mu);margin-bottom:5px}
+.field input,.field textarea,.field select{width:100%;padding:10px 13px;border:1.5px solid var(--bo);border-radius:10px;font-family:var(--bd);font-size:14px;font-weight:300;color:var(--ink);background:#fafafa;outline:none;transition:border-color .18s;resize:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--em);background:white;box-shadow:0 0 0 3px rgba(16,185,129,.07)}
+.field textarea{min-height:84px;line-height:1.65}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.frow{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:10px}
+/* UPLOAD ZONE */
+.upz{border:2px dashed rgba(16,185,129,.35);border-radius:14px;padding:26px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(16,185,129,.03);margin-bottom:14px;position:relative}
+.upz:hover,.upz.drag{border-color:var(--em);background:var(--em3)}
+.upz input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upz-ico{font-size:30px;margin-bottom:8px}.upz h4{font-family:var(--hd);font-size:14px;font-weight:700;margin-bottom:4px}.upz p{font-size:12px;color:var(--mu)}
+.upz-ok{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:9px 14px;font-size:13px;color:#15803d;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+/* STREAMING */
+.spin{width:32px;height:32px;border:2px solid rgba(16,185,129,.2);border-top-color:var(--em);border-radius:50%;animation:sp .75s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.cursor{display:inline-block;width:2px;height:1em;background:var(--em);margin-left:1px;animation:blink .8s step-end infinite;vertical-align:text-bottom}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.r-doc{background:#fafafa;border:1.5px solid var(--bo);border-radius:12px;padding:22px;font-size:14px;line-height:1.9;color:var(--ink);white-space:pre-wrap;max-height:460px;overflow-y:auto;font-family:var(--bd)}
+.r-doc::-webkit-scrollbar{width:4px}.r-doc::-webkit-scrollbar-thumb{background:rgba(16,185,129,.3);border-radius:4px}
+.r-edit{background:white;border:1.5px solid var(--em);border-radius:12px;padding:22px;font-size:14px;line-height:1.9;color:var(--ink);width:100%;min-height:340px;outline:none;font-family:var(--bd);resize:vertical;box-shadow:0 0 0 3px rgba(16,185,129,.07)}
+.r-bar{display:flex;gap:7px;justify-content:flex-end;margin-bottom:10px;flex-wrap:wrap}
+.r-tabs{display:flex;border-bottom:2px solid var(--bo);margin-bottom:16px}
+.r-tab{padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:var(--bd);color:var(--mu);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .18s}.r-tab.on{color:var(--em);border-bottom-color:var(--em)}
+/* STATUS BARS */
+.ubar{background:var(--em3);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:10px 15px;margin-bottom:15px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px}
+.u-tr{flex:1;min-width:60px;height:5px;background:rgba(11,11,18,.1);border-radius:10px;overflow:hidden}
+.u-fi{height:100%;background:var(--em);border-radius:10px;transition:width .4s}
+.ok{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 15px;font-size:13px;color:#15803d;margin-bottom:15px}
+.err{background:#fff1f1;border:1px solid #fca5a5;border-radius:10px;padding:10px 15px;font-size:13px;color:#dc2626;margin-bottom:14px}
+/* MODAL PAYWALL */
+.mbg{position:fixed;inset:0;background:rgba(7,7,14,.82);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)}
+.mod{background:var(--dk2);border:1.5px solid rgba(255,255,255,.08);border-radius:24px;padding:44px;max-width:480px;width:100%;color:white;text-align:center}
+.mod h2{font-family:var(--hd);font-size:30px;font-weight:800;margin-bottom:8px;letter-spacing:-1px}
+.mod p{font-size:13px;color:rgba(255,255,255,.42);margin-bottom:20px;line-height:1.7}
+.mod-pr{font-family:var(--hd);font-size:44px;font-weight:800;color:var(--em);margin-bottom:4px;letter-spacing:-2px}
+.mod-pr span{font-size:16px;color:rgba(255,255,255,.3);font-family:var(--bd);font-weight:300}
+.mod-fts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 20px}
+.mod-f{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px;font-size:12px;color:rgba(255,255,255,.6)}
+.mod-fi{font-size:18px;margin-bottom:3px}
+.mod-note{font-size:11px;color:rgba(255,255,255,.2);margin-top:10px;line-height:1.6}
+/* CHECKLIST */
+.cl-sb{background:var(--em3);border:1.5px solid rgba(16,185,129,.2);border-radius:14px;padding:16px 20px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.cl-pct{font-family:var(--hd);font-size:32px;font-weight:800;color:var(--em);letter-spacing:-1px}
+.cl-bar{flex:1;min-width:100px;height:6px;background:rgba(11,11,18,.1);border-radius:10px;overflow:hidden}
+.cl-fi{height:100%;background:linear-gradient(90deg,var(--em),#34d399);border-radius:10px;transition:width .5s}
+.cl-row{display:flex;align-items:flex-start;gap:12px;padding:11px 4px;border-bottom:1px solid var(--bos);cursor:pointer;border-radius:8px;transition:background .14s}.cl-row:last-child{border:none}.cl-row:hover{background:rgba(16,185,129,.04)}
+.cl-box{width:20px;height:20px;border-radius:5px;border:1.5px solid var(--bo);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .18s;margin-top:2px}.cl-box.on{background:var(--em);border-color:var(--em);color:white}
+.cl-text h5{font-size:14px;font-weight:500;margin-bottom:2px;transition:all .18s}.cl-text h5.d{text-decoration:line-through;color:var(--mu)}.cl-text p{font-size:12px;color:var(--mu);line-height:1.5}
+/* COACH */
+.chat{display:flex;flex-direction:column;gap:13px;margin-bottom:14px;max-height:400px;overflow-y:auto;padding-right:4px}
+.chat::-webkit-scrollbar{width:4px}.chat::-webkit-scrollbar-thumb{background:rgba(16,185,129,.25);border-radius:4px}
+.msg{display:flex;gap:10px;align-items:flex-start}.msg.u{flex-direction:row-reverse}
+.msg-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.msg-av.ai{background:var(--dk)}.msg-av.us{background:var(--em)}
+.msg-b{max-width:82%;padding:11px 14px;border-radius:13px;font-size:13px;line-height:1.75;white-space:pre-wrap}
+.msg.ai .msg-b{background:white;border:1.5px solid var(--bo);color:var(--ink);border-top-left-radius:3px}
+.msg.u .msg-b{background:var(--ink);color:white;border-top-right-radius:3px}
+.ic-inp{display:flex;gap:9px;align-items:flex-end}
+.ic-inp textarea{flex:1;padding:10px 13px;border:1.5px solid var(--bo);border-radius:10px;font-family:var(--bd);font-size:13px;color:var(--ink);background:white;outline:none;resize:none;min-height:48px;max-height:120px;line-height:1.5;transition:border-color .18s}.ic-inp textarea:focus{border-color:var(--em);box-shadow:0 0 0 3px rgba(16,185,129,.07)}
+/* SCORE BOX */
+.score-box{background:linear-gradient(135deg,var(--em3),rgba(16,185,129,.03));border:1.5px solid rgba(16,185,129,.2);border-radius:14px;padding:20px;margin-bottom:16px}
+.score-n{font-family:var(--hd);font-size:48px;font-weight:800;color:var(--em);line-height:1;letter-spacing:-2px}
+.score-n span{font-size:19px;color:var(--mu)}
+.score-bar{height:6px;background:rgba(11,11,18,.1);border-radius:10px;overflow:hidden;margin-top:8px;max-width:220px}
+.score-fi{height:100%;background:linear-gradient(90deg,var(--em),#34d399);border-radius:10px;transition:width .8s}
+/* ATS RESULT */
+.ats-score{display:flex;align-items:center;gap:20px;padding:20px;background:var(--dk3);border-radius:14px;margin-bottom:16px}
+.ats-ring{position:relative;width:80px;height:80px;flex-shrink:0}
+.ats-ring svg{transform:rotate(-90deg)}
+.ats-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ats-ring-n{font-family:var(--hd);font-size:22px;font-weight:800;color:white;line-height:1}
+.ats-ring-l{font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.5px}
+.ats-info{flex:1}
+.ats-grade{font-family:var(--hd);font-size:18px;font-weight:700;color:white;margin-bottom:4px}
+.ats-sub{font-size:13px;color:rgba(255,255,255,.45);line-height:1.6}
+.kw-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.kw{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.kw.found{background:var(--em3);color:var(--em2);border:1px solid rgba(16,185,129,.2)}
+.kw.miss{background:rgba(239,68,68,.08);color:#dc2626;border:1px solid rgba(239,68,68,.15)}
+/* ZEUGNIS */
+.z-grade{display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:50%;font-family:var(--hd);font-size:22px;font-weight:800;flex-shrink:0}
+.z-grade.A{background:rgba(16,185,129,.15);color:var(--em2);border:2px solid rgba(16,185,129,.3)}
+.z-grade.B{background:rgba(59,130,246,.12);color:var(--bl);border:2px solid rgba(59,130,246,.25)}
+.z-grade.C{background:rgba(245,158,11,.12);color:#92400e;border:2px solid rgba(245,158,11,.25)}
+.z-grade.D{background:rgba(239,68,68,.1);color:#dc2626;border:2px solid rgba(239,68,68,.2)}
+.z-item{background:white;border:1.5px solid var(--bo);border-radius:12px;padding:18px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start}
+.z-content h4{font-family:var(--hd);font-size:15px;font-weight:700;margin-bottom:5px}
+.z-content p{font-size:13px;color:var(--mu);line-height:1.6}
+.z-phrase{background:#fff8f0;border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px 14px;font-size:13px;font-style:italic;color:rgba(11,11,18,.7);margin-bottom:6px;line-height:1.6}
+.z-meaning{font-size:12px;color:#92400e;display:flex;align-items:center;gap:5px}
+/* JOB MATCHING */
+.jm-result{background:white;border:1.5px solid var(--bo);border-radius:14px;overflow:hidden;margin-bottom:10px;transition:all .2s}.jm-result:hover{border-color:var(--em);box-shadow:0 4px 16px rgba(16,185,129,.08)}
+.jm-top{display:flex;align-items:center;gap:14px;padding:16px 20px}
+.jm-rank{font-family:var(--hd);font-size:22px;font-weight:800;color:var(--em);width:32px;text-align:center;flex-shrink:0}
+.jm-info{flex:1}.jm-title{font-family:var(--hd);font-size:16px;font-weight:700;margin-bottom:3px}
+.jm-bar-wrap{width:80px;flex-shrink:0;text-align:right}
+.jm-pct{font-family:var(--hd);font-size:18px;font-weight:800;color:var(--em);line-height:1;margin-bottom:3px}
+.jm-bar{height:5px;background:rgba(11,11,18,.08);border-radius:10px;overflow:hidden}
+.jm-bar-fi{height:100%;background:linear-gradient(90deg,var(--em),#34d399);border-radius:10px;transition:width .6s}
+.jm-body{padding:0 20px 16px 66px;font-size:13px;color:var(--mu);line-height:1.65}
+.jm-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.jm-chip{padding:3px 10px;background:var(--em3);border:1px solid rgba(16,185,129,.2);border-radius:20px;font-size:11px;font-weight:600;color:var(--em2)}
+/* LINKEDIN PAGE */
+.li-res{background:white;border:1.5px solid var(--bo);border-radius:14px;padding:20px;margin-bottom:12px}
+.li-res h4{font-family:var(--hd);font-size:15px;font-weight:700;margin-bottom:10px}
+.li-skills{display:flex;flex-wrap:wrap;gap:6px}
+.li-sk{background:rgba(10,102,194,.08);border:1px solid rgba(10,102,194,.2);border-radius:20px;padding:4px 12px;font-size:12px;color:#0a66c2;font-weight:500}
+/* EMAIL */
+.eml-note{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.14);border-radius:10px;padding:11px 14px;font-size:13px;color:rgba(11,11,18,.56);margin-top:12px;display:flex;gap:8px;line-height:1.6}
+/* INLINE PW */
+.ipw{background:var(--dk);border-radius:var(--r2);padding:32px;margin-top:18px;text-align:center;color:white}
+.ipw h3{font-family:var(--hd);font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-.5px}
+.ipw p{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:4px;line-height:1.7}
+.ipw-pr{font-family:var(--hd);font-size:40px;font-weight:800;color:var(--em);margin:12px 0 3px;letter-spacing:-1.5px}
+.ipw-pr span{font-size:15px;color:rgba(255,255,255,.3);font-family:var(--bd);font-weight:300}
+.ipw-fts{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin:10px 0 18px}
+.ipw-ft{font-size:12px;color:rgba(255,255,255,.5);display:flex;align-items:center;gap:4px}
+/* LEGAL */
+.legal{max-width:740px;margin:0 auto;padding:68px 28px}
+.legal h1{font-family:var(--hd);font-size:38px;font-weight:800;margin-bottom:8px;letter-spacing:-1px}
+.legal-d{font-size:12px;color:var(--mu);margin-bottom:38px;padding-bottom:18px;border-bottom:1px solid var(--bo)}
+.legal h2{font-family:var(--hd);font-size:19px;font-weight:700;margin:28px 0 10px}
+.legal p{font-size:14px;line-height:1.85;color:rgba(11,11,18,.68);margin-bottom:10px}
+.legal ul{margin:0 0 10px 20px}.legal li{font-size:14px;line-height:1.85;color:rgba(11,11,18,.68);margin-bottom:4px}
+.la{color:var(--em);text-decoration:none;cursor:pointer;background:none;border:none;font-family:var(--bd);font-size:inherit;padding:0}
+/* FOOTER */
+footer{background:var(--dk);padding:50px 28px 24px}
+.fi{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:36px;padding-bottom:30px;border-bottom:1px solid rgba(255,255,255,.07)}
+.fl{font-family:var(--hd);font-size:20px;font-weight:800;color:white;display:flex;align-items:center;margin-bottom:10px}
+.fcol h5{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.25);margin-bottom:12px}
+.fcol button,.fcol a{display:block;font-size:13px;color:rgba(255,255,255,.36);margin-bottom:7px;cursor:pointer;text-decoration:none;background:none;border:none;font-family:var(--bd);text-align:left;transition:color .18s;padding:0}.fcol button:hover,.fcol a:hover{color:white}
+.fbot{max-width:1200px;margin:0 auto;padding-top:18px;font-size:11px;color:rgba(255,255,255,.25);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+@media(max-width:820px){.why-vs,.tools-grid,.feat-g6,.srow,.tg,.pgrid,.vb,.fg2,.fi{grid-template-columns:1fr}.srow::before{display:none}.hstats{gap:22px}.btog{flex-direction:column;gap:8px}.card{padding:20px 14px}.mod{padding:28px 16px}.mod-fts{grid-template-columns:1fr 1fr}}
+`;
+
+// ── ALL TEXT (single language factory) ──
+const mkT = (lang) => {
+  const L = (d,f,i,e) => ({de:d,fr:f,it:i,en:e}[lang]);
+  return {
+    nav:{
+      home:   L("Start","Accueil","Home","Home"),
+      prices: L("Preise","Tarifs","Prezzi","Pricing"),
+      tools:  L("Tools","Outils","Strumenti","Tools"),
+      excel:  L("Excel-Generator","Excel Generator","Générateur Excel","Generatore Excel"),
+      pptx:   L("PowerPoint","PowerPoint","PowerPoint","PowerPoint"),
+      ats:    "ATS-Check",
+      zeugnis:L("Zeugnis","Certificat","Certificato","Reference"),
+      jobs:   L("Job-Matching","Jobs","Lavori","Job Match"),
+    },
+    hero:{
+      eye: L(`✦ ${C.name} – ${C.tagline}`,`✦ ${C.name} – Copilote IA Carrière Suisse`,`✦ ${C.name} – Copilota IA Carriera Svizzera`,`✦ ${C.name} – ${C.tagline}`),
+      h1a: L("Deine Karriere.","Votre carrière.","La tua carriera.","Your career."),
+      h1b: L("Dein","Votre","Il tuo","Your"),
+      h1c: L("KI-Copilot.","Copilote IA.","Copilota IA.","AI Copilot."),
+      sub: L("6 KI-Tools in einem. Bewerbungen, LinkedIn, ATS-Check, Job-Matching, Zeugnisanalyse und Interview-Coach – für den Schweizer Arbeitsmarkt.",
+             "6 outils IA en un. Candidatures, LinkedIn, ATS, matching, certificats et coach – pour le marché suisse.",
+             "6 strumenti IA in uno. Candidature, LinkedIn, ATS, matching, certificati e coach – per il mercato svizzero.",
+             "6 AI tools in one. Applications, LinkedIn, ATS check, job matching, reference analysis and interview coach – for the Swiss job market."),
+      cta:  L("Kostenlos starten →","Commencer gratuitement →","Inizia gratis →","Start for free →"),
+      how:  L("Alle Tools ansehen","Voir les outils","Vedi gli strumenti","See all tools"),
+      stats:[
+        {n:"18+",   l:L("KI-Tools","AI tools","outils IA","strumenti IA")},
+        {n:"3'000+",l:L("Dokumente erstellt","docs created","documents créés","documenti creati")},
+        {n:"4",     l:L("Sprachen","languages","langues","lingue")},
+        {n:"CHF 19.90",l:L("statt CHF 300 Berater","vs CHF 300 advisor","vs CHF 300 conseil","vs CHF 300 consulente")},
+      ],
+    },
+    tools:{
+      label: L("6 Tools. Ein Copilot.","6 Outils. Un Copilote.","6 Strumenti. Un Copilota.","6 Tools. One Copilot."),
+      title: L("Alles für deine Karriere in der Schweiz.","Tout pour votre carrière en Suisse.","Tutto per la tua carriera in Svizzera.","Everything for your career in Switzerland."),
+      sub:   L("Kein Hin-und-Her zwischen verschiedenen Apps. Alles an einem Ort.","Fini les allers-retours entre apps. Tout en un endroit.","Niente avanti e indietro tra app. Tutto in un posto.","No more switching between apps. Everything in one place."),
+      items:[
+        {page:"app",  ico:"✍️",t:L("Bewerbungen","Applications","Candidatures","Candidature"),p:L("Motivationsschreiben & Lebenslauf in 60 Sekunden, live generiert. 1× gratis testen.","Cover letter & CV in 60 seconds, live generated. Try 1× for free.","Lettre & CV en 60 secondes, génération en direct. 1× gratuit.","Lettera & CV in 60 secondi, generazione live. 1× gratuito."),badge:"1× Gratis",bc:"tc-em",col:""},
+        {page:"linkedin",ico:"💼",t:"LinkedIn",p:L("Profil analysieren & optimieren – Headline, About, Skills für Recruiter.","Analyze & optimize – headline, about, skills for recruiters.","Analyser & optimiser – Titre, About, compétences pour recruteurs.","Analizzare & ottimizzare – Headline, About, skills per recruiter."),badge:"PRO",bc:"tc-bl",col:"bl"},
+        {page:"ats",  ico:"🤖",t:L("ATS-Simulation","ATS Simulation","Simulation ATS","Simulazione ATS"),p:L("Prüft ob dein Lebenslauf durch Recruiter-Software kommt. Mit Score & Tipps.","Checks if your CV passes recruiter software. With score & tips.","Vérifie si votre CV passe les logiciels RH. Avec score & conseils.","Controlla se il tuo CV passa i software HR. Con score & consigli."),badge:"PRO",bc:"tc-bl",col:"bl"},
+        {page:"zeugnis",ico:"📜",t:L("Zeugnis-Analyse","Reference Analysis","Analyse certificat","Analisi certificato"),p:L("Schweizer Arbeitszeugnis-Code entschlüsselt. Was steht wirklich drin?","Decodes Swiss work references. What do they really say?","Décode le certificat de travail suisse. Que dit-il vraiment?","Decodifica il certificato svizzero. Cosa dice davvero?"),badge:"PRO",bc:"tc-am",col:"am"},
+        {page:"jobmatch",ico:"🎯",t:L("Job-Matching","Job Matching","Matching emploi","Job Matching"),p:L("KI findet deine Top 5 passenden Stellenprofile mit Fit-Score.","AI finds your top 5 matching job profiles with fit score.","L'IA trouve vos 5 postes idéaux avec score d'adéquation.","L'IA trova i tuoi 5 profili di lavoro con score di compatibilità."),badge:"PRO",bc:"tc-em",col:""},
+        {page:"coach", ico:"🎤",t:L("Interview-Coach","Interview Coach","Coach entretien","Coach colloquio"),p:L("KI simuliert 5 echte Fragen, bewertet Antworten, gibt Note 0–100.","AI simulates 5 real questions, evaluates answers, gives score 0–100.","L'IA simule 5 vraies questions, évalue et note de 0 à 100.","L'IA simula 5 domande reali, valuta e dà voto 0–100."),badge:"PRO",bc:"tc-em",col:""},
+        {page:"excel", ico:"📊",t:L("Excel-Generator","Excel Generator","Générateur Excel","Generatore Excel"),p:L("KI erstellt professionelle Excel-Tabellen mit Formeln – für jeden Bereich. Nicht nur für Jobsuchende.","AI creates professional Excel spreadsheets with formulas – for any purpose. Not just for job seekers.","L'IA crée des tableaux Excel avec formules – pour tous. Pas seulement pour les chercheurs d'emploi.","L'IA crea fogli Excel professionali con formule – per tutti. Non solo per chi cerca lavoro."),badge:"PRO",bc:"tc-em",col:""},
+        {page:"pptx",  ico:"📽️",t:L("PowerPoint-Maker","PowerPoint Maker","Créateur PowerPoint","Creatore PowerPoint"),p:L("KI erstellt strukturierte Präsentationen mit professionellem Inhalt – für Schule, Uni, Arbeit.","AI creates structured presentations with professional content – for school, uni, work.","L'IA crée des présentations structurées – pour l'école, l'université, le travail.","L'IA crea presentazioni strutturate – per scuola, università, lavoro."),badge:"PRO",bc:"tc-bl",col:"bl"},
+      ],
+    },
+    why:{
+      label:L("Warum Stellify?","Pourquoi Stellify?","Perché Stellify?","Why Stellify?"),
+      title:L("Der erste echte AI Career Copilot für die Schweiz.","Le premier vrai copilote IA carrière pour la Suisse.","Il primo vero AI career copilot per la Svizzera.","The first real AI career copilot for Switzerland."),
+      sub:  L("Andere Tools machen eines. Stellify macht alles – und versteht den Schweizer Markt.","D'autres font une chose. Stellify fait tout – et comprend le marché suisse.","Altri strumenti fanno una cosa. Stellify fa tutto – e capisce il mercato svizzero.","Other tools do one thing. Stellify does all – and understands the Swiss market."),
+      badH: L("❌ ChatGPT / einzelne Tools","❌ ChatGPT / outils séparés","❌ ChatGPT / strumenti separati","❌ ChatGPT / separate tools"),
+      goodH:"✅ Stellify",
+      badL: L(
+        ["Leeres Chatfenster, du weisst nicht was eingeben","Kein Schweizer Format/Standard","Kein ATS-Check – du weisst nicht ob dein CV gelesen wird","Kein Zeugnis-Decoder – Schweizer Code bleibt ein Rätsel","Kein Job-Matching – du bewirbst dich ins Blaue","6 verschiedene Apps, kein roter Faden"],
+        ["Champ vide, on ne sait pas quoi écrire","Pas de format suisse","Pas d'ATS – vous ne savez pas si votre CV est lu","Pas de décodeur de certificat","Pas de matching – vous postulez au hasard","6 apps différentes, pas de fil rouge"],
+        ["Campo vuoto, non sai cosa scrivere","Nessun formato svizzero","Nessun ATS – non sai se il tuo CV viene letto","Nessun decoder certificato","Nessun matching – ti candidi al buio","6 app diverse, nessun filo conduttore"],
+        ["Empty box, you don't know what to type","No Swiss format/standard","No ATS check – you don't know if your CV gets read","No reference decoder – Swiss code remains a mystery","No job matching – you apply blindly","6 different apps, no coherent flow"]
+      ),
+      goodL:L(
+        ["Geführter Prozess in 3 Schritten, kinderleicht","Optimiert für CH-Format in DE/FR/IT/EN","ATS-Simulation prüft Keywords & gibt Score","Zeugnis-Analyse entschlüsselt Schweizer Code","Job-Matching zeigt wo du 80%+ passst","Alles in einem – ein Profil, sechs Tools"],
+        ["Processus guidé 3 étapes, très simple","Optimisé format suisse DE/FR/IT/EN","Simulation ATS vérifie mots-clés & score","Analyse certificat décode le code suisse","Matching montre où vous avez 80%+","Tout en un – un profil, six outils"],
+        ["Processo guidato 3 passi, semplicissimo","Ottimizzato formato svizzero DE/FR/IT/EN","Simulazione ATS verifica keywords & score","Analisi certificato decodifica il codice svizzero","Matching mostra dove hai 80%+","Tutto in uno – un profilo, sei strumenti"],
+        ["Guided 3-step process, incredibly simple","Optimized Swiss format in DE/FR/IT/EN","ATS simulation checks keywords & gives score","Reference analysis decodes Swiss code","Job matching shows where you fit 80%+","All in one – one profile, six tools"]
+      ),
+    },
+    how:{
+      label:L("Wie es funktioniert","Comment ça marche","Come funziona","How it works"),
+      title:L("Profil einmal anlegen. Alle 6 Tools nutzen.","Créez votre profil une fois. Utilisez les 6 outils.","Crea il profilo una volta. Usa tutti i 6 strumenti.","Set up your profile once. Use all 6 tools."),
+      sub:  L("Dein Profil ist die Basis für alle Tools.","Votre profil est la base de tous les outils.","Il tuo profilo è la base per tutti gli strumenti.","Your profile is the basis for all tools."),
+      steps:L(
+        [{n:"01",t:"Profil anlegen",p:"Stelle, Erfahrung, Skills – einmal eingeben oder CV hochladen. Die KI liest alles automatisch."},{n:"02",t:"Tool wählen",p:"Bewerbung schreiben, ATS prüfen, Zeugnis analysieren, Jobs finden oder Interview üben."},{n:"03",t:"Live-Ergebnis",p:"Streaming wie bei Claude oder ChatGPT – du siehst das Ergebnis in Echtzeit entstehen."}],
+        [{n:"01",t:"Créer le profil",p:"Poste, expérience, compétences – entrer une fois ou uploader un CV. L'IA lit tout automatiquement."},{n:"02",t:"Choisir l'outil",p:"Rédiger candidature, ATS, analyser certificat, trouver emplois ou s'entraîner."},{n:"03",t:"Résultat en direct",p:"Streaming comme Claude ou ChatGPT – vous voyez le résultat en temps réel."}],
+        [{n:"01",t:"Crea il profilo",p:"Posto, esperienza, skills – inserire una volta o caricare il CV. L'IA legge tutto automaticamente."},{n:"02",t:"Scegli lo strumento",p:"Scrivere candidatura, ATS, analizzare certificato, trovare lavori o esercitarsi."},{n:"03",t:"Risultato live",p:"Streaming come Claude o ChatGPT – vedi il risultato nascere in tempo reale."}],
+        [{n:"01",t:"Create profile",p:"Position, experience, skills – enter once or upload your CV. AI reads everything automatically."},{n:"02",t:"Choose a tool",p:"Write application, ATS check, analyze reference, find jobs or practice interview."},{n:"03",t:"Live result",p:"Streaming like Claude or ChatGPT – you see the result appear in real time."}]
+      ),
+    },
+    market:{
+      label:L("Marktpotenzial","Potentiel marché","Potenziale mercato","Market potential"),
+      title:L("Warum jetzt. Warum Schweiz.","Pourquoi maintenant. Pourquoi la Suisse.","Perché adesso. Perché la Svizzera.","Why now. Why Switzerland."),
+      points:L(
+        [{ico:"📈",t:"Jobwechsel nehmen zu",p:"Durchschnittlich alle 3 Jahre wechseln Arbeitnehmer in der Schweiz ihren Job."},{ico:"⏰",t:"Bewerbungen kosten Zeit",p:"Eine gute Bewerbung dauert 3–5 Stunden. Mit KI: 3 Minuten."},{ico:"🤖",t:"KI wird akzeptiert",p:"78% der Schweizer Arbeitnehmer würden KI für Karrierehilfe nutzen."},{ico:"🇨🇭",t:"Kein gutes CH-Tool",p:"Keine Lösung versteht das Schweizer Zeugnis-System, ATS-Anforderungen und 4 Sprachen."}],
+        [{ico:"📈",t:"Changements de poste croissants",p:"En moyenne, les salariés changent d'emploi tous les 3 ans en Suisse."},{ico:"⏰",t:"Candidatures chronophages",p:"Une bonne candidature prend 3-5h. Avec l'IA: 3 minutes."},{ico:"🤖",t:"IA de plus en plus acceptée",p:"78% des salariés suisses utiliseraient l'IA pour leur carrière."},{ico:"🇨🇭",t:"Aucun bon outil suisse",p:"Aucune solution comprend le système de certificats CH, l'ATS et 4 langues."}],
+        [{ico:"📈",t:"Cambi di lavoro in crescita",p:"In media i lavoratori svizzeri cambiano lavoro ogni 3 anni."},{ico:"⏰",t:"Candidature richiedono tempo",p:"Una buona candidatura richiede 3-5 ore. Con l'IA: 3 minuti."},{ico:"🤖",t:"IA sempre più accettata",p:"Il 78% dei lavoratori svizzeri userebbe l'IA per la carriera."},{ico:"🇨🇭",t:"Nessun buon tool svizzero",p:"Nessuna soluzione capisce i certificati svizzeri, ATS e 4 lingue."}],
+        [{ico:"📈",t:"Job changes increasing",p:"On average, Swiss employees change jobs every 3 years."},{ico:"⏰",t:"Applications take time",p:"A good application takes 3–5 hours. With AI: 3 minutes."},{ico:"🤖",t:"AI increasingly accepted",p:"78% of Swiss employees would use AI for career help."},{ico:"🇨🇭",t:"No good Swiss tool",p:"No solution understands Swiss work references, ATS requirements and 4 languages."}]
+      ),
+    },
+    testi:{
+      label:L("Was Nutzer sagen","Témoignages","Testimonianze","Testimonials"),
+      title:L("Echte Resultate.","Résultats réels.","Risultati reali.","Real results."),
+      items:L(
+        [{s:"★★★★★",t:"In 2 Minuten ein perfektes Motivationsschreiben. Ich habe den Job bekommen!",a:"Sophie K.",r:"Marketingmanagerin, Zürich"},{s:"★★★★★",t:"Der ATS-Check hat gezeigt, dass mein Lebenslauf bei 40% der Firmen aussortiert wurde. Nach der Optimierung: 91%.",a:"Lukas B.",r:"Softwareentwickler, Bern"},{s:"★★★★★",t:"Ich habe endlich verstanden was in meinem Arbeitszeugnis steht. Das Zeugnis war nicht so gut wie ich dachte.",a:"Mia T.",r:"Projektleiterin, Basel"}],
+        [{s:"★★★★★",t:"En 2 minutes une lettre parfaite. J'ai obtenu le poste!",a:"Sophie K.",r:"Responsable marketing, Zurich"},{s:"★★★★★",t:"L'ATS m'a montré que mon CV était rejeté à 40%. Après optimisation: 91%.",a:"Lukas B.",r:"Développeur, Berne"},{s:"★★★★★",t:"J'ai enfin compris ce que dit mon certificat de travail.",a:"Mia T.",r:"Cheffe de projet, Bâle"}],
+        [{s:"★★★★★",t:"In 2 minuti una lettera perfetta. Ho ottenuto il lavoro!",a:"Sophie K.",r:"Responsabile marketing, Zurigo"},{s:"★★★★★",t:"L'ATS mi ha mostrato che il mio CV veniva scartato al 40%. Dopo ottimizzazione: 91%.",a:"Lukas B.",r:"Sviluppatore, Berna"},{s:"★★★★★",t:"Ho finalmente capito cosa c'è nel mio certificato di lavoro.",a:"Mia T.",r:"Project manager, Basilea"}],
+        [{s:"★★★★★",t:"In 2 minutes a perfect cover letter. I got the job!",a:"Sophie K.",r:"Marketing manager, Zurich"},{s:"★★★★★",t:"The ATS check showed my CV was rejected at 40% of companies. After optimization: 91%.",a:"Lukas B.",r:"Software developer, Berne"},{s:"★★★★★",t:"I finally understood what my work reference says. It wasn't as good as I thought.",a:"Mia T.",r:"Project manager, Basel"}]
+      ),
+    },
+    price:{
+      label: L("Preise","Tarifs","Prezzi","Pricing"),
+      title: L("Ein Preis. Sechs Tools.","Un prix. Six outils.","Un prezzo. Sei strumenti.","One price. Six tools."),
+      sub:   L("Jederzeit kündbar. Keine versteckten Kosten.","Résiliable à tout moment.","Cancellabile in qualsiasi momento.","Cancel anytime. No hidden costs."),
+      monthly:L("Monatlich","Mensuel","Mensile","Monthly"),
+      yearly: L("Jährlich","Annuel","Annuale","Yearly"),
+      save:   L("25% sparen","Économisez 25%","Risparmia 25%","Save 25%"),
+      recom:  L("Empfohlen","Recommandé","Consigliato","Recommended"),
+      tiers:[
+        {id:"free",name:L("Gratis","Gratuit","Gratuito","Free"),price:0,
+         note:L("Für immer kostenlos","Gratuit pour toujours","Sempre gratuito","Free forever"),
+         list:L([`${C.FREE_LIMIT} Generierungen / Monat`,"Motivationsschreiben","Lebenslauf","CV hochladen","Text kopieren"],[`${C.FREE_LIMIT} générations / mois`,"Lettre de motivation","CV","Upload CV","Copier"],[`${C.FREE_LIMIT} generazioni / mese`,"Lettera motivazione","CV","Upload CV","Copia"],[`${C.FREE_LIMIT} generations / month`,"Cover letter","CV","Upload CV","Copy text"]),
+         no:L(["LinkedIn","ATS-Check","Zeugnis-Analyse","Job-Matching","Interview-Coach","PDF-Export","E-Mail senden"],["LinkedIn","ATS","Analyse certificat","Matching","Coach","PDF","E-mail"],["LinkedIn","ATS","Analisi certificato","Matching","Coach","PDF","E-mail"],["LinkedIn","ATS check","Reference analysis","Job matching","Interview coach","PDF export","Email send"]),
+         btn:L("Kostenlos starten","Commencer gratuitement","Inizia gratis","Start for free"),btnS:"b-out"},
+        {id:"pro",name:"Pro",priceM:19.90,priceY:14.90,best:true,
+         note:L("CHF 19.90/Monat · CHF 178.80/Jahr","CHF 19.90/month · CHF 178.80/year","CHF 19.90/mois · CHF 178.80/an","CHF 19.90/mese · CHF 178.80/anno"),
+         list:L(
+           ["Unbegrenzte Bewerbungen","✍️ Motivationsschreiben & Lebenslauf","💼 LinkedIn Analyse & Optimierung","🤖 ATS-Simulation mit Score","📜 Zeugnis-Analyse & Decoder","🎯 Job-Matching (Top 5 Profile)","🎤 Interview-Coach (Note 0–100)","📊 Excel-Generator mit Formeln (NEU)","📽️ PowerPoint-Maker (NEU)","✅ Bewerbungs-Checkliste","✉️ E-Mail & PDF Export","Alle 4 Sprachen"],
+           ["Unlimited applications","✍️ Cover letter & CV","💼 LinkedIn analysis & optimization","🤖 ATS simulation with score","📜 Work reference analysis","🎯 Job matching (Top 5)","🎤 Interview coach (score 0–100)","📊 Excel generator with formulas (NEW)","📽️ PowerPoint maker (NEW)","✅ Application checklist","✉️ Email & PDF export","All 4 languages"],
+           ["Documents illimités","✍️ Lettre & CV","💼 LinkedIn analyse & optimisation","🤖 Simulation ATS avec score","📜 Analyse certificat de travail","🎯 Matching emploi (Top 5)","🎤 Coach entretien (note 0–100)","📊 Générateur Excel avec formules (NOUVEAU)","📽️ Créateur PowerPoint (NOUVEAU)","✅ Check-liste","✉️ E-mail & PDF","4 langues"],
+           ["Documenti illimitati","✍️ Lettera & CV","💼 LinkedIn analisi & ottimizzazione","🤖 Simulazione ATS con score","📜 Analisi certificato di lavoro","🎯 Job matching (Top 5)","🎤 Coach colloquio (voto 0–100)","📊 Generatore Excel con formule (NUOVO)","📽️ Creatore PowerPoint (NUOVO)","✅ Checklist","✉️ E-mail & PDF","4 lingue"]
+         ),
+         btn:L("Jetzt Pro werden → CHF 19.90/Mo.","Become Pro → CHF 19.90/mo","Devenir Pro → CHF 19.90/mois","Diventa Pro → CHF 19.90/mese"),btnS:"b-em"},
+        {id:"team",name:L("Team","Équipe","Team","Team"),price:null,
+         note:L("Für Schulen & HR-Teams","Écoles & équipes RH","Scuole & team HR","Schools & HR teams"),
+         list:L(["Alles in Pro","Bis 25 Nutzer","Admin-Dashboard","Onboarding"],["Tout en Pro","25 utilisateurs","Dashboard","Onboarding"],["Tutto in Pro","25 utenti","Dashboard","Onboarding"],["Everything in Pro","Up to 25 users","Admin dashboard","Onboarding"]),
+         btn:L("Kontakt →","Contact →","Contatto →","Contact →"),btnS:"b-out"},
+      ],
+      valTitle:L("CHF 19.90 – lohnt sich das?","CHF 19.90 – ça vaut la peine?","CHF 19.90 – vale la pena?","CHF 19.90 – is it worth it?"),
+      valPts:L(
+        ["Ein Karriereberater kostet CHF 200–400 / Sitzung","Ein schlechter ATS-Score = dein CV wird nie gelesen","Zeugnis nicht verstanden = falscher Job","Stellify spart Zeit & Geld bei jeder Bewerbung"],
+        ["Un conseiller coûte CHF 200–400 / séance","Mauvais score ATS = votre CV n'est jamais lu","Certificat mal compris = mauvais emploi","1 mois de candidature réussie rembourse tout"],
+        ["Un consulente costa CHF 200–400 / seduta","Score ATS basso = il tuo CV non viene mai letto","Certificato non capito = lavoro sbagliato","1 mese di candidatura riuscita ripaga tutto"],
+        ["A career advisor costs CHF 200–400 / session","Bad ATS score = your CV is never read","Reference misunderstood = wrong job","1 successful application month pays for everything"]
+      ),
+    },
+    payments:{
+      label:L("Bezahle wie du willst","Payez comme vous voulez","Paga come vuoi","Pay your way"),
+      sub:L("Sicher via Stripe verarbeitet.","Traitement sécurisé via Stripe.","Elaborazione sicura via Stripe.","Securely processed via Stripe."),
+      methods:["🇨🇭 Twint","💳 Visa","💳 Mastercard","💳 Amex","🅿️ PayPal","🍎 Apple Pay","🤖 Google Pay","🏦 SEPA","🛒 Klarna"],
+    },
+    cta:{
+      title:L("Deine Karriere verdient","Votre carrière mérite","La tua carriera merita","Your career deserves"),
+      italic:L("deinen persönlichen Copilot.","votre copilote personnel.","il tuo copilota personale.","your personal copilot."),
+      sub:L("Kostenlos starten. 6 Tools. Schweizer Standard. Pro jederzeit kündbar.","Commencer gratuitement. 6 outils. Standard suisse. Pro résiliable.","Inizia gratis. 6 strumenti. Standard svizzero. Pro cancellabile.","Start free. 6 tools. Swiss standard. Pro cancellable anytime."),
+      btn:L("Jetzt kostenlos starten →","Commencer gratuitement →","Inizia gratis ora →","Start for free now →"),
+    },
+    app:{
+      title:L("Bewerbung erstellen","Créer votre candidature","Crea la tua candidatura","Create your application"),
+      sub:L("Live-Streaming · Schweizer Format · 60 Sekunden","Streaming live · Format suisse · 60 secondes","Streaming live · Formato svizzero · 60 secondi","Live streaming · Swiss format · 60 seconds"),
+      steps:L(["Stelle","Profil","Dokument"],["Poste","Profil","Document"],["Posto","Profilo","Documento"],["Position","Profile","Document"]),
+      uLeft:(n)=>L(`${n} kostenlose Generierung${n!==1?"en":""} übrig`,`${n} génération${n!==1?"s":""} restante${n!==1?"s":""}`,`${n} generazion${n!==1?"i":"e"} rimast${n!==1?"e":"a"}`,`${n} free generation${n!==1?"s":""} remaining`),
+      proActive:L("✦ Pro aktiv – alle 18+ Tools freigeschaltet","✦ Pro active – all 18+ tools unlocked","✦ Pro actif – 18+ outils disponibles","✦ Pro attivo – 18+ strumenti disponibili"),
+      branches:L(
+        ["Technologie / IT","Finanzen / Versicherung","Gesundheit / Pharma","Marketing","Handel","Industrie","Bildung / Forschung","Öffentlicher Dienst","Tourismus","Andere"],
+        ["Technologie / IT","Finance / Assurance","Santé / Pharma","Marketing","Commerce","Industrie","Éducation","Service public","Tourisme","Autre"],
+        ["Tecnologia / IT","Finanza / Assicurazione","Salute / Pharma","Marketing","Commercio","Industria","Istruzione","Servizio pubblico","Turismo","Altro"],
+        ["Technology / IT","Finance / Insurance","Healthcare / Pharma","Marketing","Retail","Industry","Education","Public sector","Tourism","Other"]
+      ),
+      back:L("← Zurück","← Retour","← Indietro","← Back"),
+      next:L("Weiter →","Suivant →","Avanti →","Next →"),
+      copy:L("Kopieren","Copier","Copia","Copy"),
+      copied:L("✓ Kopiert!","✓ Copié!","✓ Copiato!","✓ Copied!"),
+      edit:L("Bearbeiten","Modifier","Modifica","Edit"),
+      prev:L("Vorschau","Aperçu","Anteprima","Preview"),
+      pdf:L("PDF","PDF","PDF","PDF"),
+      regen:L("Neu","Nouveau","Nuovo","New"),
+      stream:L("KI schreibt live…","L'IA rédige en direct…","L'IA scrive live…","AI writing live…"),
+      genBtn:L("✨ Jetzt erstellen","✨ Créer maintenant","✨ Crea ora","✨ Create now"),
+      genLoad:L("Generiere…","Génération…","Generando…","Generating…"),
+      goCoach:L("🎤 Interview-Coach →","🎤 Coach →","🎤 Coach →","🎤 Interview Coach →"),
+      goAts:L("🤖 ATS-Check →","🤖 ATS →","🤖 ATS →","🤖 ATS Check →"),
+      goCl:L("✅ Checkliste →","✅ Check-liste →","✅ Checklist →","✅ Checklist →"),
+      goLi:L("💼 LinkedIn →","💼 LinkedIn →","💼 LinkedIn →","💼 LinkedIn →"),
+      pw:{
+        title:L("Noch mehr mit Pro ✦","Plus avec Pro ✦","Di più con Pro ✦","More with Pro ✦"),
+        sub:L("Du siehst wie gut es funktioniert.","Vous voyez comment ça marche.","Vedi come funziona bene.","You see how well it works."),
+        feats:L(["LinkedIn","ATS","Zeugnis","Coach","Matching"],["LinkedIn","ATS","Certificat","Coach","Matching"],["LinkedIn","ATS","Certificato","Coach","Matching"],["LinkedIn","ATS","Reference","Coach","Matching"]),
+        btn:L(`Pro werden – CHF ${C.priceM}/Mo. →`,`Devenir Pro – CHF ${C.priceM}/Mo. →`,`Diventa Pro – CHF ${C.priceM}/Mo. →`,`Become Pro – CHF ${C.priceM}/mo →`),
+        secure:L("Stripe · Twint · Jederzeit kündbar","Stripe · Twint · Résiliable","Stripe · Twint · Cancellabile","Stripe · Twint · Cancel anytime"),
+      },
+    },
+    email:{
+      title:L("✉️ Direkt per E-Mail senden","✉️ Envoi direct par e-mail","✉️ Invio diretto per e-mail","✉️ Send directly by email"),
+      toLbl:L("E-Mail des Unternehmens *","E-mail de l'entreprise *","E-mail dell'azienda *","Company email *"),
+      subjLbl:L("Betreff","Objet","Oggetto","Subject"),
+      msgPh:L("Mit freundlichen Grüssen…","Cordiales salutations…","Cordiali saluti…","Kind regards…"),
+      btn:L("✉️ E-Mail öffnen","✉️ Ouvrir e-mail","✉️ Apri e-mail","✉️ Open email"),
+      note:L("Öffnet deinen E-Mail-Client mit dem Anschreiben.","Ouvre votre client avec la lettre.","Apre il client con la lettera.","Opens your email client with the cover letter."),
+    },
+    checklist:{
+      title:L("✅ Bewerbungs-Checkliste","✅ Check-liste candidature","✅ Checklist candidatura","✅ Application Checklist"),
+      sub:L("Hake ab was erledigt ist.","Cochez ce qui est fait.","Spunta cosa è fatto.","Tick off what's done."),
+      score:(n,t)=>L(`${n}/${t} erledigt`,`${n}/${t} effectués`,`${n}/${t} completati`,`${n} of ${t} done`),
+      perfect:L("🎉 Vollständig! Bereit.","🎉 Complet! Prêt.","🎉 Completo! Pronto.","🎉 Complete! Ready."),
+      items:L(
+        [{id:"m",t:"Motivationsschreiben",d:"Persönlich, fehlerfrei, auf die Stelle zugeschnitten"},{id:"cv",t:"Lebenslauf",d:"Aktuell, max. 2 Seiten, Schweizer Format"},{id:"ats",t:"ATS-Check gemacht",d:"Score 70%+ – Lebenslauf kommt durch Recruiting-Software"},{id:"foto",t:"Bewerbungsfoto",d:"Professionell, aktuell, neutraler Hintergrund"},{id:"zeug",t:"Arbeitszeugnisse",d:"Letzte 2–3 Stellen, Original oder zertifiziert"},{id:"dipl",t:"Diplome & Zertifikate",d:"Relevante Abschlüsse"},{id:"ref",t:"Referenzpersonen",d:"2–3 Personen, kontaktiert"},{id:"mail",t:"Professionelle E-Mail",d:"vorname.nachname@..."},{id:"spell",t:"Rechtschreibung geprüft",d:"Alles gelesen, null Fehler"},{id:"fu",t:"Follow-up geplant",d:"Wann rufst du nach?"}],
+        [{id:"m",t:"Lettre de motivation",d:"Personnelle, sans fautes"},{id:"cv",t:"Curriculum vitae",d:"À jour, max. 2 pages"},{id:"ats",t:"ATS effectué",d:"Score 70%+ – CV passe les logiciels"},{id:"foto",t:"Photo",d:"Professionnelle, fond neutre"},{id:"zeug",t:"Certificats",d:"2–3 derniers postes"},{id:"dipl",t:"Diplômes",d:"Formations pertinentes"},{id:"ref",t:"Références",d:"2–3 personnes contactées"},{id:"mail",t:"E-mail pro",d:"prenom.nom@..."},{id:"spell",t:"Orthographe",d:"Tout relu"},{id:"fu",t:"Suivi planifié",d:"Quand relancez-vous?"}],
+        [{id:"m",t:"Lettera motivazione",d:"Personale, senza errori"},{id:"cv",t:"Curriculum vitae",d:"Aggiornato, max. 2 pagine"},{id:"ats",t:"ATS effettuato",d:"Score 70%+ – CV passa i software"},{id:"foto",t:"Foto",d:"Professionale, sfondo neutro"},{id:"zeug",t:"Certificati",d:"Ultimi 2–3 posti"},{id:"dipl",t:"Diplomi",d:"Formazioni pertinenti"},{id:"ref",t:"Referenze",d:"2–3 persone contattate"},{id:"mail",t:"E-mail professionale",d:"nome.cognome@..."},{id:"spell",t:"Ortografia",d:"Tutto riletto"},{id:"fu",t:"Follow-up pianificato",d:"Quando ricontatti?"}],
+        [{id:"m",t:"Cover letter",d:"Personal, error-free, tailored"},{id:"cv",t:"Curriculum vitae",d:"Current, max. 2 pages"},{id:"ats",t:"ATS check done",d:"Score 70%+ – CV passes recruiting software"},{id:"foto",t:"Application photo",d:"Professional, neutral background"},{id:"zeug",t:"Work references",d:"Last 2–3 positions"},{id:"dipl",t:"Diplomas",d:"Relevant qualifications"},{id:"ref",t:"References",d:"2–3 people contacted"},{id:"mail",t:"Professional email",d:"firstname.lastname@..."},{id:"spell",t:"Spelling checked",d:"Everything re-read"},{id:"fu",t:"Follow-up planned",d:"When will you call?"}]
+      ),
+    },
+    ats:{
+      title:L("🤖 ATS-Simulation","🤖 Simulation ATS","🤖 Simulazione ATS","🤖 ATS Simulation"),
+      sub:L("Prüft ob dein Lebenslauf durch Recruiter-Software kommt.","Vérifie si votre CV passe les logiciels RH.","Controlla se il tuo CV passa i software HR.","Checks if your CV passes recruiter software."),
+      cvLbl:L("Dein Lebenslauf (Text einfügen) *","Votre CV (coller le texte) *","Il tuo CV (incolla il testo) *","Your CV (paste text) *"),
+      cvPh:L("Lebenslauf-Text einfügen…","Collez votre CV…","Incolla il tuo CV…","Paste your CV text here…"),
+      jobLbl:L("Stellenbezeichnung *","Intitulé du poste *","Titolo del posto *","Job title *"),
+      jobDescLbl:L("Stellenbeschreibung (empfohlen)","Description du poste (recommandé)","Descrizione (consigliato)","Job description (recommended)"),
+      jobDescPh:L("Inserat einfügen für bessere Keyword-Analyse…","Collez l'annonce pour une meilleure analyse…","Incolla l'annuncio per un'analisi migliore…","Paste job ad for better keyword analysis…"),
+      btn:L("🤖 ATS-Check starten","🤖 Lancer l'ATS","🤖 Avvia ATS","🤖 Run ATS check"),
+      loading:L("Simuliere ATS…","Simulation ATS…","Simulando ATS…","Simulating ATS…"),
+      scoreLabel:L("ATS-Score","Score ATS","Score ATS","ATS Score"),
+      found:L("✓ Gefundene Keywords","✓ Mots-clés trouvés","✓ Keywords trovati","✓ Keywords found"),
+      miss:L("✗ Fehlende Keywords","✗ Mots-clés manquants","✗ Keywords mancanti","✗ Missing keywords"),
+      tips:L("💡 Optimierungstipps","💡 Conseils d'optimisation","💡 Consigli di ottimizzazione","💡 Optimization tips"),
+      prompt:(cv,job,desc)=>L(
+        `Du bist ein ATS-System (Applicant Tracking System) für Schweizer HR. Analysiere diesen Lebenslauf für die Stelle "${job}". Antworte NUR mit JSON:\n{"score":82,"grade":"Gut","summary":"2 Sätze zur Gesamtbewertung","keywords_found":["Python","Projektmanagement","Deutsch"],"keywords_missing":["Scrum","SQL","Englisch"],"tips":["Tipp 1 (konkret)","Tipp 2","Tipp 3"]}\nStelle: ${job}\nInserat: ${desc||"nicht angegeben"}\nLebenslauf:\n${cv}`,
+        `Tu es un système ATS pour RH suisses. Analyse ce CV pour le poste "${job}". Réponds UNIQUEMENT avec JSON:\n{"score":82,"grade":"Bien","summary":"2 phrases","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Conseil 1","Conseil 2","Conseil 3"]}\nPoste: ${job}\nAnnonce: ${desc||"non fournie"}\nCV:\n${cv}`,
+        `Sei un sistema ATS per HR svizzeri. Analizza questo CV per il posto "${job}". Rispondi SOLO con JSON:\n{"score":82,"grade":"Bene","summary":"2 frasi","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Consiglio 1","Consiglio 2","Consiglio 3"]}\nPosto: ${job}\nAnnuncio: ${desc||"non fornito"}\nCV:\n${cv}`,
+        `You are an ATS system for Swiss HR. Analyze this CV for the position "${job}". Reply ONLY with JSON:\n{"score":82,"grade":"Good","summary":"2 sentences","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Tip 1","Tip 2","Tip 3"]}\nPosition: ${job}\nJob ad: ${desc||"not provided"}\nCV:\n${cv}`
+      ),
+    },
+    zeugnis:{
+      title:L("📜 Zeugnis-Analyse","📜 Analyse certificat","📜 Analisi certificato","📜 Reference Analysis"),
+      sub:L("Entschlüssle den Schweizer Zeugnis-Code. Was steht wirklich drin?","Déchiffrez le code suisse. Que dit vraiment votre certificat?","Decodifica il codice svizzero. Cosa dice davvero il tuo certificato?","Decode the Swiss reference code. What does it really say?"),
+      textLbl:L("Zeugnis-Text einfügen *","Texte du certificat *","Testo del certificato *","Reference text *"),
+      textPh:L("Ganzen Zeugnistext hier einfügen…","Collez ici le texte complet du certificat…","Incolla qui il testo completo del certificato…","Paste the full reference text here…"),
+      btn:L("📜 Zeugnis analysieren","📜 Analyser le certificat","📜 Analizza il certificato","📜 Analyse reference"),
+      loading:L("Analysiere…","Analyse…","Analizzando…","Analysing…"),
+      overall:L("Gesamtbewertung","Évaluation globale","Valutazione globale","Overall assessment"),
+      phrases:L("Entschlüsselte Formulierungen","Formulations déchiffrées","Formulazioni decifrate","Decoded phrases"),
+      tips:L("💡 Was du tun solltest","💡 Ce que vous devriez faire","💡 Cosa dovresti fare","💡 What you should do"),
+      prompt:(text)=>L(
+        `Du bist Experte für Schweizer Arbeitszeugnisse. Analysiere dieses Zeugnis und entschlüssle den Schweizer Zeugnis-Code. Antworte NUR mit JSON:\n{"grade":"A","grade_text":"Sehr gut","overall":"2-3 Sätze zur Gesamtbewertung","phrases":[{"original":"hat die ihm übertragenen Aufgaben stets zu unserer vollsten Zufriedenheit erledigt","decoded":"Bestnote – entspricht einer 6","rating":"A"},{"original":"war bemüht","decoded":"Schwache Formulierung – bedeutet mangelhafte Leistung","rating":"D"}],"tips":["Tipp 1","Tipp 2"]}\nZeugnis:\n${text}`,
+        `Tu es expert en certificats de travail suisses. Analyse ce certificat. Réponds UNIQUEMENT avec JSON:\n{"grade":"A","grade_text":"Très bien","overall":"2-3 phrases","phrases":[{"original":"phrase originale","decoded":"sens réel","rating":"A"}],"tips":["Conseil"]}\nCertificat:\n${text}`,
+        `Sei esperto di certificati di lavoro svizzeri. Analizza questo certificato. Rispondi SOLO con JSON:\n{"grade":"A","grade_text":"Molto bene","overall":"2-3 frasi","phrases":[{"original":"frase originale","decoded":"significato reale","rating":"A"}],"tips":["Consiglio"]}\nCertificato:\n${text}`,
+        `You are an expert in Swiss work references. Analyse this reference. Reply ONLY with JSON:\n{"grade":"A","grade_text":"Excellent","overall":"2-3 sentences","phrases":[{"original":"original phrase","decoded":"real meaning","rating":"A"}],"tips":["Tip"]}\nReference:\n${text}`
+      ),
+    },
+    jobmatch:{
+      title:L("🎯 Job-Matching","🎯 Matching emploi","🎯 Job Matching","🎯 Job Matching"),
+      sub:L("Die KI analysiert dein Profil und findet die Top 5 passenden Stellen.","L'IA analyse votre profil et trouve les 5 postes les mieux adaptés.","L'IA analizza il tuo profilo e trova i 5 posti più adatti.","AI analyzes your profile and finds your top 5 matching positions."),
+      skillsLbl:L("Skills & Erfahrung *","Compétences & expérience *","Competenze & esperienza *","Skills & experience *"),
+      skillsPh:L("z.B. 5 Jahre Projektmanagement, Python, Teamführung, Finanzen…","ex. 5 ans gestion de projet, Python, management…","es. 5 anni gestione progetti, Python, management…","e.g. 5 years project management, Python, team leadership, finance…"),
+      eduLbl:L("Ausbildung","Formation","Formazione","Education"),
+      eduPh:L("z.B. BSc Wirtschaftsinformatik, Uni Bern","ex. BSc Informatique, Uni Berne","es. BSc Informatica, Uni Berna","e.g. BSc Business Informatics, Uni Berne"),
+      prefLbl:L("Präferenzen (optional)","Préférences (optionnel)","Preferenze (opzionale)","Preferences (optional)"),
+      prefPh:L("z.B. Homeoffice, Startup, Zürich, 100%…","ex. Télétravail, startup, Zurich…","es. Telelavoro, startup, Zurigo…","e.g. Home office, startup, Zurich, 100%…"),
+      btn:L("🎯 Matching starten","🎯 Lancer le matching","🎯 Avvia matching","🎯 Start matching"),
+      loading:L("Analysiere Profil…","Analyse du profil…","Analizzando profilo…","Analysing profile…"),
+      fitScore:L("Fit-Score","Score d'adéquation","Score compatibilità","Fit score"),
+      applyBtn:L("Bewerben →","Postuler →","Candidarsi →","Apply →"),
+      prompt:(skills,edu,pref)=>L(
+        `Du bist ein Karriereberater für den Schweizer Arbeitsmarkt. Analysiere dieses Profil und finde die Top 5 passenden Stellenprofile. Antworte NUR mit JSON:\n{"matches":[{"rank":1,"title":"Senior Project Manager","fit":91,"industry":"Technologie","description":"Kurze Beschreibung warum dieser Job passt (2 Sätze)","skills_match":["Projektmanagement","Python"],"salary":"CHF 110–140k"},{"rank":2,"title":"...","fit":84,...}]}\nSkills & Erfahrung: ${skills}\nAusbildung: ${edu||"nicht angegeben"}\nPräferenzen: ${pref||"keine"}`,
+        `Tu es conseiller carrière pour le marché suisse. Analyse ce profil et trouve les 5 postes idéaux. Réponds UNIQUEMENT avec JSON:\n{"matches":[{"rank":1,"title":"Chef de projet senior","fit":91,"industry":"Technologie","description":"Pourquoi ce poste correspond (2 phrases)","skills_match":["Gestion de projet"],"salary":"CHF 110–140k"}]}\nCompétences: ${skills}\nFormation: ${edu||"n/a"}\nPréférences: ${pref||"aucune"}`,
+        `Sei consulente carriera per il mercato svizzero. Analizza questo profilo e trova i 5 posti ideali. Rispondi SOLO con JSON:\n{"matches":[{"rank":1,"title":"Senior Project Manager","fit":91,"industry":"Tecnologia","description":"Perché questo lavoro corrisponde (2 frasi)","skills_match":["Gestione progetti"],"salary":"CHF 110–140k"}]}\nSkills: ${skills}\nFormazione: ${edu||"n/d"}\nPreferenze: ${pref||"nessuna"}`,
+        `You are a career advisor for the Swiss job market. Analyse this profile and find the top 5 matching positions. Reply ONLY with JSON:\n{"matches":[{"rank":1,"title":"Senior Project Manager","fit":91,"industry":"Technology","description":"Why this job fits (2 sentences)","skills_match":["Project management"],"salary":"CHF 110–140k"}]}\nSkills & experience: ${skills}\nEducation: ${edu||"not provided"}\nPreferences: ${pref||"none"}`
+      ),
+    },
+    coach:{
+      title:L("🎤 Interview-Coach","🎤 Coach d'entretien","🎤 Coach colloquio","🎤 Interview Coach"),
+      sub:L("KI simuliert 5 echte Fragen, bewertet Antworten, gibt Note 0–100.","L'IA simule 5 vraies questions, évalue et note de 0 à 100.","L'IA simula 5 domande reali, valuta e dà voto 0–100.","AI simulates 5 real questions, evaluates answers, gives score 0–100."),
+      ready:L("Bereit für dein Interview?","Prêt pour votre entretien?","Pronto per il colloquio?","Ready for your interview?"),
+      readySub:L("5 Fragen · KI-Bewertung · Konkrete Tipps","5 questions · Évaluation · Conseils","5 domande · Valutazione · Consigli","5 questions · AI evaluation · Concrete tips"),
+      noJob:L("Bitte zuerst Stelle angeben.","Veuillez d'abord entrer un poste.","Inserisci prima un posto.","Please enter a position first."),
+      start:L("Interview starten →","Démarrer →","Inizia →","Start interview →"),
+      prep:L("Bereite vor…","Préparation…","Preparando…","Preparing…"),
+      qOf:(n)=>L(`Frage ${n}/5`,`Question ${n}/5`,`Domanda ${n}/5`,`Question ${n}/5`),
+      ph:L("Deine Antwort…","Votre réponse…","La tua risposta…","Your answer…"),
+      send:L("Senden","Envoyer","Invia","Send"),
+      newIC:L("🔄 Neues Interview","🔄 Nouvel entretien","🔄 Nuovo colloquio","🔄 New interview"),
+      result:L("Dein Ergebnis","Votre résultat","Il tuo risultato","Your result"),
+      strengths:L("Stärken:","Points forts:","Punti di forza:","Strengths:"),
+      tip:L("Tipp:","Conseil:","Consiglio:","Tip:"),
+      locked:L("Pro-Feature","Pro","Pro","Pro Feature"),
+      lockedSub:L("Der Interview-Coach ist in Pro enthalten.","Le coach est inclus dans Pro.","Il coach è incluso in Pro.","The interview coach is included in Pro."),
+      icStart:(j)=>L(
+        `Du bist HR-Interviewer in der Schweiz für "${j.title||"diese Stelle"}" bei "${j.company||"diesem Unternehmen"}". Stelle deine erste Interviewfrage auf Schweizer Hochdeutsch. Nur die Frage.`,
+        `Tu es recruteur en Suisse pour "${j.title||"ce poste"}" chez "${j.company||"cette entreprise"}". Pose ta première question d'entretien en français. Seulement la question.`,
+        `Sei recruiter svizzero per "${j.title||"questo posto"}" presso "${j.company||"questa azienda"}". Fai la tua prima domanda di colloquio in italiano. Solo la domanda.`,
+        `You are an HR interviewer in Switzerland for "${j.title||"this position"}" at "${j.company||"this company"}". Ask your first interview question in English. Only the question.`
+      ),
+      icNext:(j)=>L(
+        `Interviewer für "${j.title||"diese Stelle"}": Reagiere 1 Satz, dann neue tiefgehende Frage. Schweizer Hochdeutsch.`,
+        `Recruteur pour "${j.title||"ce poste"}": Réagis en 1 phrase, puis nouvelle question approfondie. En français.`,
+        `Recruiter per "${j.title||"questo posto"}": Reagisci in 1 frase, poi nuova domanda approfondita. In italiano.`,
+        `Interviewer for "${j.title||"this role"}": React in 1 sentence, then new in-depth question. In English.`
+      ),
+      icScore:(h)=>L(
+        `Analysiere dieses Interview. NUR JSON: {"score":75,"feedback":"2-3 Sätze","staerken":["S1","S2"],"verbesserung":"1 Tipp"}\n${h}`,
+        `Analyse cet entretien. UNIQUEMENT JSON: {"score":75,"feedback":"2-3 phrases","staerken":["P1"],"verbesserung":"1 conseil"}\n${h}`,
+        `Analizza questo colloquio. SOLO JSON: {"score":75,"feedback":"2-3 frasi","staerken":["P1"],"verbesserung":"1 consiglio"}\n${h}`,
+        `Analyse this interview. ONLY JSON: {"score":75,"feedback":"2-3 sentences","staerken":["S1"],"verbesserung":"1 tip"}\n${h}`
+      ),
+      icDone:(s)=>L(`🎯 Fertig! Dein Score: ${s}/100`,`🎯 Terminé! Score: ${s}/100`,`🎯 Finito! Score: ${s}/100`,`🎯 Done! Score: ${s}/100`),
+    },
+    linkedin:{
+      title:L("💼 LinkedIn Analyse & Optimierung","💼 LinkedIn Analyse & Optimisation","💼 LinkedIn Analisi & Ottimizzazione","💼 LinkedIn Analysis & Optimization"),
+      sub:L("Die KI macht dein Profil für Recruiter unwiderstehlich.","L'IA rend votre profil irrésistible pour les recruteurs.","L'IA rende il tuo profilo irresistibile per i recruiter.","The AI makes your profile irresistible to recruiters."),
+      analyzeLabel:L("LinkedIn-Profil Text (About + Erfahrung)","Texte profil LinkedIn (About + Expérience)","Testo profilo LinkedIn (About + Esperienza)","LinkedIn profile text (About + Experience)"),
+      analyzePh:L("Füge deinen aktuellen LinkedIn-Text ein oder beschreibe dein Profil…","Collez votre texte LinkedIn ou décrivez votre profil…","Incolla il tuo testo LinkedIn o descrivi il tuo profilo…","Paste your current LinkedIn text or describe your profile…"),
+      roleLbl:L("Zielrolle","Poste cible","Ruolo target","Target role"),
+      rolePh:L("z.B. Senior Product Manager","ex. Chef de produit senior","es. Senior Product Manager","e.g. Senior Product Manager"),
+      achLbl:L("Top 3 Erfolge","3 meilleures réalisations","Top 3 successi","Top 3 achievements"),
+      achPh:L("z.B. Team von 10 geführt…","ex. Équipe de 10 gérée…","es. Team di 10 gestito…","e.g. Led team of 10…"),
+      btn:L("💼 LinkedIn optimieren →","💼 Optimiser →","💼 Ottimizzare →","💼 Optimize →"),
+      load:L("Optimiere…","Optimisation…","Ottimizzando…","Optimizing…"),
+      resH:L("🚀 Optimierter Headline","🚀 Titre optimisé","🚀 Headline ottimizzato","🚀 Optimized headline"),
+      resA:L("📝 About-Sektion","📝 Section About","📝 Sezione About","📝 About section"),
+      resS:L("🏷️ Empfohlene Skills","🏷️ Compétences","🏷️ Skills consigliati","🏷️ Recommended skills"),
+      copy:L("Kopieren","Copier","Copia","Copy"),
+      prompt:(d)=>`You are a LinkedIn career coach for the Swiss job market. Optimize this profile. Reply ONLY with valid JSON.\nLanguage: ${L("Schweizer Hochdeutsch","français","italiano","English")}\nCurrent text: ${d.text||"not provided"}\nTarget role: ${d.role||"not provided"}\nAchievements: ${d.ach||"not provided"}\nCurrent job: ${d.beruf||"not provided"} | Experience: ${d.erfahrung||0} years | Skills: ${d.skills||"not provided"}\nRequired JSON: {"headline":"max 220 chars","about":"3-4 paragraphs first person ~250 words","skills":["Skill1","Skill2","Skill3","Skill4","Skill5","Skill6","Skill7","Skill8","Skill9","Skill10"]}`,
+    },
+    modal:{
+      title:`${C.name} Pro`,
+      sub:L("Alle 6 KI-Tools freischalten.","Débloquer les 6 outils IA.","Sblocca i 6 strumenti IA.","Unlock all 6 AI tools."),
+      feats:L([["✍️","Bewerbungen"],["🤖","ATS"],["📜","Zeugnis"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
+              [["✍️","Candidatures"],["🤖","ATS"],["📜","Certificat"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
+              [["✍️","Candidature"],["🤖","ATS"],["📜","Certificato"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
+              [["✍️","Applications"],["🤖","ATS"],["📜","Reference"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]]),
+      btn:L("Jetzt Pro werden →","Devenir Pro →","Diventa Pro →","Become Pro →"),
+      close:L("Schliessen","Fermer","Chiudi","Close"),
+      note:L("Stripe · Twint · Kreditkarte · PayPal · Apple Pay · Jederzeit kündbar","Stripe · Twint · CB · PayPal · Apple Pay · Résiliable","Stripe · Twint · CC · PayPal · Apple Pay · Cancellabile","Stripe · Twint · Credit card · PayPal · Apple Pay · Cancel anytime"),
+    },
+    legal:{
+      agb:L("AGB","CGV","CGC","T&C"), privacy:L("Datenschutz","Confidentialité","Privacy","Privacy"),
+      imprint:L("Impressum","Mentions légales","Note legali","Imprint"),
+      product:L("Produkt","Produit","Prodotto","Product"),
+      legalL:L("Rechtliches","Légal","Note legali","Legal"),
+      tagline:L(`${C.tagline} – Schweizer Standard.`,`${C.tagline} – Standard suisse.`,`${C.tagline} – Standard svizzero.`,`${C.tagline} – Swiss standard.`),
+    },
+    motivPrompt:(j,p)=>L(
+      `Erfahrener Karrierecoach: Professionelles Motivationsschreiben Schweizer Hochdeutsch (kein ß).\nStelle: ${j.title} bei ${j.company} | Branche: ${j.branch||"k.A."} | Inserat: ${j.desc||"k.A."}\n${p.name} | ${p.beruf} | ${p.erfahrung} J. | Skills: ${p.skills} | Sprachen: ${p.sprachen} | Ausbildung: ${p.ausbildung}\n~350 Wörter, direkt mit Brief beginnen (Ort/Datum/Anschrift).`,
+      `Coach carrière: Lettre de motivation française pour le marché suisse.\nPoste: ${j.title} chez ${j.company} | ${p.name} | ${p.beruf} | ${p.erfahrung} ans | ${p.skills}\n~350 mots, commencer directement par la lettre.`,
+      `Coach carriera: Lettera di motivazione italiana per il mercato svizzero.\nPosto: ${j.title} presso ${j.company} | ${p.name} | ${p.beruf} | ${p.erfahrung} anni | ${p.skills}\n~350 parole, iniziare direttamente con la lettera.`,
+      `Career coach: Professional English cover letter for Swiss job market.\nPosition: ${j.title} at ${j.company} | ${p.name} | ${p.beruf} | ${p.erfahrung} years | ${p.skills}\n~350 words, start directly with the letter.`
+    ),
+    cvPrompt:(j,p)=>L(
+      `Erfahrener Karrierecoach: Vollständiger Lebenslauf Schweizer Hochdeutsch im CH-Format.\n${p.name} | ${p.beruf} | ${p.erfahrung} J. | ${p.skills} | ${p.sprachen} | ${p.ausbildung} | Ziel: ${j.title} bei ${j.company}\nAlle Sektionen: Persönliche Angaben, Berufsprofil, Berufserfahrung, Ausbildung, Skills, Sprachen.`,
+      `Coach carrière: CV complet français format suisse. ${p.name} | ${p.beruf} | ${p.erfahrung} ans | ${p.skills} | Poste: ${j.title} chez ${j.company}. Toutes sections.`,
+      `Coach carriera: CV completo italiano formato svizzero. ${p.name} | ${p.beruf} | ${p.erfahrung} anni | ${p.skills} | Posto: ${j.title} presso ${j.company}. Tutte le sezioni.`,
+      `Career coach: Complete English CV in Swiss format. ${p.name} | ${p.beruf} | ${p.erfahrung} years | ${p.skills} | Target: ${j.title} at ${j.company}. All sections.`
+    ),
+  };
+};
+
+// ── GENERIC TOOL CONFIG ──
+// Each tool: { id, icon, color, category, langs:{de,en,fr,it}, inputs:[{key,label,type,ph,required}], prompt:(vals,lang)=>string }
+const GENERIC_TOOLS = [
+  // ── KARRIERE ──
+  { id:"gehalt", ico:"💰", color:"#059669", cat:"karriere",
+    t:{de:"Gehaltsverhandlung",en:"Salary Negotiation",fr:"Négociation salariale",it:"Negoziazione stipendio"},
+    sub:{de:"KI simuliert das Gespräch & gibt dir starke Argumente.",en:"AI simulates the conversation & gives you strong arguments.",fr:"L'IA simule la conversation & vous donne des arguments solides.",it:"L'IA simula la conversazione & ti dà argomenti solidi."},
+    inputs:[
+      {k:"job",   lbl:{de:"Deine Stelle",en:"Your position",fr:"Votre poste",it:"Il tuo posto"},             ph:{de:"z.B. Softwareentwickler",en:"e.g. Software Engineer",fr:"ex. Ingénieur logiciel",it:"es. Ingegnere software"}, req:true},
+      {k:"curr",  lbl:{de:"Aktuelles Gehalt (CHF)",en:"Current salary (CHF)",fr:"Salaire actuel (CHF)",it:"Stipendio attuale (CHF)"},ph:{de:"z.B. 95'000",en:"e.g. 95,000",fr:"ex. 95'000",it:"es. 95'000"},req:true},
+      {k:"target",lbl:{de:"Zielgehalt (CHF)",en:"Target salary (CHF)",fr:"Salaire cible (CHF)",it:"Stipendio target (CHF)"},          ph:{de:"z.B. 115'000",en:"e.g. 115,000",fr:"ex. 115'000",it:"es. 115'000"},req:true},
+      {k:"exp",   lbl:{de:"Berufserfahrung & Stärken",en:"Experience & strengths",fr:"Expérience & points forts",it:"Esperienza & punti di forza"}, ph:{de:"z.B. 6 Jahre, 3 Mio. Umsatz generiert, Team geleitet",en:"e.g. 6 years, €3M revenue generated, led team",fr:"ex. 6 ans, 3M CHF CA, gestion d'équipe",it:"es. 6 anni, 3M CHF fatturato, team guidato"},type:"textarea",req:false},
+    ],
+    prompt:(v,l)=>({
+      de:`Du bist Karrierecoach in der Schweiz. Erstelle einen vollständigen Gehaltsverhandlungs-Leitfaden auf Schweizer Hochdeutsch (kein ß).\nStelle: ${v.job} | Aktuell: CHF ${v.curr} | Ziel: CHF ${v.target} | Stärken: ${v.exp||"nicht angegeben"}\n\nErstelle:\n1. Einstiegssatz für die Verhandlung\n2. 5 starke Argumente mit konkreten Formulierungen\n3. Antwort auf "Das Budget ist leider voll"\n4. Antwort auf "Wir müssen das intern besprechen"\n5. Abschlusssatz\n6. Do's & Don'ts`,
+      en:`You are a career coach in Switzerland. Create a complete salary negotiation guide in English.\nPosition: ${v.job} | Current: CHF ${v.curr} | Target: CHF ${v.target} | Strengths: ${v.exp||"not provided"}\n\nCreate:\n1. Opening sentence for the negotiation\n2. 5 strong arguments with concrete phrases\n3. Response to "The budget is unfortunately full"\n4. Response to "We need to discuss this internally"\n5. Closing sentence\n6. Do's & Don'ts`,
+      fr:`Tu es coach carrière en Suisse. Crée un guide complet de négociation salariale en français.\nPoste: ${v.job} | Actuel: CHF ${v.curr} | Cible: CHF ${v.target} | Points forts: ${v.exp||"non fourni"}\n\nCrée:\n1. Phrase d'ouverture\n2. 5 arguments forts avec formulations concrètes\n3. Réponse à "Le budget est malheureusement plein"\n4. Réponse à "Nous devons en discuter en interne"\n5. Phrase de clôture\n6. À faire & À éviter`,
+      it:`Sei un coach carriera in Svizzera. Crea una guida completa alla negoziazione dello stipendio in italiano.\nPosto: ${v.job} | Attuale: CHF ${v.curr} | Target: CHF ${v.target} | Punti di forza: ${v.exp||"non fornito"}\n\nCrea:\n1. Frase di apertura\n2. 5 argomenti forti con formulazioni concrete\n3. Risposta a "Purtroppo il budget è esaurito"\n4. Risposta a "Dobbiamo discuterne internamente"\n5. Frase di chiusura\n6. Da fare & Da evitare`,
+    }[l]),
+  },
+  { id:"networking", ico:"🤝", color:"#0a66c2", cat:"karriere",
+    t:{de:"Networking-Nachricht",en:"Networking Message",fr:"Message de networking",it:"Messaggio di networking"},
+    sub:{de:"Perfekte LinkedIn-Kontaktanfrage oder Cold-E-Mail an Recruiter.",en:"Perfect LinkedIn connection request or cold email to recruiters.",fr:"Demande de connexion LinkedIn parfaite ou e-mail à recruteurs.",it:"Perfetta richiesta di connessione LinkedIn o e-mail a recruiter."},
+    inputs:[
+      {k:"type",  lbl:{de:"Nachrichtentyp",en:"Message type",fr:"Type de message",it:"Tipo di messaggio"},type:"select",opts:{de:["LinkedIn-Kontaktanfrage","Cold-E-Mail an Recruiter","Nachfassnachricht nach Bewerbung","Dankes-E-Mail nach Interview"],en:["LinkedIn connection request","Cold email to recruiter","Follow-up after application","Thank you email after interview"],fr:["Demande LinkedIn","E-mail à recruteur","Suivi après candidature","E-mail de remerciement"],it:["Richiesta LinkedIn","E-mail a recruiter","Follow-up dopo candidatura","E-mail di ringraziamento"]},req:true},
+      {k:"empf",  lbl:{de:"Empfänger (Name / Firma / Rolle)",en:"Recipient (name / company / role)",fr:"Destinataire (nom / entreprise / rôle)",it:"Destinatario (nome / azienda / ruolo)"}, ph:{de:"z.B. Sarah Müller, HR-Leiterin, Google Zürich",en:"e.g. Sarah Miller, HR Lead, Google Zurich",fr:"ex. Sarah Müller, DRH, Google Zurich",it:"es. Sarah Müller, HR Lead, Google Zurigo"},req:true},
+      {k:"ich",   lbl:{de:"Wer bist du?",en:"Who are you?",fr:"Qui êtes-vous?",it:"Chi sei?"},ph:{de:"z.B. Softwareentwickler, 5 Jahre, Python-Spezialist",en:"e.g. Software engineer, 5 years, Python specialist",fr:"ex. Développeur, 5 ans, spécialiste Python",it:"es. Sviluppatore, 5 anni, specialista Python"},req:true},
+      {k:"ziel",  lbl:{de:"Was willst du erreichen?",en:"What do you want to achieve?",fr:"Que souhaitez-vous accomplir?",it:"Cosa vuoi ottenere?"},ph:{de:"z.B. Bewerbungsgespräch, Informationsgespräch, Job-Angebot",en:"e.g. Job interview, informational interview, job offer",fr:"ex. Entretien d'embauche, café virtuel",it:"es. Colloquio di lavoro, chiacchierata informativa"},req:false},
+    ],
+    prompt:(v,l)=>({
+      de:`Erfahrener Karrierecoach Schweiz: Schreibe eine kurze, professionelle ${v.type} auf Schweizer Hochdeutsch (kein ß). An: ${v.empf}. Von: ${v.ich}. Ziel: ${v.ziel||"Kontakt knüpfen"}. Authentisch, nicht spammy. Max. 150 Wörter.`,
+      en:`Career coach Switzerland: Write a short, professional ${v.type} in English. To: ${v.empf}. From: ${v.ich}. Goal: ${v.ziel||"connect"}. Authentic, not spammy. Max 150 words.`,
+      fr:`Coach carrière Suisse: Écris un(e) ${v.type} court(e) et professionnel(le) en français. À: ${v.empf}. De: ${v.ich}. Objectif: ${v.ziel||"prendre contact"}. Authentique. Max 150 mots.`,
+      it:`Coach carriera Svizzera: Scrivi un/una ${v.type} breve e professionale in italiano. A: ${v.empf}. Da: ${v.ich}. Obiettivo: ${v.ziel||"connettersi"}. Autentico. Max 150 parole.`,
+    }[l]),
+  },
+  { id:"kuendigung", ico:"📤", color:"#dc2626", cat:"karriere",
+    t:{de:"Kündigung schreiben",en:"Resignation Letter",fr:"Lettre de démission",it:"Lettera di dimissioni"},
+    sub:{de:"Professionelle Kündigung im Schweizer Format, rechtlich korrekt.",en:"Professional resignation letter in Swiss format, legally correct.",fr:"Lettre de démission professionnelle au format suisse.",it:"Lettera di dimissioni professionale nel formato svizzero."},
+    inputs:[
+      {k:"name",  lbl:{de:"Dein Name",en:"Your name",fr:"Votre nom",it:"Il tuo nome"},ph:{de:"Max Mustermann",en:"John Doe",fr:"Jean Dupont",it:"Mario Rossi"},req:true},
+      {k:"firma", lbl:{de:"Arbeitgeber / Firma",en:"Employer / Company",fr:"Employeur / Entreprise",it:"Datore di lavoro / Azienda"},ph:{de:"Musterfirma AG, Zürich",en:"Example Corp, Zurich",fr:"Exemple SA, Zurich",it:"Esempio SA, Zurigo"},req:true},
+      {k:"datum", lbl:{de:"Letzter Arbeitstag (gewünscht)",en:"Desired last day of work",fr:"Dernier jour de travail souhaité",it:"Ultimo giorno di lavoro desiderato"},ph:{de:"z.B. 31. März 2026",en:"e.g. March 31, 2026",fr:"ex. 31 mars 2026",it:"es. 31 marzo 2026"},req:true},
+      {k:"grund", lbl:{de:"Grund (optional – erscheint NICHT im Brief)",en:"Reason (optional – will NOT appear in letter)",fr:"Raison (optionnel – n'apparaît PAS dans la lettre)",it:"Motivo (opzionale – NON appare nella lettera)"},ph:{de:"z.B. Neuer Job, bessere Perspektiven",en:"e.g. New job, better opportunities",fr:"ex. Nouvel emploi",it:"es. Nuovo lavoro"},req:false},
+    ],
+    prompt:(v,l)=>({
+      de:`Schreibe eine professionelle Kündigung auf Schweizer Hochdeutsch (kein ß). Schweizer Recht, neutrale Formulierung, Dank für die Zusammenarbeit.\nName: ${v.name} | Firma: ${v.firma} | Letzter Tag: ${v.datum}\nNICHT erwähnen: ${v.grund||"–"}. Vollständiger Brief mit Datum, Anschrift, Betreff.`,
+      en:`Write a professional resignation letter in English for the Swiss job market.\nName: ${v.name} | Company: ${v.firma} | Last day: ${v.datum}\nDO NOT mention: ${v.grund||"–"}. Complete letter with date, address, subject line.`,
+      fr:`Rédige une lettre de démission professionnelle en français pour le marché suisse.\nNom: ${v.name} | Entreprise: ${v.firma} | Dernier jour: ${v.datum}\nNE PAS mentionner: ${v.grund||"–"}. Lettre complète.`,
+      it:`Scrivi una lettera di dimissioni professionale in italiano per il mercato svizzero.\nNome: ${v.name} | Azienda: ${v.firma} | Ultimo giorno: ${v.datum}\nNON menzionare: ${v.grund||"–"}. Lettera completa.`,
+    }[l]),
+  },
+  { id:"plan306090", ico:"🗓️", color:"#7c3aed", cat:"karriere",
+    t:{de:"30-60-90-Tage-Plan",en:"30-60-90 Day Plan",fr:"Plan 30-60-90 jours",it:"Piano 30-60-90 giorni"},
+    sub:{de:"Strukturierter Einarbeitungsplan für deinen neuen Job.",en:"Structured onboarding plan for your new job.",fr:"Plan d'intégration structuré pour votre nouvel emploi.",it:"Piano di inserimento strutturato per il tuo nuovo lavoro."},
+    inputs:[
+      {k:"job",   lbl:{de:"Deine neue Stelle",en:"Your new position",fr:"Votre nouveau poste",it:"Il tuo nuovo posto"},ph:{de:"z.B. Product Manager, Fintech-Startup",en:"e.g. Product Manager, Fintech startup",fr:"ex. Chef de produit, startup Fintech",it:"es. Product Manager, startup Fintech"},req:true},
+      {k:"ziele", lbl:{de:"Was sind die Hauptziele?",en:"What are the main goals?",fr:"Quels sont les objectifs principaux?",it:"Quali sono gli obiettivi principali?"},ph:{de:"z.B. Team kennenlernen, Roadmap verstehen, erste Features liefern",en:"e.g. Meet the team, understand roadmap, deliver first features",fr:"ex. Rencontrer l'équipe, comprendre la feuille de route",it:"es. Conoscere il team, capire la roadmap"},type:"textarea",req:false},
+    ],
+    prompt:(v,l)=>({
+      de:`Erstelle einen detaillierten 30-60-90-Tage-Einarbeitungsplan auf Schweizer Hochdeutsch (kein ß) für: ${v.job}. Ziele: ${v.ziele||"Nicht angegeben"}.\nStruktur: Klare Abschnitte für Tag 1-30, 31-60, 61-90. Je: Prioritäten, konkrete Aufgaben, Meilensteine, Erfolgsmessung. Praxisnah und umsetzbar.`,
+      en:`Create a detailed 30-60-90 day onboarding plan in English for: ${v.job}. Goals: ${v.ziele||"not provided"}.\nStructure: Clear sections for days 1-30, 31-60, 61-90. Each: priorities, concrete tasks, milestones, success metrics. Practical and actionable.`,
+      fr:`Crée un plan d'intégration 30-60-90 jours détaillé en français pour: ${v.job}. Objectifs: ${v.ziele||"non fournis"}.\nStructure: Sections claires pour jours 1-30, 31-60, 61-90. Chaque section: priorités, tâches concrètes, jalons, mesure du succès.`,
+      it:`Crea un piano di inserimento 30-60-90 giorni dettagliato in italiano per: ${v.job}. Obiettivi: ${v.ziele||"non forniti"}.\nStruttura: Sezioni chiare per giorni 1-30, 31-60, 61-90. Ogni sezione: priorità, compiti concreti, traguardi, misurazione del successo.`,
+    }[l]),
+  },
+  { id:"referenz", ico:"🏆", color:"#b45309", cat:"karriere",
+    t:{de:"Referenzschreiben",en:"Reference Letter",fr:"Lettre de référence",it:"Lettera di referenza"},
+    sub:{de:"Für Arbeitgeber, die ein professionelles Zeugnis schreiben müssen.",en:"For employers who need to write a professional reference.",fr:"Pour les employeurs qui doivent rédiger une référence professionnelle.",it:"Per datori di lavoro che devono scrivere una referenza professionale."},
+    inputs:[
+      {k:"mitarb",lbl:{de:"Name des Mitarbeiters",en:"Employee name",fr:"Nom de l'employé(e)",it:"Nome del dipendente"},ph:{de:"Max Mustermann",en:"John Doe",fr:"Jean Dupont",it:"Mario Rossi"},req:true},
+      {k:"stelle", lbl:{de:"Stelle & Dauer",en:"Position & duration",fr:"Poste & durée",it:"Posto & durata"},ph:{de:"z.B. Projektleiter, 3 Jahre",en:"e.g. Project manager, 3 years",fr:"ex. Chef de projet, 3 ans",it:"es. Project manager, 3 anni"},req:true},
+      {k:"leist",  lbl:{de:"Wichtigste Leistungen & Stärken",en:"Key achievements & strengths",fr:"Principales réalisations & points forts",it:"Principali risultati & punti di forza"},ph:{de:"z.B. Hat ein Team von 8 geleitet, Projekt 20% früher abgeliefert, sehr zuverlässig",en:"e.g. Led a team of 8, delivered project 20% early, very reliable",fr:"ex. Dirigé équipe de 8, livré projet en avance",it:"es. Guidato team di 8, progetto consegnato in anticipo"},type:"textarea",req:true},
+      {k:"note",   lbl:{de:"Gesamtnote (für Zeugnis-Formulierung)",en:"Overall grade (for reference wording)",fr:"Note globale (pour la formulation)",it:"Voto complessivo (per la formulazione)"},type:"select",opts:{de:["Sehr gut (6)","Gut (5)","Befriedigend (4)","Genügend (3)"],en:["Excellent","Good","Satisfactory","Sufficient"],fr:["Excellent","Bien","Satisfaisant","Suffisant"],it:["Eccellente","Buono","Soddisfacente","Sufficiente"]},req:true},
+    ],
+    prompt:(v,l)=>({
+      de:`Schreibe ein professionelles Schweizer Arbeitszeugnis auf Schweizer Hochdeutsch (kein ß) mit der korrekten Zeugnis-Sprache.\nMitarbeiter: ${v.mitarb} | Stelle: ${v.stelle} | Note: ${v.note}\nLeistungen: ${v.leist}\nVerwende die korrekte Schweizer Zeugnis-Formulierung entsprechend der Note. Vollständiges Zeugnis.`,
+      en:`Write a professional Swiss work reference letter in English with appropriate Swiss reference language conventions.\nEmployee: ${v.mitarb} | Position: ${v.stelle} | Grade: ${v.note}\nAchievements: ${v.leist}\nUse appropriate language for the given grade level. Complete reference letter.`,
+      fr:`Rédige un certificat de travail suisse professionnel en français avec le langage approprié.\nEmployé(e): ${v.mitarb} | Poste: ${v.stelle} | Note: ${v.note}\nRéalisations: ${v.leist}\nCertificat de travail complet.`,
+      it:`Scrivi un certificato di lavoro svizzero professionale in italiano con il linguaggio appropriato.\nDipendente: ${v.mitarb} | Posto: ${v.stelle} | Voto: ${v.note}\nRisultati: ${v.leist}\nCertificato di lavoro completo.`,
+    }[l]),
+  },
+  // ── AUSBILDUNG ──
+  { id:"lehrstelle", ico:"🎓", color:"#0891b2", cat:"ausbildung",
+    t:{de:"Lehrstellen-Bewerbung",en:"Apprenticeship Application",fr:"Candidature apprentissage",it:"Candidatura apprendistato"},
+    sub:{de:"Speziell für das Schweizer Lehrstellensystem optimiert.",en:"Specifically optimized for the Swiss apprenticeship system.",fr:"Spécialement optimisé pour le système suisse d'apprentissage.",it:"Specificamente ottimizzato per il sistema svizzero di apprendistato."},
+    inputs:[
+      {k:"beruf",  lbl:{de:"Lehrberuf *",en:"Apprenticeship trade *",fr:"Métier *",it:"Mestiere *"},ph:{de:"z.B. Kaufmann/-frau EFZ, Informatiker EFZ",en:"e.g. Commercial employee, IT specialist",fr:"ex. Employé de commerce AFC",it:"es. Impiegato di commercio AFC"},req:true},
+      {k:"firma",  lbl:{de:"Lehrfirma *",en:"Company *",fr:"Entreprise *",it:"Azienda *"},ph:{de:"z.B. UBS AG, Zürich",en:"e.g. UBS AG, Zurich",fr:"ex. UBS SA, Zurich",it:"es. UBS SA, Zurigo"},req:true},
+      {k:"name",   lbl:{de:"Dein Name",en:"Your name",fr:"Votre nom",it:"Il tuo nome"},ph:{de:"Max Mustermann",en:"John Doe",fr:"Jean Dupont",it:"Mario Rossi"},req:true},
+      {k:"alter",  lbl:{de:"Alter / Schuljahr",en:"Age / School year",fr:"Âge / Année scolaire",it:"Età / Anno scolastico"},ph:{de:"z.B. 15 Jahre, 3. Sek",en:"e.g. 15 years, 9th grade",fr:"ex. 15 ans, 3e secondaire",it:"es. 15 anni, 3a media"},req:false},
+      {k:"staerken",lbl:{de:"Stärken & Interessen",en:"Strengths & interests",fr:"Points forts & intérêts",it:"Punti di forza & interessi"},ph:{de:"z.B. Mathe gut, fleissig, computererfahren",en:"e.g. Good at maths, hardworking, computer savvy",fr:"ex. Bon en maths, travailleur, à l'aise en informatique",it:"es. Bravo in matematica, laborioso, esperto di computer"},type:"textarea",req:false},
+    ],
+    prompt:(v,l)=>({
+      de:`Schreibe ein professionelles Motivationsschreiben für eine Lehrstelle auf Schweizer Hochdeutsch (kein ß).\nLehrberuf: ${v.beruf} | Firma: ${v.firma} | Name: ${v.name} | Alter: ${v.alter||"nicht angegeben"} | Stärken: ${v.staerken||"nicht angegeben"}\nTon: jugendlich aber professionell, authentisch, enthusiastisch. Schweizer Lehrstellenformat. ~250 Wörter.`,
+      en:`Write a professional motivation letter for an apprenticeship in English for the Swiss system.\nTrade: ${v.beruf} | Company: ${v.firma} | Name: ${v.name} | Age: ${v.alter||"not provided"} | Strengths: ${v.staerken||"not provided"}\nTone: youthful but professional, authentic, enthusiastic. ~250 words.`,
+      fr:`Rédige une lettre de motivation pour un apprentissage en français pour le système suisse.\nMétier: ${v.beruf} | Entreprise: ${v.firma} | Nom: ${v.name} | Âge: ${v.alter||"n/a"} | Points forts: ${v.staerken||"n/a"}\nTon: jeune mais professionnel, authentique. ~250 mots.`,
+      it:`Scrivi una lettera di motivazione per un apprendistato in italiano per il sistema svizzero.\nMestiere: ${v.beruf} | Azienda: ${v.firma} | Nome: ${v.name} | Età: ${v.alter||"n/d"} | Punti di forza: ${v.staerken||"n/d"}\nTono: giovanile ma professionale, autentico. ~250 parole.`,
+    }[l]),
+  },
+  { id:"lernplan", ico:"📚", color:"#0891b2", cat:"ausbildung",
+    t:{de:"Lernplan Generator",en:"Study Plan Generator",fr:"Générateur de plan d'étude",it:"Generatore piano di studio"},
+    sub:{de:"KI erstellt deinen strukturierten Lernplan für Matura, LAP oder Prüfungen.",en:"AI creates your structured study plan for any exam.",fr:"L'IA crée votre plan d'étude structuré pour n'importe quel examen.",it:"L'IA crea il tuo piano di studio strutturato per qualsiasi esame."},
+    inputs:[
+      {k:"pruef",  lbl:{de:"Prüfung / Fach *",en:"Exam / Subject *",fr:"Examen / Matière *",it:"Esame / Materia *"},ph:{de:"z.B. Matura Mathematik, LAP Kaufmann, Semesterprüfung BWL",en:"e.g. Final maths exam, apprenticeship exam",fr:"ex. Maturité mathématiques, examen de fin d'apprentissage",it:"es. Maturità matematica, esame finale apprendistato"},req:true},
+      {k:"datum",  lbl:{de:"Prüfungsdatum",en:"Exam date",fr:"Date de l'examen",it:"Data dell'esame"},ph:{de:"z.B. 15. Juni 2026",en:"e.g. June 15, 2026",fr:"ex. 15 juin 2026",it:"es. 15 giugno 2026"},req:true},
+      {k:"niveau", lbl:{de:"Dein aktuelles Niveau",en:"Your current level",fr:"Votre niveau actuel",it:"Il tuo livello attuale"},type:"select",opts:{de:["Anfänger – fast nichts vorbereitet","Mittelmässig – Grundlagen da","Gut – muss nur üben","Fast fertig – letzte Details"],en:["Beginner – barely prepared","Intermediate – basics there","Good – just need practice","Almost done – last details"],fr:["Débutant – presque rien","Intermédiaire – bases ok","Bien – juste besoin de pratiquer","Presque prêt – derniers détails"],it:["Principiante – quasi nulla","Intermedio – basi ok","Buono – solo pratica","Quasi pronto – ultimi dettagli"]},req:true},
+      {k:"themen", lbl:{de:"Schwierige Themen (optional)",en:"Difficult topics (optional)",fr:"Sujets difficiles (optionnel)",it:"Argomenti difficili (opzionale)"},ph:{de:"z.B. Integralrechnung, Buchhaltung Abschluss",en:"e.g. Integral calculus, closing accounts",fr:"ex. Calcul intégral, clôture comptable",it:"es. Calcolo integrale, chiusura contabile"},req:false},
+    ],
+    prompt:(v,l)=>({
+      de:`Erstelle einen detaillierten Lernplan auf Schweizer Hochdeutsch (kein ß) für: ${v.pruef}\nPrüfungsdatum: ${v.datum} | Niveau: ${v.niveau} | Schwierige Themen: ${v.themen||"nicht angegeben"}\nStruktur: Wochenplan bis zur Prüfung, tägliche Lernzeiten, Themenverteilung, Wiederholungsphase, Tipps für Prüfungstag.`,
+      en:`Create a detailed study plan in English for: ${v.pruef}\nExam date: ${v.datum} | Level: ${v.niveau} | Difficult topics: ${v.themen||"not provided"}\nStructure: Weekly plan until exam, daily study times, topic distribution, revision phase, exam day tips.`,
+      fr:`Crée un plan d'étude détaillé en français pour: ${v.pruef}\nDate: ${v.datum} | Niveau: ${v.niveau} | Sujets difficiles: ${v.themen||"n/a"}\nStructure: Plan hebdomadaire, heures d'étude quotidiennes, répartition des sujets, révision, conseils le jour J.`,
+      it:`Crea un piano di studio dettagliato in italiano per: ${v.pruef}\nData: ${v.datum} | Livello: ${v.niveau} | Argomenti difficili: ${v.themen||"n/d"}\nStruttura: Piano settimanale, ore di studio giornaliere, distribuzione argomenti, fase di ripasso, consigli per il giorno dell'esame.`,
+    }[l]),
+  },
+  { id:"zusammenfassung", ico:"📄", color:"#0891b2", cat:"ausbildung",
+    t:{de:"Zusammenfassung",en:"Summary",fr:"Résumé",it:"Riassunto"},
+    sub:{de:"Text oder Thema eingeben – KI erstellt eine kompakte Zusammenfassung.",en:"Enter text or topic – AI creates a compact summary.",fr:"Entrez un texte ou sujet – l'IA crée un résumé compact.",it:"Inserisci testo o argomento – l'IA crea un riassunto compatto."},
+    inputs:[
+      {k:"text",   lbl:{de:"Text / Thema *",en:"Text / Topic *",fr:"Texte / Sujet *",it:"Testo / Argomento *"},ph:{de:"Text einfügen oder Thema beschreiben…",en:"Paste text or describe topic…",fr:"Collez un texte ou décrivez un sujet…",it:"Incolla il testo o descrivi l'argomento…"},type:"textarea",req:true,tall:true},
+      {k:"laenge", lbl:{de:"Gewünschte Länge",en:"Desired length",fr:"Longueur souhaitée",it:"Lunghezza desiderata"},type:"select",opts:{de:["Sehr kurz (5 Sätze)","Kurz (10-15 Sätze)","Mittel (1 Seite)","Ausführlich (2 Seiten)"],en:["Very short (5 sentences)","Short (10-15 sentences)","Medium (1 page)","Detailed (2 pages)"],fr:["Très court (5 phrases)","Court (10-15 phrases)","Moyen (1 page)","Détaillé (2 pages)"],it:["Molto breve (5 frasi)","Breve (10-15 frasi)","Medio (1 pagina)","Dettagliato (2 pagine)"]},req:false},
+      {k:"zweck",  lbl:{de:"Zweck (optional)",en:"Purpose (optional)",fr:"Objectif (optionnel)",it:"Scopo (opzionale)"},ph:{de:"z.B. Für Matura-Lernen, Referat, Geschäftsmeeting",en:"e.g. For exam prep, presentation, business meeting",fr:"ex. Pour révision, exposé, réunion",it:"es. Per studio, presentazione, riunione"},req:false},
+    ],
+    prompt:(v,l)=>({
+      de:`Erstelle eine ${v.laenge||"mittellange"} Zusammenfassung auf Schweizer Hochdeutsch (kein ß). Zweck: ${v.zweck||"allgemein"}.\nText/Thema:\n${v.text}\nStrukturiert, klar, die wichtigsten Punkte auf den Punkt.`,
+      en:`Create a ${v.laenge||"medium-length"} summary in English. Purpose: ${v.zweck||"general"}.\nText/Topic:\n${v.text}\nStructured, clear, hitting all key points.`,
+      fr:`Crée un résumé ${v.laenge||"de longueur moyenne"} en français. Objectif: ${v.zweck||"général"}.\nTexte/Sujet:\n${v.text}\nStructuré, clair, les points clés mis en avant.`,
+      it:`Crea un riassunto ${v.laenge||"di media lunghezza"} in italiano. Scopo: ${v.zweck||"generale"}.\nTesto/Argomento:\n${v.text}\nStrutturato, chiaro, i punti chiave in evidenza.`,
+    }[l]),
+  },
+  // ── PRODUKTIVITÄT ──
+  { id:"email", ico:"✉️", color:"#7c3aed", cat:"produktivitaet",
+    t:{de:"E-Mail Assistent",en:"Email Assistant",fr:"Assistant e-mail",it:"Assistente e-mail"},
+    sub:{de:"Schwierige E-Mails formulieren – Beschwerden, Reklamationen, Anfragen.",en:"Formulate difficult emails – complaints, enquiries, negotiations.",fr:"Formule des e-mails difficiles – plaintes, réclamations, demandes.",it:"Formula e-mail difficili – reclami, richieste, negoziazioni."},
+    inputs:[
+      {k:"typ",  lbl:{de:"E-Mail-Typ",en:"Email type",fr:"Type d'e-mail",it:"Tipo di e-mail"},type:"select",opts:{de:["Beschwerde / Reklamation","Freundliche Mahnung","Gehaltserhöhungs-Anfrage","Professionelle Ablehnung","Entschuldigungs-E-Mail","Kundenanfrage","Interne Mitteilung","Kündigungsbestätigung"],en:["Complaint / Claim","Friendly reminder","Raise request","Professional decline","Apology email","Customer inquiry","Internal notice","Cancellation confirmation"],fr:["Plainte / Réclamation","Rappel amical","Demande d'augmentation","Refus professionnel","E-mail d'excuses","Demande client","Note interne","Confirmation résiliation"],it:["Reclamo / Lamentela","Promemoria amichevole","Richiesta aumento","Rifiuto professionale","E-mail di scuse","Richiesta cliente","Comunicazione interna","Conferma disdetta"]},req:true},
+      {k:"an",   lbl:{de:"An (Empfänger)",en:"To (recipient)",fr:"À (destinataire)",it:"A (destinatario)"},ph:{de:"z.B. Herr Meier, Kundendienst Swisscom",en:"e.g. Mr. Smith, Customer Service",fr:"ex. M. Dupont, Service client",it:"es. Sig. Rossi, Servizio clienti"},req:true},
+      {k:"thema",lbl:{de:"Thema / Situation",en:"Topic / Situation",fr:"Sujet / Situation",it:"Argomento / Situazione"},ph:{de:"z.B. Ich habe am 3. März eine Rechnung erhalten, die falsch ist. Der Betrag ist 150 CHF zu hoch.",en:"e.g. I received an incorrect invoice on March 3. The amount is 150 CHF too high.",fr:"ex. J'ai reçu une facture incorrecte le 3 mars. Le montant est 150 CHF trop élevé.",it:"es. Ho ricevuto una fattura errata il 3 marzo. L'importo è 150 CHF troppo alto."},type:"textarea",req:true},
+      {k:"ton",  lbl:{de:"Ton",en:"Tone",fr:"Ton",it:"Tono"},type:"select",opts:{de:["Professionell & sachlich","Freundlich & diplomatisch","Bestimmt & klar","Formell"],en:["Professional & factual","Friendly & diplomatic","Firm & clear","Formal"],fr:["Professionnel & factuel","Amical & diplomatique","Ferme & clair","Formel"],it:["Professionale & fattuale","Amichevole & diplomatico","Deciso & chiaro","Formale"]},req:false},
+    ],
+    prompt:(v,l)=>({
+      de:`Schreibe eine professionelle ${v.typ}-E-Mail auf Schweizer Hochdeutsch (kein ß). Ton: ${v.ton||"professionell & sachlich"}.\nAn: ${v.an} | Thema: ${v.thema}\nMit Betreffzeile. Klar, präzise, Schweizer Stil.`,
+      en:`Write a professional ${v.typ} email in English. Tone: ${v.ton||"professional & factual"}.\nTo: ${v.an} | Topic: ${v.thema}\nInclude subject line. Clear, precise, professional style.`,
+      fr:`Rédige un e-mail professionnel de type ${v.typ} en français. Ton: ${v.ton||"professionnel & factuel"}.\nÀ: ${v.an} | Sujet: ${v.thema}\nAvec ligne d'objet. Clair, précis.`,
+      it:`Scrivi un'e-mail professionale di tipo ${v.typ} in italiano. Tono: ${v.ton||"professionale & fattuale"}.\nA: ${v.an} | Argomento: ${v.thema}\nCon oggetto. Chiara, precisa.`,
+    }[l]),
+  },
+  { id:"protokoll", ico:"📋", color:"#0891b2", cat:"produktivitaet",
+    t:{de:"Meeting-Protokoll",en:"Meeting Minutes",fr:"Procès-verbal",it:"Verbale riunione"},
+    sub:{de:"Stichworte eingeben → fertiges Protokoll im Schweizer Format.",en:"Enter bullet points → complete meeting minutes.",fr:"Entrez des notes → procès-verbal complet.",it:"Inserisci appunti → verbale completo."},
+    inputs:[
+      {k:"titel",  lbl:{de:"Meetingtitel / Thema",en:"Meeting title / Topic",fr:"Titre / Sujet",it:"Titolo / Argomento"},ph:{de:"z.B. Quartalsbesprechung Q1 2026",en:"e.g. Q1 2026 quarterly review",fr:"ex. Revue trimestrielle Q1 2026",it:"es. Revisione trimestrale Q1 2026"},req:true},
+      {k:"datum",  lbl:{de:"Datum & Teilnehmer",en:"Date & participants",fr:"Date & participants",it:"Data & partecipanti"},ph:{de:"z.B. 7. März 2026, Max M., Sarah K., Lukas B.",en:"e.g. March 7, 2026, Max M., Sarah K.",fr:"ex. 7 mars 2026, Max M., Sarah K.",it:"es. 7 marzo 2026, Max M., Sarah K."},req:false},
+      {k:"punkte", lbl:{de:"Besprochene Punkte (Stichworte) *",en:"Discussed points (bullet notes) *",fr:"Points discutés (notes) *",it:"Punti discussi (appunti) *"},ph:{de:"z.B.\n- Umsatz Q1: 2.3 Mio., +12% vs. Vorjahr\n- Marketing plant neue Kampagne April\n- IT: Server-Update nächste Woche\n- Nächstes Meeting: 4. April",en:"e.g.\n- Q1 revenue: 2.3M, +12% vs last year\n- Marketing planning new campaign April\n- IT: server update next week\n- Next meeting: April 4",fr:"ex.\n- CA T1: 2.3M, +12%\n- Marketing planifie campagne avril\n- IT: mise à jour serveur\n- Prochain: 4 avril",it:"es.\n- Fatturato Q1: 2.3M, +12%\n- Marketing: campagna ad aprile\n- IT: aggiornamento server\n- Prossimo: 4 aprile"},type:"textarea",req:true,tall:true},
+    ],
+    prompt:(v,l)=>({
+      de:`Erstelle ein professionelles Meeting-Protokoll auf Schweizer Hochdeutsch (kein ß) aus diesen Stichworten.\nMeeting: ${v.titel} | ${v.datum||""}\nPunkte:\n${v.punkte}\nFormat: Traktanden, Beschlüsse, Verantwortlichkeiten, Pendenzen, nächste Schritte. Professionell, klar.`,
+      en:`Create professional meeting minutes in English from these notes.\nMeeting: ${v.titel} | ${v.datum||""}\nPoints:\n${v.punkte}\nFormat: Agenda items, decisions, responsibilities, outstanding items, next steps. Professional, clear.`,
+      fr:`Crée un procès-verbal professionnel en français à partir de ces notes.\nRéunion: ${v.titel} | ${v.datum||""}\nPoints:\n${v.punkte}\nFormat: Ordre du jour, décisions, responsabilités, points en suspens, prochaines étapes.`,
+      it:`Crea un verbale professionale in italiano da questi appunti.\nRiunione: ${v.titel} | ${v.datum||""}\nPunti:\n${v.punkte}\nFormato: Ordine del giorno, decisioni, responsabilità, punti aperti, prossimi passi.`,
+    }[l]),
+  },
+  { id:"uebersetzer", ico:"🌐", color:"#0f766e", cat:"produktivitaet",
+    t:{de:"Übersetzer mit Kontext",en:"Contextual Translator",fr:"Traducteur contextuel",it:"Traduttore contestuale"},
+    sub:{de:"Nicht nur Wörter – ganze Dokumente mit Branchenkontext übersetzen.",en:"Not just words – translate entire documents with industry context.",fr:"Pas seulement des mots – traduisez des documents entiers avec contexte.",it:"Non solo parole – traduci interi documenti con contesto di settore."},
+    inputs:[
+      {k:"von",  lbl:{de:"Von Sprache",en:"From language",fr:"De la langue",it:"Dalla lingua"},type:"select",opts:{de:["Deutsch","Englisch","Französisch","Italienisch","Spanisch","Portugiesisch"],en:["German","English","French","Italian","Spanish","Portuguese"],fr:["Allemand","Anglais","Français","Italien","Espagnol","Portugais"],it:["Tedesco","Inglese","Francese","Italiano","Spagnolo","Portoghese"]},req:true},
+      {k:"nach", lbl:{de:"Nach Sprache",en:"To language",fr:"Vers la langue",it:"Nella lingua"},type:"select",opts:{de:["Deutsch (Schweizer Hochdeutsch)","Englisch","Französisch","Italienisch","Spanisch","Portugiesisch"],en:["German (Swiss Standard)","English","French","Italian","Spanish","Portuguese"],fr:["Allemand (suisse)","Anglais","Français","Italien","Espagnol","Portugais"],it:["Tedesco (svizzero)","Inglese","Francese","Italiano","Spagnolo","Portoghese"]},req:true},
+      {k:"kontext",lbl:{de:"Kontext / Branche",en:"Context / Industry",fr:"Contexte / Secteur",it:"Contesto / Settore"},type:"select",opts:{de:["Allgemein","Business & Finanzen","Juristisch / Verträge","Medizin & Gesundheit","Technologie & IT","Marketing","Bewerbung & HR","Wissenschaft"],en:["General","Business & Finance","Legal / Contracts","Medical & Health","Technology & IT","Marketing","HR & Applications","Science"],fr:["Général","Business & Finance","Juridique","Médecine","Technologie","Marketing","RH","Science"],it:["Generale","Business & Finanza","Legale","Medicina","Tecnologia","Marketing","HR","Scienza"]},req:false},
+      {k:"text", lbl:{de:"Text zum Übersetzen *",en:"Text to translate *",fr:"Texte à traduire *",it:"Testo da tradurre *"},ph:{de:"Text hier einfügen…",en:"Paste text here…",fr:"Collez le texte ici…",it:"Incolla il testo qui…"},type:"textarea",req:true,tall:true},
+    ],
+    prompt:(v,l)=>({
+      de:`Übersetze den folgenden Text von ${v.von} nach ${v.nach}. Kontext: ${v.kontext||"Allgemein"}. Bei Schweizer Hochdeutsch: kein ß. Natürlich, professionell, kontextsensibel. Nur die Übersetzung, keine Erklärungen.\n\n${v.text}`,
+      en:`Translate the following text from ${v.von} to ${v.nach}. Context: ${v.kontext||"General"}. Natural, professional, context-aware translation. Only the translation, no explanations.\n\n${v.text}`,
+      fr:`Traduis le texte suivant de ${v.von} vers ${v.nach}. Contexte: ${v.kontext||"Général"}. Naturel, professionnel, sensible au contexte. Uniquement la traduction.\n\n${v.text}`,
+      it:`Traduci il seguente testo da ${v.von} a ${v.nach}. Contesto: ${v.kontext||"Generale"}. Naturale, professionale, sensibile al contesto. Solo la traduzione.\n\n${v.text}`,
+    }[l]),
+  },
+];
+
+const TOOL_CATS = {
+  karriere:       {de:"💼 Karriere & Jobs",en:"💼 Career & Jobs",fr:"💼 Carrière & Emploi",it:"💼 Carriera & Lavoro"},
+  ausbildung:     {de:"🎓 Schule & Ausbildung",en:"🎓 School & Education",fr:"🎓 École & Formation",it:"🎓 Scuola & Formazione"},
+  produktivitaet: {de:"⚡ Produktivität",en:"⚡ Productivity",fr:"⚡ Productivité",it:"⚡ Produttività"},
+};
+
+// ── GENERIC TOOL PAGE ──
+const LANGS=["de","en","fr","it"], FLAGS={de:"DE",en:"EN",fr:"FR",it:"IT"};
+
+function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage, setProUsage }) {
+  const L = (d,e,f,i) => ({de:d,en:e,fr:f,it:i}[lang]);
+  const [vals, setVals] = useState({});
+  const [result, setResult] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const [err, setErr] = useState("");
+  const [copied, setCopied] = useState(false);
+  const stripeLink = () => yearly ? C.stripeYearly : C.stripeMonthly;
+  const nextReset=()=>{const d=new Date();d.setMonth(d.getMonth()+1);d.setDate(1);return d.toLocaleDateString(lang==="de"?"de-CH":lang==="fr"?"fr-CH":lang==="it"?"it-CH":"en-CH",{day:"numeric",month:"long",year:"numeric"});};
+  const limitHit = pro && proUsage >= C.PRO_LIMIT;
+
+  const setV = (k,v) => setVals(p=>({...p,[k]:v}));
+  const canRun = tool.inputs.filter(i=>i.req).every(i=>(vals[i.k]||"").trim());
+
+  const run = async () => {
+    if (!pro) { setPw(true); return; }
+    if (limitHit) return;
+    setStreaming(true); setResult(""); setErr("");
+    try {
+      await streamAI(tool.prompt(vals, lang), chunk => setResult(chunk), null, tool.id);
+      incPro(); if(setProUsage) setProUsage(getProCount());
+    } catch(e) { setErr(e.message); } finally { setStreaming(false); }
+  };
+
+  const hdrColor = tool.color || "#10b981";
+
+  return (
+    <>
+      <div style={{background:`linear-gradient(135deg,${hdrColor}dd,${hdrColor})`,padding:"48px 28px 34px",textAlign:"center"}}>
+        <div style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>{tool.ico} {tool.t[lang]}</div>
+        <div style={{fontSize:14,color:"rgba(255,255,255,.5)"}}>{tool.sub[lang]}</div>
+      </div>
+      <div style={{maxWidth:740,margin:"0 auto",padding:"36px 28px 80px"}}>
+        {err&&<div className="err">⚠️ {err}</div>}
+        {limitHit&&(
+          <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",borderRadius:12,padding:"16px 20px",marginBottom:16,textAlign:"center"}}>
+            <div style={{fontSize:24,marginBottom:6}}>⏳</div>
+            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,marginBottom:4}}>{L("Monatliches Kontingent aufgebraucht","Monthly quota used up","Quota mensuel épuisé","Quota mensile esaurito")}</div>
+            <div style={{fontSize:13,color:"var(--mu)"}}>{L("Nächster Reset:","Next reset:","Prochaine réinitialisation:","Prossimo reset:")} <strong>{nextReset()}</strong></div>
+          </div>
+        )}
+        {!pro ? (
+          <div className="card">
+            <div style={{textAlign:"center",padding:"20px 0"}}>
+              <div style={{fontSize:36,marginBottom:10}}>🔒</div>
+              <div style={{fontFamily:"var(--hd)",fontSize:19,fontWeight:800,marginBottom:8}}>Pro Feature</div>
+              <p style={{fontSize:13,color:"var(--mu)",marginBottom:16,lineHeight:1.7}}>{L("Dieses Tool ist in Pro enthalten.","This tool is included in Pro.","Cet outil est inclus dans Pro.","Questo strumento è incluso in Pro.")} CHF {C.priceM}/{L("Mo.","mo","mois","mese")}</p>
+              <button className="btn b-em" onClick={()=>window.open(stripeLink(),"_blank")}>{L("Jetzt Pro werden →","Become Pro →","Devenir Pro →","Diventa Pro →")}</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="card">
+              {tool.inputs.map(inp => (
+                <div className="field" key={inp.k}>
+                  <label>{inp.lbl[lang]}{inp.req&&" *"}</label>
+                  {inp.type==="textarea" ? (
+                    <textarea value={vals[inp.k]||""} onChange={e=>setV(inp.k,e.target.value)} placeholder={inp.ph?.[lang]||""} style={{minHeight:inp.tall?140:80}}/>
+                  ) : inp.type==="select" ? (
+                    <select value={vals[inp.k]||""} onChange={e=>setV(inp.k,e.target.value)}>
+                      <option value="">–</option>
+                      {(inp.opts?.[lang]||[]).map(o=><option key={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input value={vals[inp.k]||""} onChange={e=>setV(inp.k,e.target.value)} placeholder={inp.ph?.[lang]||""}/>
+                  )}
+                </div>
+              ))}
+              <button className="btn b-em" onClick={run} disabled={streaming||!canRun} style={{background:hdrColor}}>
+                {streaming ? L("Erstelle…","Creating…","Création…","Creando…") : `${tool.ico} ${L("Erstellen","Create","Créer","Crea")}`}
+              </button>
+            </div>
+
+            {(streaming||result) && (
+              <div className="card" style={{marginTop:14}}>
+                {streaming&&<div style={{display:"flex",alignItems:"center",gap:9,marginBottom:12,color:hdrColor,fontWeight:600,fontSize:13}}>
+                  <div style={{width:8,height:8,background:hdrColor,borderRadius:"50%",animation:"blink .8s step-end infinite"}}/>
+                  {L("KI schreibt…","AI writing…","L'IA rédige…","L'IA scrive…")}
+                </div>}
+                <div style={{display:"flex",gap:7,justifyContent:"flex-end",marginBottom:10,flexWrap:"wrap"}}>
+                  {copied&&<span className="ok" style={{margin:0,padding:"4px 11px"}}>✓ {L("Kopiert!","Copied!","Copié!","Copiato!")}</span>}
+                  <button className="btn b-outd b-sm" onClick={()=>{navigator.clipboard.writeText(result);setCopied(true);setTimeout(()=>setCopied(false),2000);}}>📋 {L("Kopieren","Copy","Copier","Copia")}</button>
+                  {!streaming&&<button className="btn b-outd b-sm" onClick={()=>{setResult("");setVals({});}}>🔄 {L("Neu","New","Nouveau","Nuovo")}</button>}
+                </div>
+                <div className="r-doc">{result}{streaming&&<span className="cursor"/>}</div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+
+// ════════════════════════════════════════
+export default function App() {
+  const [lang,setLang]=useState("de"); const t=mkT(lang);
+  const [page,setPage]=useState("landing");
+  const [pro,setPro]=useState(false); const [usage,setUsage]=useState(0); const [proUsage,setProUsage]=useState(0);
+  const [pw,setPw]=useState(false); const [yearly,setYearly]=useState(false);
+  // app state
+  const [step,setStep]=useState(0); const [docType,setDocType]=useState("motivation");
+  const [tab,setTab]=useState(0); const [streaming,setStreaming]=useState(false);
+  const [editing,setEditing]=useState(false); const [err,setErr]=useState("");
+  const [copied,setCopied]=useState(false);
+  const [results,setResults]=useState({motivation:"",lebenslauf:""});
+  const [job,setJob]=useState({title:"",company:"",desc:"",branch:""});
+  const [prof,setProf]=useState({name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:""});
+  const [ck,setCk]=useState({});
+  const [eTo,setETo]=useState(""); const [eSub,setESub]=useState(""); const [eMsg,setEMsg]=useState("");
+  // coach
+  const [icReady,setIcReady]=useState(false); const [icMsgs,setIcMsgs]=useState([]);
+  const [icIn,setIcIn]=useState(""); const [icLoad,setIcLoad]=useState(false);
+  const [icScore,setIcScore]=useState(null); const [icN,setIcN]=useState(0);
+  const chatRef=useRef(null);
+  // linkedin
+  const [liData,setLiData]=useState({text:"",role:"",ach:""}); const [liRes,setLiRes]=useState(null); const [liLoad,setLiLoad]=useState(false);
+  // ats
+  const [atsCv,setAtsCv]=useState(""); const [atsJob,setAtsJob]=useState(""); const [atsDesc,setAtsDesc]=useState(""); const [atsRes,setAtsRes]=useState(null); const [atsLoad,setAtsLoad]=useState(false);
+  // zeugnis
+  const [zText,setZText]=useState(""); const [zRes,setZRes]=useState(null); const [zLoad,setZLoad]=useState(false);
+  // jobmatch
+  const [jmSkills,setJmSkills]=useState(""); const [jmEdu,setJmEdu]=useState(""); const [jmPref,setJmPref]=useState(""); const [jmRes,setJmRes]=useState(null); const [jmLoad,setJmLoad]=useState(false);
+  // excel
+  const [xlTask,setXlTask]=useState(""); const [xlRes,setXlRes]=useState(null); const [xlLoad,setXlLoad]=useState(false); const [xlCopied,setXlCopied]=useState(false);
+  // pptx
+  const [ppTask,setPpTask]=useState(""); const [ppSlides,setPpSlides]=useState(""); const [ppTone,setPpTone]=useState("professional"); const [ppRes,setPpRes]=useState(null); const [ppLoad,setPpLoad]=useState(false);
+
+  const uj=(k,v)=>setJob(p=>({...p,[k]:v})); const up=(k,v)=>setProf(p=>({...p,[k]:v}));
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]);
+  const stripeLink=()=>yearly?C.stripeYearly:C.stripeMonthly;
+  const canGen=()=>pro?(proUsage<C.PRO_LIMIT):(usage<C.FREE_LIMIT);
+  const canGenPro=()=>proUsage<C.PRO_LIMIT;
+  const nextReset=()=>{const d=new Date();d.setMonth(d.getMonth()+1);d.setDate(1);return d.toLocaleDateString(lang==="de"?"de-CH":lang==="fr"?"fr-CH":lang==="it"?"it-CH":"en-CH",{day:"numeric",month:"long",year:"numeric"});};
+
+  const curDoc=()=>docType==="beide"?(tab===0?results.motivation:results.lebenslauf):results[docType];
+  const setCurDoc=v=>{ if(docType==="beide") setResults(r=>tab===0?{...r,motivation:v}:{...r,lebenslauf:v}); else setResults(r=>({...r,[docType]:v})); };
+
+  // Browser-Zurück-Button Support
+  const navTo = (p) => {
+    window.history.pushState({page:p},"",`#${p==="landing"?"":p}`);
+    setPage(p);
+  };
+
+  useEffect(()=>{
+    // Initialen History-Eintrag setzen
+    const hash = window.location.hash.replace("#","") || "landing";
+    window.history.replaceState({page:hash},"",window.location.href);
+    const onPop = (e) => setPage(e.state?.page || "landing");
+    window.addEventListener("popstate", onPop);
+    return ()=>window.removeEventListener("popstate", onPop);
+  },[]);
+
+  useEffect(()=>{
+    window.scrollTo(0,0);
+    const p=new URLSearchParams(window.location.search);
+    if(p.get("pro")==="activated"){actPro();setPro(true);window.history.replaceState({},"",window.location.pathname);}
+    setUsage(getU().count); setProUsage(getProCount()); setPro(isPro());
+  },[page]);
+  useEffect(()=>{if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight;},[icMsgs]);
+  useEffect(()=>{if(job.title&&prof.name)setESub(`Bewerbung als ${job.title} – ${prof.name}`);},[job.title,prof.name]);
+
+  const generate=async()=>{
+    if(!canGen()){setPw(true);return;} setStreaming(true); setErr(""); setEditing(false);
+    const toGen=docType==="beide"?["motivation","lebenslauf"]:[docType];
+    try{
+      const res={...results};
+      for(const tp of toGen){ res[tp]=""; setResults({...res});
+        await streamAI(tp==="motivation"?t.motivPrompt(job,prof):t.cvPrompt(job,prof),
+          chunk=>setResults(r=>tp==="motivation"?{...r,motivation:chunk}:{...r,lebenslauf:chunk}),
+          null, pro ? "" : "free");
+      }
+      if(!pro){incU();setUsage(getU().count);} else {incPro();setProUsage(getProCount());} setStep(3);
+    }catch(e){setErr(e.message);}finally{setStreaming(false);}
+  };
+
+  const copyDoc=()=>{navigator.clipboard.writeText(curDoc());setCopied(true);setTimeout(()=>setCopied(false),2200);};
+  const pdfDoc=()=>{if(!pro){setPw(true);return;}const w=window.open("","_blank");w.document.write(`<html><head><title>${C.name}</title><style>body{font-family:Georgia,serif;font-size:13px;line-height:1.9;color:#111;padding:64px;max-width:760px;margin:0 auto;white-space:pre-wrap}</style></head><body>${curDoc().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br/>")}</body></html>`);w.document.close();w.print();};
+  const openEmail=()=>{if(!pro){setPw(true);return;}if(!eTo)return;window.open(`mailto:${eTo}?subject=${encodeURIComponent(eSub)}&body=${encodeURIComponent(curDoc()+(eMsg?"\n\n"+eMsg:""))}`);};
+
+  const startIC=async()=>{if(!pro){setPw(true);return;}if(!canGenPro()){return;}setIcLoad(true);setIcMsgs([]);setIcScore(null);setIcN(0);
+    try{const txt=await callAI(t.coach.icStart(job));setIcMsgs([{r:"ai",t:txt}]);setIcReady(true);}
+    catch(e){setErr(e.message);}finally{setIcLoad(false);}};
+  const sendIC=async()=>{if(!icIn.trim())return;if(!canGenPro())return;const um=icIn.trim();setIcIn("");const nc=icN+1;setIcN(nc);
+    const msgs=[...icMsgs,{r:"u",t:um}];setIcMsgs(msgs);setIcLoad(true);
+    try{if(nc>=5){const h=msgs.map(m=>`${m.r==="ai"?"Interviewer":"Kandidat"}: ${m.t}`).join("\n");
+      const raw=await callAI(t.coach.icScore(h),"",C.MODEL_FAST);
+      try{const sc=parseJSON(raw);setIcScore(sc);setIcMsgs([...msgs,{r:"ai",t:t.coach.icDone(sc.score)}]);}
+      catch{setIcMsgs([...msgs,{r:"ai",t:"✓"}]);}
+    }else{const history=msgs.map(m=>({role:m.r==="ai"?"assistant":"user",content:m.t}));
+      const r2=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:C.MODEL_FAST,max_tokens:400,system:t.coach.icNext(job),messages:history})});
+      const d=await r2.json();if(d.error)throw new Error(d.error.message);
+      setIcMsgs([...msgs,{r:"ai",t:d.content?.[0]?.text||""}]);}
+      incPro();setProUsage(getProCount());
+    }catch(e){setErr(e.message);}finally{setIcLoad(false);}};
+
+  const runLI=async()=>{if(!pro){setPw(true);return;}if(!canGenPro()){return;}setLiLoad(true);setLiRes(null);
+    try{const raw=await callAI(t.linkedin.prompt({...liData,beruf:prof.beruf,erfahrung:prof.erfahrung,skills:prof.skills}));
+    setLiRes(parseJSON(raw));}catch(e){setErr(e.message);}finally{setLiLoad(false);}};
+
+  const runATS=async()=>{if(!pro){setPw(true);return;}if(!canGenPro()){return;}setAtsLoad(true);setAtsRes(null);
+    try{const raw=await callAI(t.ats.prompt(atsCv,atsJob,atsDesc));setAtsRes(parseJSON(raw));incPro();setProUsage(getProCount());}
+    catch(e){setErr(e.message);}finally{setAtsLoad(false);}};
+
+  const runZeugnis=async()=>{if(!pro){setPw(true);return;}if(!canGenPro()){return;}setZLoad(true);setZRes(null);
+    try{const raw=await callAI(t.zeugnis.prompt(zText));setZRes(parseJSON(raw));incPro();setProUsage(getProCount());}
+    catch(e){setErr(e.message);}finally{setZLoad(false);}};
+
+  const runJM=async()=>{if(!pro){setPw(true);return;}if(!canGenPro()){return;}setJmLoad(true);setJmRes(null);
+    try{const raw=await callAI(t.jobmatch.prompt(jmSkills,jmEdu,jmPref));setJmRes(parseJSON(raw));incPro();setProUsage(getProCount());}
+    catch(e){setErr(e.message);}finally{setJmLoad(false);}};
+
+  const runXL=async()=>{if(!pro){setPw(true);return;}if(!canGenPro()){return;}setXlLoad(true);setXlRes(null);
+    const prompt=`Du bist ein Excel-Experte. Erstelle eine detaillierte Excel-Tabellenstruktur für folgende Aufgabe: "${xlTask}".
+Antworte NUR mit JSON (kein Markdown, keine Backticks):
+{"title":"Tabellentitel","description":"Kurze Beschreibung","sheets":[{"name":"Tabellenblatt1","headers":["Spalte1","Spalte2","Spalte3"],"sample_rows":[["Beispiel1","Beispiel2","100"],["Beispiel3","Beispiel4","200"]],"formulas":[{"cell":"C10","formula":"=SUMME(C2:C9)","description":"Summe aller Werte"},{"cell":"D2","formula":"=C2*0.077","description":"MwSt. 7.7%"}],"description":"Beschreibung dieses Blattes","formatting_tips":["Tipp 1 für Formatierung","Tipp 2"]}],"excel_tips":["Allgemeiner Tipp 1","Tipp 2"],"download_note":"Hinweis für den Nutzer"}`;
+    try{const raw=await callAI(prompt);setXlRes(parseJSON(raw));incPro();setProUsage(getProCount());}
+    catch(e){setErr(e.message);}finally{setXlLoad(false);}};
+
+  const downloadCSV=()=>{
+    if(!xlRes||!xlRes.sheets?.[0]) return;
+    const sh=xlRes.sheets[0];
+    const rows=[sh.headers,...(sh.sample_rows||[])];
+    const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download=`${xlRes.title||"Stellify-Tabelle"}.csv`; a.click();
+  };
+
+  const runPP=async()=>{if(!pro){setPw(true);return;}if(!canGenPro()){return;}setPpLoad(true);setPpRes(null);
+    const nSlides=parseInt(ppSlides)||6;
+    const prompt=`Du bist ein PowerPoint-Experte. Erstelle eine professionelle Präsentation für: "${ppTask}". Ton: ${ppTone}. Anzahl Folien: ${nSlides}.
+Antworte NUR mit JSON:
+{"title":"Präsentationstitel","subtitle":"Untertitel","theme_suggestion":"Farbschema-Empfehlung (z.B. Dunkelblau/Grün professionell)","slides":[{"slide":1,"title":"Folientitel","layout":"title","content":["Bullet 1","Bullet 2","Bullet 3"],"speaker_note":"Was du bei dieser Folie sagen solltest","design_tip":"Gestaltungshinweis"},{"slide":2,"title":"...","layout":"content","content":["..."],"speaker_note":"...","design_tip":"..."}],"design_tips":["Allgemeiner Gestaltungstipp 1","Tipp 2"],"estimated_duration":"Geschätzte Präsentationsdauer"}`;
+    try{const raw=await callAI(prompt);setPpRes(parseJSON(raw));incPro();setProUsage(getProCount());}
+    catch(e){setErr(e.message);}finally{setPpLoad(false);}};
+
+  // ── SHARED COMPONENTS ──
+  const LangSw=()=><div className="ls">{LANGS.map(l=><button key={l} className={`lb ${lang===l?"on":""}`} onClick={()=>setLang(l)}>{FLAGS[l]}</button>)}</div>;
+
+  const Nav=({dark})=>(
+    <nav style={dark?{background:"rgba(7,7,14,.95)",borderColor:"rgba(255,255,255,.07)"}:{}}>
+      <div className="ni">
+        <div className="logo" onClick={()=>navTo("landing")} style={dark?{color:"white"}:{}}>{C.name}<div className="logo-dot"/>{pro&&<span className="pb">PRO</span>}</div>
+        <div className="nl">
+          <LangSw/>
+          <button className="nlk" style={dark?{color:"rgba(255,255,255,.4)"}:{}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("tools")?.scrollIntoView({behavior:"smooth"}),100)}}>{t.nav.tools}</button>
+          <button className="nlk" style={dark?{color:"rgba(255,255,255,.4)"}:{}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"}),100)}}>{t.nav.prices}</button>
+          {pro&&<>
+            <button className="nlk" style={dark?{color:"rgba(255,255,255,.4)"}:{}} onClick={()=>navTo("ats")}>{t.nav.ats}</button>
+            <button className="nlk" style={dark?{color:"rgba(255,255,255,.4)"}:{}} onClick={()=>navTo("zeugnis")}>{t.nav.zeugnis}</button>
+            <button className="nlk" style={dark?{color:"rgba(255,255,255,.4)"}:{}} onClick={()=>navTo("jobmatch")}>{t.nav.jobs}</button>
+            <button className="nlk" style={dark?{color:"rgba(255,255,255,.4)"}:{}} onClick={()=>navTo("excel")}>{t.nav.excel}</button>
+            <button className="nlk" style={dark?{color:"rgba(255,255,255,.4)"}:{}} onClick={()=>navTo("pptx")}>{t.nav.pptx}</button>
+            <button className="nlk" style={dark?{color:"rgba(255,255,255,.4)"}:{}} onClick={()=>navTo("coach")}>{t.nav.coach}</button>
+          </>}
+          <button className="nc" onClick={()=>navTo("app")}>{lang==="de"?"Starten":"Start"} →</button>
+        </div>
+      </div>
+    </nav>
+  );
+
+  const Footer=()=>(
+    <footer>
+      <div className="fi">
+        <div>
+          <div className="fl">{C.name}<div className="logo-dot" style={{marginLeft:4,marginBottom:8}}/></div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,.3)",lineHeight:1.7,marginBottom:9}}>{t.legal.tagline}</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.2)"}}>{C.email}</div>
+        </div>
+        <div className="fcol"><h5>{t.legal.product}</h5>
+          <button onClick={()=>navTo("app")}>{lang==="de"?"Bewerbung":lang==="en"?"Application":lang==="fr"?"Candidature":"Candidatura"}</button>
+          <button onClick={()=>navTo("linkedin")}>LinkedIn</button>
+          <button onClick={()=>navTo("ats")}>{t.nav.ats}</button>
+          <button onClick={()=>navTo("zeugnis")}>{t.nav.zeugnis}</button>
+          <button onClick={()=>navTo("jobmatch")}>{t.nav.jobs}</button>
+          <button onClick={()=>navTo("excel")}>{t.nav.excel}</button>
+          <button onClick={()=>navTo("pptx")}>{t.nav.pptx}</button>
+          <button onClick={()=>navTo("coach")}>{t.nav.coach}</button>
+        </div>
+        <div className="fcol"><h5>{lang==="de"?"Mehr Tools":lang==="en"?"More tools":lang==="fr"?"Plus d'outils":"Altri strumenti"}</h5>
+          {GENERIC_TOOLS.map(g=><button key={g.id} onClick={()=>navTo(g.id)}>{g.ico} {g.t[lang]}</button>)}
+        </div>
+        <div className="fcol"><h5>{t.legal.legalL}</h5>
+          <button onClick={()=>navTo("agb")}>{t.legal.agb}</button>
+          <button onClick={()=>navTo("datenschutz")}>{t.legal.privacy}</button>
+          <button onClick={()=>navTo("impressum")}>{t.legal.imprint}</button>
+        </div>
+        <div className="fcol"><h5>{lang==="en"?"Payment":"Zahlung"}</h5>
+          {["Twint","Visa","Mastercard","PayPal","Apple Pay","Google Pay","SEPA","Klarna"].map(p=><div key={p} style={{fontSize:12,color:"rgba(255,255,255,.28)",marginBottom:5}}>{p}</div>)}
+        </div>
+      </div>
+      <div className="fbot">
+        <div>© {new Date().getFullYear()} {C.name} · {C.owner}</div>
+        <div style={{display:"flex",gap:12}}>{[["agb",t.legal.agb],["datenschutz",t.legal.privacy]].map(([p,l])=><button key={p} onClick={()=>navTo(p)} style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",fontSize:11,cursor:"pointer",fontFamily:"var(--bd)"}}>{l}</button>)}</div>
+      </div>
+    </footer>
+  );
+
+  const PW=()=>(
+    <div className="mbg" onClick={e=>e.target===e.currentTarget&&setPw(false)}>
+      <div className="mod">
+        <div style={{fontSize:32,marginBottom:10}}>✦</div>
+        <h2>{t.modal.title}</h2><p>{t.modal.sub}</p>
+        <div className="mod-pr">CHF {C.priceM}<span> / {lang==="en"?"mo":"Mo."}</span></div>
+        <div className="mod-fts">{t.modal.feats.map(([ico,tx])=><div key={tx} className="mod-f"><div className="mod-fi">{ico}</div>{tx}</div>)}</div>
+        <button className="btn b-em b-w" onClick={()=>window.open(stripeLink(),"_blank")}>{t.modal.btn}</button>
+        <div className="mod-note">{t.modal.note}</div>
+        <button className="btn b-out b-sm" style={{marginTop:9,width:"100%"}} onClick={()=>setPw(false)}>{t.modal.close}</button>
+      </div>
+    </div>
+  );
+
+  const UsageBar=()=>!pro?(
+    <div className="ubar">
+      <span><strong>{C.FREE_LIMIT-usage}</strong> {t.app.uLeft(C.FREE_LIMIT-usage)}</span>
+      <div style={{display:"flex",alignItems:"center",gap:9}}>
+        <div className="u-tr"><div className="u-fi" style={{width:`${(usage/C.FREE_LIMIT)*100}%`}}/></div>
+        <button className="btn b-em b-sm" onClick={()=>setPw(true)}>Pro →</button>
+      </div>
+    </div>
+  ):proUsage>=C.PRO_LIMIT?(
+    <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.25)",borderRadius:10,padding:"10px 16px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+      <span>⏳ {L("Monatliches Kontingent aufgebraucht","Monthly quota used up","Quota mensuel épuisé","Monthly quota used up")} · {L("Reset am","Reset on","Réinitialisation le","Reset on")} <strong>{nextReset()}</strong></span>
+    </div>
+  ):(
+    <div className="ubar">
+      <span style={{color:"var(--em)",fontWeight:600}}>✦ Pro · <strong>{C.PRO_LIMIT-proUsage}</strong> {L("von","of","de","of")} {C.PRO_LIMIT} {L("Generierungen übrig","generations left","générations restantes","generations left")}</span>
+      <div style={{display:"flex",alignItems:"center",gap:9}}>
+        <div className="u-tr"><div className="u-fi" style={{width:`${(proUsage/C.PRO_LIMIT)*100}%`,background:"var(--em)"}}/></div>
+        <span style={{fontSize:11,color:"var(--mu)",whiteSpace:"nowrap"}}>↻ {nextReset()}</span>
+      </div>
+    </div>
+  );
+
+  const LockMsg=({sub})=>(
+    <div style={{textAlign:"center",padding:"24px 0"}}>
+      <div style={{fontSize:40,marginBottom:12}}>🔒</div>
+      <div style={{fontFamily:"var(--hd)",fontSize:19,fontWeight:800,marginBottom:8}}>{lang==="de"?"Pro-Feature":lang==="fr"?"Fonctionnalité Pro":lang==="it"?"Funzionalità Pro":"Pro Feature"}</div>
+      <p style={{fontSize:13,color:"var(--mu)",marginBottom:16,lineHeight:1.7}}>{sub}</p>
+      <button className="btn b-em" onClick={()=>window.open(stripeLink(),"_blank")}>{t.modal.btn} – CHF {C.priceM}/{lang==="en"?"mo":"Mo."}</button>
+    </div>
+  );
+
+  const TOOL_INFO = {
+    app:      {ico:"✍️", title:L("Bewerbungen","Applications","Candidatures","Candidature"),       desc:L("Erstellt Motivationsschreiben & Lebenslauf in 60 Sekunden – live, auf dein Profil zugeschnitten.","Generates cover letter & CV in 60 seconds – live, tailored to your profile.","Génère lettre de motivation & CV en 60 secondes – en direct, adapté à votre profil.","Genera lettera di motivazione & CV in 60 secondi – live, su misura per il tuo profilo.")},
+    linkedin: {ico:"💼", title:"LinkedIn Optimierung",                                              desc:L("Analysiert dein LinkedIn-Profil und optimiert Headline, About & Skills für Recruiter.","Analyzes your LinkedIn profile and optimizes Headline, About & Skills for recruiters.","Analyse votre profil LinkedIn et optimise Headline, About & Skills pour les recruteurs.","Analizza il tuo profilo LinkedIn e ottimizza Headline, About & Skills per i recruiter.")},
+    ats:      {ico:"🤖", title:"ATS-Simulation",                                                   desc:L("Prüft ob dein Lebenslauf durch Recruiter-Software kommt – mit Score und konkreten Tipps.","Checks if your CV passes recruiting software – with score and concrete tips.","Vérifie si votre CV passe le logiciel de recrutement – avec score et conseils concrets.","Verifica se il tuo CV supera il software di recruiting – con punteggio e consigli concreti.")},
+    zeugnis:  {ico:"📜", title:L("Zeugnis-Analyse","Reference Analysis","Analyse de certificat","Analisi referenze"), desc:L("Entschlüsselt den Schweizer Zeugnis-Code und zeigt was dein Arbeitszeugnis wirklich bedeutet.","Decodes the Swiss reference code and shows what your work reference really means.","Décode le code suisse des certificats et montre ce que votre certificat signifie vraiment.","Decodifica il codice svizzero dei certificati e mostra cosa significa davvero il tuo certificato.")},
+    jobmatch: {ico:"🎯", title:"Job-Matching",                                                     desc:L("Findet deine Top 5 passenden Stellenprofile basierend auf deinen Skills und Wünschen.","Finds your top 5 matching job profiles based on your skills and preferences.","Trouve vos 5 postes idéaux basés sur vos compétences et préférences.","Trova i tuoi 5 profili di lavoro ideali basati sulle tue competenze e preferenze.")},
+    coach:    {ico:"🎤", title:"Interview-Coach",                                                  desc:L("Simuliert ein echtes Vorstellungsgespräch und gibt dir danach eine Bewertung mit Tipps.","Simulates a real job interview and gives you a rating with tips afterwards.","Simule un vrai entretien d'embauche et vous donne ensuite une évaluation avec des conseils.","Simula un vero colloquio di lavoro e ti dà poi una valutazione con consigli.")},
+    excel:    {ico:"📊", title:"Excel-Generator",                                                  desc:L("Beschreibe deine Tabelle – die KI erstellt Struktur, Spalten, Beispieldaten und Formeln.","Describe your spreadsheet – AI creates structure, columns, sample data and formulas.","Décrivez votre tableau – l'IA crée structure, colonnes, données d'exemple et formules.","Descrivi il tuo foglio – l'IA crea struttura, colonne, dati di esempio e formule.")},
+    pptx:     {ico:"📽️", title:"PowerPoint-Maker",                                                desc:L("Erstellt eine komplette Präsentation mit Folien, Bullet Points und Sprechernotizen.","Creates a complete presentation with slides, bullet points and speaker notes.","Crée une présentation complète avec diapositives, points clés et notes de présentateur.","Crea una presentazione completa con diapositive, punti chiave e note del presentatore.")},
+  };
+  const ToolBanner=({pageId})=>{const info=TOOL_INFO[pageId];if(!info)return null;return(
+    <div style={{background:"linear-gradient(135deg,rgba(16,185,129,.08),rgba(16,185,129,.03))",border:"1px solid rgba(16,185,129,.2)",borderRadius:14,padding:"16px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:14}}>
+      <div style={{fontSize:32,flexShrink:0}}>{info.ico}</div>
+      <div><div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,marginBottom:3}}>{info.title}</div>
+      <div style={{fontSize:13,color:"var(--mu)",lineHeight:1.5}}>{info.desc}</div></div>
+    </div>
+  );};
+
+  // ══════════════════ LANDING PAGE ══════════════════
+  if(page==="landing") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <div>
+      <Nav/>
+      {/* HERO */}
+      <section className="hero"><div className="hbg"/><div className="hdots"/>
+        <div className="con">
+          <div className="eyebrow">{t.hero.eye}</div>
+          <h1 className="hh">{t.hero.h1a}<br/>{t.hero.h1b} <em>{t.hero.h1c}</em></h1>
+          <p className="hsub">{t.hero.sub}</p>
+          <div className="hctas">
+            <button className="btn b-em b-lg" onClick={()=>navTo("app")}>{t.hero.cta}</button>
+            <button className="btn b-out" onClick={()=>document.getElementById("tools")?.scrollIntoView({behavior:"smooth"})}>{t.hero.how}</button>
+          </div>
+          <div className="hstats">{t.hero.stats.map((s,i)=><div key={i}><div className="stat-n">{s.n}</div><div className="stat-l">{s.l}</div></div>)}</div>
+        </div>
+      </section>
+
+      {/* ═══ TOOLS HEADER ═══ */}
+      <section style={{padding:"88px 0 0",background:"var(--bg)"}} id="tools">
+        <div className="con">
+          <div className="sh shc">
+            <div className="seye">{lang==="de"?"✦ 18+ Tools – ein Abo":lang==="en"?"✦ 18+ Tools – one subscription":lang==="fr"?"✦ 18+ outils – un abonnement":"✦ 18+ strumenti – un abbonamento"}</div>
+            <h2 className="st">{lang==="de"?"Nicht nur für Jobsuchende.":lang==="en"?"Not just for job seekers.":lang==="fr"?"Pas seulement pour les chercheurs d'emploi.":"Non solo per chi cerca lavoro."}</h2>
+            <p className="ss">{lang==="de"?"Karriere, Schule, Produktivität – alles in einem Abo für CHF 19.90/Monat.":lang==="en"?"Career, school, productivity – all in one subscription for CHF 19.90/month.":lang==="fr"?"Carrière, école, productivité – tout pour CHF 19.90/mois.":"Carriera, scuola, produttività – tutto per CHF 19.90/mese."}</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── KARRIERE DARK SECTION ── */}
+      <section style={{background:"var(--dk)",padding:"0 0 72px",position:"relative",overflow:"hidden"}}>
+        <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(rgba(16,185,129,.05) 1px,transparent 1px)",backgroundSize:"28px 28px",pointerEvents:"none"}}/>
+        <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse 60% 70% at 80% 50%,rgba(16,185,129,.07),transparent)",pointerEvents:"none"}}/>
+        <div className="con" style={{position:"relative"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,paddingTop:52,marginBottom:28}}>
+            <div style={{width:36,height:36,background:"var(--em3)",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>💼</div>
+            <div>
+              <div style={{fontFamily:"var(--hd)",fontSize:21,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>{lang==="de"?"Karriere & Bewerbung":lang==="en"?"Career & Applications":lang==="fr"?"Carrière & Candidatures":"Carriera & Candidature"}</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.3)",marginTop:2}}>{lang==="de"?"Für Jobsuchende & Berufstätige":lang==="en"?"For job seekers & professionals":lang==="fr"?"Pour chercheurs d'emploi & professionnels":"Per chi cerca lavoro & professionisti"}</div>
+            </div>
+          </div>
+
+          {/* Featured row */}
+          <div style={{display:"grid",gridTemplateColumns:"1.6fr 1fr 1fr",gap:14,marginBottom:14}}>
+            {(()=>{const item=t.tools.items[0]; return(
+              <div onClick={()=>navTo(item.page)} style={{cursor:"pointer",background:"linear-gradient(135deg,rgba(16,185,129,.14),rgba(16,185,129,.04))",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:20,padding:30,position:"relative",overflow:"hidden",transition:"all .22s",gridRow:"span 2"}}
+                onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";e.currentTarget.style.boxShadow="0 20px 48px rgba(16,185,129,.18)";}}
+                onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
+                <div style={{position:"absolute",top:-20,right:-20,width:110,height:110,background:"radial-gradient(circle,rgba(16,185,129,.18),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
+                <div style={{fontSize:42,marginBottom:12}}>{item.ico}</div>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                  <div style={{fontFamily:"var(--hd)",fontSize:22,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>{item.t}</div>
+                  <span style={{fontSize:10,fontWeight:700,background:"rgba(16,185,129,.2)",color:"var(--em)",border:"1px solid rgba(16,185,129,.3)",padding:"2px 9px",borderRadius:20,textTransform:"uppercase",letterSpacing:"1px",flexShrink:0}}>1× Gratis</span>
+                </div>
+                <p style={{fontSize:13,color:"rgba(255,255,255,.48)",lineHeight:1.75,marginBottom:18}}>{item.p}</p>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:22}}>
+                  {["Motivationsschreiben","CV","Live-Streaming","PDF"].map((tag,j)=>(
+                    <span key={j} style={{fontSize:11,fontWeight:600,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.09)",color:"rgba(255,255,255,.45)",padding:"3px 10px",borderRadius:20}}>{tag}</span>
+                  ))}
+                </div>
+                <div style={{display:"inline-flex",alignItems:"center",gap:7,background:"var(--em)",color:"white",padding:"10px 20px",borderRadius:10,fontSize:13,fontWeight:700}}>
+                  {lang==="de"?"Jetzt starten →":lang==="en"?"Start now →":lang==="fr"?"Commencer →":"Inizia →"}
+                </div>
+              </div>
+            );})()}
+            {[t.tools.items[1],t.tools.items[2]].map((item,i)=>(
+              <div key={i} onClick={()=>navTo(item.page)} style={{cursor:"pointer",background:"rgba(59,130,246,.08)",border:"1.5px solid rgba(59,130,246,.2)",borderRadius:16,padding:22,transition:"all .22s"}}
+                onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.borderColor="rgba(59,130,246,.45)";e.currentTarget.style.boxShadow="0 8px 32px rgba(59,130,246,.12)";}}
+                onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.borderColor="rgba(59,130,246,.2)";e.currentTarget.style.boxShadow="none";}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}><div style={{fontSize:26}}>{item.ico}</div><span style={{fontSize:10,fontWeight:700,background:"rgba(59,130,246,.15)",color:"#60a5fa",border:"1px solid rgba(59,130,246,.2)",padding:"2px 8px",borderRadius:20}}>PRO</span></div>
+                <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700,color:"white",marginBottom:5}}>{item.t}</div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,.38)",lineHeight:1.65}}>{item.p}</div>
+                <div style={{marginTop:11,fontSize:12,color:"#60a5fa",fontWeight:600}}>{lang==="de"?"Öffnen →":"Open →"}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* 4 equal cards */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:14}}>
+            {t.tools.items.slice(3).map((item,i)=>{
+              const C2=[
+                {bg:"rgba(245,158,11,.08)",bd:"rgba(245,158,11,.22)",hv:"rgba(245,158,11,.4)",tc:"#fbbf24"},
+                {bg:"rgba(16,185,129,.07)",bd:"rgba(16,185,129,.2)",hv:"rgba(16,185,129,.4)",tc:"#34d399"},
+                {bg:"rgba(167,139,250,.08)",bd:"rgba(167,139,250,.22)",hv:"rgba(167,139,250,.4)",tc:"#a78bfa"},
+                {bg:"rgba(251,113,133,.08)",bd:"rgba(251,113,133,.18)",hv:"rgba(251,113,133,.38)",tc:"#fb7185"},
+              ][i%4];
+              return(
+                <div key={i} onClick={()=>navTo(item.page)} style={{cursor:"pointer",background:C2.bg,border:`1.5px solid ${C2.bd}`,borderRadius:16,padding:20,transition:"all .22s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.borderColor=C2.hv;e.currentTarget.style.boxShadow=`0 8px 28px ${C2.bg}`;}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.borderColor=C2.bd;e.currentTarget.style.boxShadow="none";}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}><div style={{fontSize:24}}>{item.ico}</div><span style={{fontSize:10,fontWeight:700,background:`${C2.tc}22`,color:C2.tc,padding:"2px 8px",borderRadius:20}}>PRO</span></div>
+                  <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:700,color:"white",marginBottom:4}}>{item.t}</div>
+                  <div style={{fontSize:12,color:"rgba(255,255,255,.38)",lineHeight:1.6,marginBottom:10}}>{item.p}</div>
+                  <div style={{fontSize:12,color:C2.tc,fontWeight:600}}>{lang==="de"?"Öffnen →":"Open →"}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Karriere mini tools */}
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:"2px",textTransform:"uppercase",color:"rgba(255,255,255,.18)",marginBottom:10}}>
+            {lang==="de"?"Weitere Karriere-Tools":lang==="en"?"More career tools":lang==="fr"?"Plus d'outils":"Altri strumenti"}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:9}}>
+            {GENERIC_TOOLS.filter(g=>g.cat==="karriere").map(g=>(
+              <div key={g.id} onClick={()=>navTo(g.id)} style={{cursor:"pointer",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:13,padding:"14px 16px",transition:"all .2s",display:"flex",flexDirection:"column",gap:7}}
+                onMouseEnter={e=>{e.currentTarget.style.background="rgba(255,255,255,.06)";e.currentTarget.style.borderColor="rgba(16,185,129,.25)";e.currentTarget.style.transform="translateY(-2px)";}}
+                onMouseLeave={e=>{e.currentTarget.style.background="rgba(255,255,255,.03)";e.currentTarget.style.borderColor="rgba(255,255,255,.07)";e.currentTarget.style.transform="none";}}>
+                <div style={{fontSize:20}}>{g.ico}</div>
+                <div style={{fontFamily:"var(--hd)",fontSize:12,fontWeight:700,color:"white",lineHeight:1.3}}>{g.t[lang]}</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,.28)",lineHeight:1.45,flex:1}}>{g.sub[lang]}</div>
+                <div style={{fontSize:11,color:"var(--em)",fontWeight:600}}>→</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── SCHULE & PRODUKTIVITÄT LIGHT SECTION ── */}
+      <section style={{background:"var(--bg)",padding:"64px 0 88px"}}>
+        <div className="con">
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:44}}>
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:22}}>
+                <div style={{width:36,height:36,background:"rgba(8,145,178,.1)",border:"1.5px solid rgba(8,145,178,.22)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🎓</div>
+                <div>
+                  <div style={{fontFamily:"var(--hd)",fontSize:19,fontWeight:800,letterSpacing:"-.3px"}}>{lang==="de"?"Schule & Ausbildung":lang==="en"?"School & Education":lang==="fr"?"École & Formation":"Scuola & Formazione"}</div>
+                  <div style={{fontSize:12,color:"var(--mu)",marginTop:2}}>{lang==="de"?"Für Lernende, Lehrlinge & Studierende":lang==="en"?"For learners, apprentices & students":lang==="fr"?"Pour apprenants, apprentis & étudiants":"Per apprendisti e studenti"}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {GENERIC_TOOLS.filter(g=>g.cat==="ausbildung").map(g=>(
+                  <div key={g.id} onClick={()=>navTo(g.id)} style={{cursor:"pointer",background:"white",border:"1.5px solid var(--bo)",borderRadius:14,padding:"15px 20px",display:"flex",alignItems:"center",gap:13,transition:"all .2s",boxShadow:"0 1px 4px rgba(11,11,18,.04)"}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(8,145,178,.35)";e.currentTarget.style.transform="translateX(5px)";e.currentTarget.style.boxShadow="0 4px 20px rgba(8,145,178,.09)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--bo)";e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(11,11,18,.04)";}}>
+                    <div style={{width:40,height:40,background:"rgba(8,145,178,.07)",border:"1.5px solid rgba(8,145,178,.14)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{g.ico}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:700,marginBottom:2}}>{g.t[lang]}</div>
+                      <div style={{fontSize:12,color:"var(--mu)",lineHeight:1.5,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.sub[lang]}</div>
+                    </div>
+                    <div style={{fontSize:14,color:"#0891b2",fontWeight:700,flexShrink:0}}>→</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:22}}>
+                <div style={{width:36,height:36,background:"rgba(124,58,237,.09)",border:"1.5px solid rgba(124,58,237,.22)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>⚡</div>
+                <div>
+                  <div style={{fontFamily:"var(--hd)",fontSize:19,fontWeight:800,letterSpacing:"-.3px"}}>{lang==="de"?"Produktivität":lang==="en"?"Productivity":lang==="fr"?"Productivité":"Produttività"}</div>
+                  <div style={{fontSize:12,color:"var(--mu)",marginTop:2}}>{lang==="de"?"Für alle – Excel, PPT, E-Mail, Übersetzer":lang==="en"?"For all – Excel, PPT, email, translator":lang==="fr"?"Pour tous – Excel, PPT, e-mail, traducteur":"Per tutti – Excel, PPT, e-mail, traduttore"}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {[{page:"excel",ico:"📊",tl:{de:"Excel-Generator",en:"Excel Generator",fr:"Générateur Excel",it:"Generatore Excel"},sl:{de:"Profi-Tabellen mit Formeln per Beschreibung",en:"Pro spreadsheets with formulas from description",fr:"Tableaux pros avec formules sur description",it:"Fogli pro con formule da descrizione"},c:"#059669"},
+                  {page:"pptx",ico:"📽️",tl:{de:"PowerPoint-Maker",en:"PowerPoint Maker",fr:"Créateur PowerPoint",it:"Creatore PowerPoint"},sl:{de:"Präsentationen für Schule, Uni & Arbeit",en:"Presentations for school, uni & work",fr:"Présentations pour école, université & travail",it:"Presentazioni per scuola, università e lavoro"},c:"#2563eb"},
+                ].map(g=>(
+                  <div key={g.page} onClick={()=>navTo(g.page)} style={{cursor:"pointer",background:"white",border:`1.5px solid ${g.c}28`,borderRadius:14,padding:"15px 20px",display:"flex",alignItems:"center",gap:13,transition:"all .2s",boxShadow:"0 1px 4px rgba(11,11,18,.04)"}}
+                    onMouseEnter={e=>{e.currentTarget.style.transform="translateX(5px)";e.currentTarget.style.boxShadow=`0 4px 20px ${g.c}18`;}}
+                    onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(11,11,18,.04)";}}>
+                    <div style={{width:40,height:40,background:`${g.c}14`,border:`1.5px solid ${g.c}28`,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{g.ico}</div>
+                    <div style={{flex:1}}><div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:700,marginBottom:2}}>{g.tl[lang]}</div><div style={{fontSize:12,color:"var(--mu)"}}>{g.sl[lang]}</div></div>
+                    <div style={{fontSize:14,color:g.c,fontWeight:700,flexShrink:0}}>→</div>
+                  </div>
+                ))}
+                {GENERIC_TOOLS.filter(g=>g.cat==="produktivitaet").map(g=>(
+                  <div key={g.id} onClick={()=>navTo(g.id)} style={{cursor:"pointer",background:"white",border:"1.5px solid var(--bo)",borderRadius:14,padding:"15px 20px",display:"flex",alignItems:"center",gap:13,transition:"all .2s",boxShadow:"0 1px 4px rgba(11,11,18,.04)"}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(124,58,237,.3)";e.currentTarget.style.transform="translateX(5px)";e.currentTarget.style.boxShadow="0 4px 20px rgba(124,58,237,.08)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--bo)";e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(11,11,18,.04)";}}>
+                    <div style={{width:40,height:40,background:"rgba(124,58,237,.06)",border:"1.5px solid rgba(124,58,237,.14)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{g.ico}</div>
+                    <div style={{flex:1,minWidth:0}}><div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:700,marginBottom:2}}>{g.t[lang]}</div><div style={{fontSize:12,color:"var(--mu)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.sub[lang]}</div></div>
+                    <div style={{fontSize:14,color:"#7c3aed",fontWeight:700,flexShrink:0}}>→</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      {/* WHY */}
+      <section className="sec sec-w">
+        <div className="con">
+          <div className="sh"><div className="seye">{t.why.label}</div><h2 className="st">{t.why.title}</h2><p className="ss">{t.why.sub}</p></div>
+          <div className="why-vs">
+            <div className="why-col bad"><h4 style={{color:"#dc2626"}}>{t.why.badH}</h4><ul>{t.why.badL.map((x,i)=><li key={i}><span style={{color:"#fca5a5",flexShrink:0}}>✗</span><span>{x}</span></li>)}</ul></div>
+            <div className="why-col good"><h4 style={{color:"var(--em2)"}}>{t.why.goodH}</h4><ul>{t.why.goodL.map((x,i)=><li key={i}><span style={{color:"var(--em)",flexShrink:0}}>✓</span><span>{x}</span></li>)}</ul></div>
+          </div>
+        </div>
+      </section>
+
+      {/* HOW */}
+      <section className="sec sec-dk">
+        <div className="con">
+          <div className="sh"><div className="seye">{t.how.label}</div><h2 className="st">{t.how.title}</h2><p className="ss">{t.how.sub}</p></div>
+          <div className="srow">{t.how.steps.map((s,i)=><div key={i} className="sc"><div className="sn">{s.n}</div><h3>{s.t}</h3><p>{s.p}</p></div>)}</div>
+        </div>
+      </section>
+
+      {/* MARKET */}
+      <section className="sec sec-bg">
+        <div className="con">
+          <div className="sh"><div className="seye">{t.market.label}</div><h2 className="st">{t.market.title}</h2></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:18}}>
+            {t.market.points.map((p,i)=>(
+              <div key={i} style={{padding:"24px",background:"white",border:"1.5px solid var(--bo)",borderRadius:"var(--r2)"}}>
+                <div style={{fontSize:28,marginBottom:10}}>{p.ico}</div>
+                <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700,marginBottom:7}}>{p.t}</div>
+                <div style={{fontSize:13,color:"var(--mu)",lineHeight:1.7}}>{p.p}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* TESTI */}
+      <section className="sec sec-dk2">
+        <div className="con">
+          <div className="sh shc"><div className="seye">{t.testi.label}</div><h2 className="st">{t.testi.title}</h2></div>
+          <div className="tg">{t.testi.items.map((x,i)=><div key={i} className="tc2"><div className="ts">{x.s}</div><p className="tq">«{x.t}»</p><div className="tn">{x.a}</div><div className="tr">{x.r}</div></div>)}</div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section className="sec sec-dk" id="preise">
+        <div className="con">
+          <div className="sh shc"><div className="seye">{t.price.label}</div><h2 className="st">{t.price.title}</h2><p className="ss">{t.price.sub}</p></div>
+          <div className="btog">
+            <span className={`bto ${!yearly?"on":""}`} onClick={()=>setYearly(false)}>{t.price.monthly}</span>
+            <div className={`btsw ${yearly?"yr":""}`} onClick={()=>setYearly(v=>!v)}><div className="btt"/></div>
+            <span className={`bto ${yearly?"on":""}`} onClick={()=>setYearly(true)}>{t.price.yearly}</span>
+            {yearly&&<span className="save-t">{t.price.save}</span>}
+          </div>
+          <div className="pgrid">
+            {t.price.tiers.map(tier=>(
+              <div key={tier.id} className={`pc ${tier.best?"hl":""} ${tier.id==="team"?"hl2":""}`}>
+                {tier.best&&<div className="bst">{t.price.recom}</div>}
+                <div className={`ppl ${tier.best?"em":tier.id==="team"?"am":""}`}>{tier.name}</div>
+                {tier.price===0&&<><div className="ppr">CHF 0<span> / {lang==="en"?"mo":"Mo."}</span></div><div className="pper">{tier.note}</div></>}
+                {tier.priceM&&<><div className="ppr">CHF {yearly ? Number(tier.priceY).toFixed(2) : Number(tier.priceM).toFixed(2)}<span> / {lang==="en"?"mo":"Mo."}</span></div><div className="pper">{yearly ? `CHF ${(tier.priceY*12).toFixed(2)}/${lang==="en"?"yr":"J."} – ${lang==="de"?"jährlich abgerechnet":lang==="en"?"billed yearly":lang==="fr"?"facturé annuellement":"fatturato annualmente"}` : `CHF ${(tier.priceM*12).toFixed(2)}/${lang==="en"?"yr":"J."} – ${lang==="de"?"oder CHF "+Number(tier.priceY).toFixed(2)+"/Mo. jährlich":lang==="en"?"or CHF "+Number(tier.priceY).toFixed(2)+"/mo yearly":lang==="fr"?"ou CHF "+Number(tier.priceY).toFixed(2)+"/mois annuel":"o CHF "+Number(tier.priceY).toFixed(2)+"/mese annuale"}`}</div></>}
+                {tier.price===null&&<><div className="ppr" style={{fontSize:26,letterSpacing:0}}>{lang==="de"?"Auf Anfrage":lang==="fr"?"Sur demande":lang==="it"?"Su richiesta":"On request"}</div><div className="pper">{tier.note}</div></>}
+                <ul className="pfl">
+                  {tier.list.map(f=><li key={f}><span className="pck">✓</span>{f}</li>)}
+                  {(tier.no||[]).map(f=><li key={f} className="off"><span className="pcx">×</span>{f}</li>)}
+                </ul>
+                {tier.id==="free"&&<button className="btn b-out b-w" style={{borderColor:"rgba(255,255,255,.18)",color:"white"}} onClick={()=>navTo("app")}>{tier.btn}</button>}
+                {tier.id==="pro"&&<button className={`btn ${tier.btnS} b-w`} onClick={()=>window.open(stripeLink(),"_blank")}>{tier.btn}</button>}
+                {tier.id==="team"&&<button className={`btn b-out b-w`} style={{borderColor:"rgba(245,158,11,.3)",color:"rgba(245,158,11,.8)"}} onClick={()=>window.open(`mailto:${C.email}`)}>{tier.btn}</button>}
+              </div>
+            ))}
+          </div>
+          <div className="vb">
+            <h4>{t.price.valTitle}</h4>
+            {t.price.valPts.map((p,i)=><div key={i} className="vp"><span style={{color:"var(--em)",flexShrink:0}}>✓</span>{p}</div>)}
+          </div>
+          <div style={{textAlign:"center",marginTop:40}}>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:"rgba(255,255,255,.26)",marginBottom:16}}>{t.payments.label}</div>
+            <div className="pay-row">{t.payments.methods.map(m=><div key={m} className="pay-chip">{m}</div>)}</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.2)",marginTop:12}}>{t.payments.sub}</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="cta-sec">
+        <div className="csm">
+          <h2 style={{fontFamily:"var(--hd)",fontSize:"clamp(36px,5vw,60px)",fontWeight:800,color:"white",letterSpacing:"-2px",lineHeight:1.05,marginBottom:16}}>
+            {t.cta.title} <em style={{fontStyle:"normal",color:"var(--em)"}}>{t.cta.italic}</em>
+          </h2>
+          <p style={{fontSize:16,color:"rgba(255,255,255,.4)",marginBottom:32,lineHeight:1.7}}>{t.cta.sub}</p>
+          <button className="btn b-em b-lg" onClick={()=>navTo("app")}>{t.cta.btn}</button>
+        </div>
+      </section>
+      <Footer/>
+    </div>
+  </>);
+
+  // ══════════════════ APPLICATION TOOL ══════════════════
+  if(page==="app") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr dk">
+      <h1>{t.app.title}</h1><p>{t.app.sub}</p>
+      {step<3&&<div className="asteps">{t.app.steps.map((s,i)=><div key={i} className={`as ${i===step?"on":""} ${i<step?"done":""}`}>{i<step?"✓ ":`0${i+1}. `}{s}</div>)}</div>}
+    </div>
+    <div className="abody">
+      <UsageBar/>
+      <ToolBanner pageId="app"/>
+      {err&&<div className="err">⚠️ {err}<button style={{float:"right",background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontWeight:700}} onClick={()=>setErr("")}>✕</button></div>}
+
+      {step===0&&<div className="card">
+        <div className="ct">{lang==="de"?"Die Stelle":lang==="fr"?"Le poste":lang==="it"?"Il posto":"The position"}</div>
+        <div className="cs">{lang==="de"?"Wo möchtest du dich bewerben?":lang==="fr"?"Où souhaitez-vous postuler?":lang==="it"?"Dove vuoi candidarti?":"Where would you like to apply?"}</div>
+        <div className="fg2">
+          <div className="field"><label>{lang==="de"?"Stellenbezeichnung *":lang==="fr"?"Intitulé *":lang==="it"?"Titolo *":"Job title *"}</label><input value={job.title} onChange={e=>uj("title",e.target.value)}/></div>
+          <div className="field"><label>{lang==="de"?"Unternehmen *":lang==="fr"?"Entreprise *":lang==="it"?"Azienda *":"Company *"}</label><input value={job.company} onChange={e=>uj("company",e.target.value)}/></div>
+        </div>
+        <div className="field"><label>{lang==="de"?"Branche":lang==="fr"?"Secteur":lang==="it"?"Settore":"Industry"}</label>
+          <select value={job.branch} onChange={e=>uj("branch",e.target.value)}><option value="">–</option>{t.app.branches.map(b=><option key={b}>{b}</option>)}</select></div>
+        <div className="field"><label>{lang==="de"?"Stellenbeschreibung (empfohlen)":lang==="fr"?"Description (recommandé)":lang==="it"?"Descrizione (consigliato)":"Job description (recommended)"}</label>
+          <textarea value={job.desc} onChange={e=>uj("desc",e.target.value)} style={{minHeight:88}}/></div>
+        <div className="frow"><button className="btn b-outd" onClick={()=>navTo("landing")}>{t.app.back}</button><button className="btn b-dk" disabled={!job.title||!job.company} onClick={()=>setStep(1)}>{t.app.next}</button></div>
+      </div>}
+
+      {step===1&&<div className="card">
+        <div className="ct">{lang==="de"?"Dein Profil":lang==="fr"?"Votre profil":lang==="it"?"Il tuo profilo":"Your profile"}</div>
+        <div className="cs">{lang==="de"?"Die KI erstellt massgeschneiderte Unterlagen.":lang==="fr"?"L'IA créera des documents sur mesure.":lang==="it"?"L'IA creerà documenti su misura.":"The AI will create tailored documents."}</div>
+        <div className="fg2">
+          <div className="field"><label>{lang==="de"?"Name *":lang==="fr"?"Nom *":lang==="it"?"Nome *":"Name *"}</label><input value={prof.name} onChange={e=>up("name",e.target.value)}/></div>
+          <div className="field"><label>{lang==="de"?"Beruf *":lang==="fr"?"Métier *":lang==="it"?"Lavoro *":"Job *"}</label><input value={prof.beruf} onChange={e=>up("beruf",e.target.value)}/></div>
+          <div className="field"><label>{lang==="de"?"Erfahrung (Jahre)":lang==="fr"?"Expérience (ans)":lang==="it"?"Esperienza (anni)":"Experience (years)"}</label><input type="number" min="0" max="50" value={prof.erfahrung} onChange={e=>up("erfahrung",e.target.value)}/></div>
+          <div className="field"><label>{lang==="de"?"Sprachen":lang==="fr"?"Langues":lang==="it"?"Lingue":"Languages"}</label><input value={prof.sprachen} onChange={e=>up("sprachen",e.target.value)} placeholder="Deutsch, English, Français"/></div>
+        </div>
+        <div className="field"><label>{lang==="de"?"Skills & Stärken":lang==="fr"?"Compétences":lang==="it"?"Competenze":"Skills"}</label><textarea value={prof.skills} onChange={e=>up("skills",e.target.value)}/></div>
+        <div className="field"><label>{lang==="de"?"Ausbildung":lang==="fr"?"Formation":lang==="it"?"Formazione":"Education"}</label><textarea value={prof.ausbildung} onChange={e=>up("ausbildung",e.target.value)} style={{minHeight:64}}/></div>
+        <div className="frow"><button className="btn b-outd" onClick={()=>setStep(0)}>{t.app.back}</button><button className="btn b-dk" disabled={!prof.name||!prof.beruf} onClick={()=>setStep(2)}>{t.app.next}</button></div>
+      </div>}
+
+      {step===2&&<div className="card">
+        <div className="ct">{lang==="de"?"Dokument wählen":lang==="fr"?"Choisir le document":lang==="it"?"Scegli il documento":"Choose document"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+          {[{k:"motivation",ico:"✍️",t:lang==="de"?"Motivationsschreiben":lang==="fr"?"Lettre de motivation":lang==="it"?"Lettera di motivazione":"Cover letter",d:lang==="de"?"Persönlich, überzeugend.":lang==="fr"?"Personnelle, convaincante.":lang==="it"?"Personale, convincente.":"Personal, convincing."},
+            {k:"lebenslauf",ico:"📋",t:"Curriculum Vitae",d:lang==="de"?"Schweizer Format.":lang==="fr"?"Format suisse.":lang==="it"?"Formato svizzero.":"Swiss format."},
+            {k:"beide",ico:"🚀",t:lang==="de"?"Beides":lang==="fr"?"Les deux":lang==="it"?"Entrambi":"Both",d:lang==="de"?"Vollständiges Dossier.":lang==="fr"?"Dossier complet.":lang==="it"?"Dossier completo.":"Complete dossier.",full:true}
+          ].map(d=><button key={d.k} className={`tool-card ${docType===d.k?"":""}`} style={{cursor:"pointer",border:`1.5px solid ${docType===d.k?"var(--em)":"var(--bo)"}`,background:docType===d.k?"var(--em3)":"white",gridColumn:d.full?"1/-1":"auto"}} onClick={()=>setDocType(d.k)}>
+            <div style={{fontSize:22,marginBottom:6}}>{d.ico}</div>
+            <div style={{fontWeight:600,fontSize:14,marginBottom:3}}>{d.t}</div>
+            <div style={{fontSize:12,color:"var(--mu)"}}>{d.d}</div>
+          </button>)}
+        </div>
+        <div className="frow"><button className="btn b-outd" onClick={()=>setStep(1)}>{t.app.back}</button><button className="btn b-em" onClick={generate} disabled={streaming}>{streaming?t.app.genLoad:t.app.genBtn}</button></div>
+      </div>}
+
+      {(streaming||(step===3&&(results.motivation||results.lebenslauf)))&&<div className="card" style={{marginTop:streaming?18:0}}>
+        {streaming&&<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,color:"var(--em)",fontWeight:600,fontSize:14}}>
+          <div style={{width:9,height:9,background:"var(--em)",borderRadius:"50%",animation:"blink .8s step-end infinite"}}/>{t.app.stream}
+        </div>}
+        {docType==="beide"&&<div className="r-tabs">
+          <button className={`r-tab ${tab===0?"on":""}`} onClick={()=>{setTab(0);setEditing(false)}}>{lang==="de"?"✍️ Motivationsschreiben":lang==="fr"?"✍️ Lettre":lang==="it"?"✍️ Lettera":"✍️ Cover letter"}</button>
+          <button className={`r-tab ${tab===1?"on":""}`} onClick={()=>{setTab(1);setEditing(false)}}>{lang==="de"?"📋 Lebenslauf":"📋 CV"}</button>
+        </div>}
+        {!streaming&&<div className="r-bar">
+          {copied&&<span className="ok" style={{margin:0,padding:"4px 11px"}}>{t.app.copied}</span>}
+          <button className="btn b-outd b-sm" onClick={copyDoc}>📋 {t.app.copy}</button>
+          <button className="btn b-outd b-sm" onClick={()=>{if(!pro){setPw(true);return;}setEditing(!editing);}}>{editing?`👁 ${t.app.prev}`:`✏️ ${t.app.edit}`}{!pro&&<span className="pb" style={{fontSize:8,marginLeft:3}}>PRO</span>}</button>
+          <button className="btn b-outd b-sm" onClick={pdfDoc}>📥 PDF{!pro&&<span className="pb" style={{fontSize:8,marginLeft:3}}>PRO</span>}</button>
+          <button className="btn b-outd b-sm" onClick={()=>{setStep(2);setResults({motivation:"",lebenslauf:""});setEditing(false);}}>🔄 {t.app.regen}</button>
+        </div>}
+        {editing&&!streaming?<textarea className="r-edit" value={curDoc()} onChange={e=>setCurDoc(e.target.value)}/>:<div className="r-doc">{curDoc()}{streaming&&<span className="cursor"/>}</div>}
+      </div>}
+
+      {step===3&&!streaming&&<>
+        {/* Email */}
+        <div className="card" style={{marginTop:14}}>
+          <div className="ct" style={{fontSize:17}}>{t.email.title}</div>
+          {!pro?<LockMsg sub={t.modal.sub}/>:<>
+            <div className="fg2">
+              <div className="field"><label>{t.email.toLbl}</label><input type="email" value={eTo} onChange={e=>setETo(e.target.value)} placeholder="recruiting@firma.ch"/></div>
+              <div className="field"><label>{t.email.subjLbl}</label><input value={eSub} onChange={e=>setESub(e.target.value)}/></div>
+            </div>
+            <div className="field"><label>{lang==="de"?"Optionale Nachricht":lang==="fr"?"Message optionnel":lang==="it"?"Messaggio opzionale":"Optional message"}</label><textarea value={eMsg} onChange={e=>setEMsg(e.target.value)} placeholder={t.email.msgPh} style={{minHeight:60}}/></div>
+            <button className="btn b-em" disabled={!eTo} onClick={openEmail}>{t.email.btn}</button>
+            <div className="eml-note">ℹ️ {t.email.note}</div>
+          </>}
+        </div>
+        {/* Quick nav */}
+        {pro?<div style={{marginTop:14,display:"flex",gap:9,flexWrap:"wrap"}}>
+          <button className="btn b-outd b-sm" style={{flex:1}} onClick={()=>navTo("ats")}>{t.app.goAts}</button>
+          <button className="btn b-outd b-sm" style={{flex:1}} onClick={()=>navTo("coach")}>{t.app.goCoach}</button>
+          <button className="btn b-outd b-sm" style={{flex:1}} onClick={()=>navTo("jobmatch")}>{lang==="de"?"🎯 Job-Matching →":lang==="fr"?"🎯 Matching →":lang==="it"?"🎯 Matching →":"🎯 Job matching →"}</button>
+        </div>:<div className="ipw">
+          <h3>{t.app.pw.title}</h3><p>{t.app.pw.sub}</p>
+          <div className="ipw-pr">CHF {C.priceM}<span> / {lang==="en"?"mo":"Mo."}</span></div>
+          <div className="ipw-fts">{t.app.pw.feats.map(f=><div key={f} className="ipw-ft"><span style={{color:"var(--em)"}}>✓</span>{f}</div>)}</div>
+          <button className="btn b-em" onClick={()=>window.open(stripeLink(),"_blank")}>{t.app.pw.btn}</button>
+          <div style={{marginTop:10,fontSize:11,color:"rgba(255,255,255,.25)"}}>{t.app.pw.secure}</div>
+        </div>}
+      </>}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ ATS CHECK ══════════════════
+  if(page==="ats") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr dk"><h1>{t.ats.title}</h1><p>{t.ats.sub}</p></div>
+    <div className="abody">
+      <ToolBanner pageId="ats"/>
+      {err&&<div className="err">⚠️ {err}</div>}
+      {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
+        <div className="card">
+          <div className="ct">{t.ats.title}</div><div className="cs">{t.ats.sub}</div>
+          <div className="fg2">
+            <div className="field"><label>{t.ats.jobLbl}</label><input value={atsJob} onChange={e=>setAtsJob(e.target.value)}/></div>
+            <div className="field" style={{gridColumn:"1/-1"}}><label>{t.ats.jobDescLbl}</label><textarea value={atsDesc} onChange={e=>setAtsDesc(e.target.value)} placeholder={t.ats.jobDescPh} style={{minHeight:72}}/></div>
+            <div className="field" style={{gridColumn:"1/-1"}}><label>{t.ats.cvLbl}</label><textarea value={atsCv} onChange={e=>setAtsCv(e.target.value)} placeholder={t.ats.cvPh} style={{minHeight:160}}/></div>
+          </div>
+          <button className="btn b-em" onClick={runATS} disabled={atsLoad||!atsCv||!atsJob}>{atsLoad?t.ats.loading:t.ats.btn}</button>
+        </div>
+        {atsRes&&<div style={{marginTop:16}}>
+          {/* Score ring */}
+          <div className="ats-score">
+            <div className="ats-ring">
+              <svg width="80" height="80" viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="6"/>
+                <circle cx="40" cy="40" r="34" fill="none" stroke={atsRes.score>=70?"#10b981":atsRes.score>=50?"#f59e0b":"#ef4444"} strokeWidth="6" strokeLinecap="round"
+                  strokeDasharray={`${2*Math.PI*34*atsRes.score/100} ${2*Math.PI*34}`}/>
+              </svg>
+              <div className="ats-ring-text"><div className="ats-ring-n">{atsRes.score}</div><div className="ats-ring-l">ATS</div></div>
+            </div>
+            <div className="ats-info">
+              <div className="ats-grade">{t.ats.scoreLabel}: {atsRes.score}/100 – {atsRes.grade}</div>
+              <div className="ats-sub">{atsRes.summary}</div>
+            </div>
+          </div>
+          {/* Keywords */}
+          <div className="card" style={{marginBottom:12}}>
+            <h4 style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,marginBottom:10,color:"var(--em2)"}}>{t.ats.found}</h4>
+            <div className="kw-list">{(atsRes.keywords_found||[]).map((k,i)=><span key={i} className="kw found">{k}</span>)}</div>
+          </div>
+          <div className="card" style={{marginBottom:12}}>
+            <h4 style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,marginBottom:10,color:"#dc2626"}}>{t.ats.miss}</h4>
+            <div className="kw-list">{(atsRes.keywords_missing||[]).map((k,i)=><span key={i} className="kw miss">{k}</span>)}</div>
+          </div>
+          <div className="card">
+            <h4 style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,marginBottom:14}}>{t.ats.tips}</h4>
+            {(atsRes.tips||[]).map((tip,i)=><div key={i} style={{display:"flex",gap:10,padding:"10px 0",borderBottom:"1px solid var(--bos)"}}>
+              <div style={{width:24,height:24,background:"var(--em3)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"var(--em2)",flexShrink:0}}>{i+1}</div>
+              <div style={{fontSize:13,color:"var(--mu)",lineHeight:1.7,paddingTop:2}}>{tip}</div>
+            </div>)}
+          </div>
+          <div style={{marginTop:14,display:"flex",gap:9}}>
+            <button className="btn b-dk" style={{flex:1}} onClick={()=>navTo("app")}>{lang==="de"?"✍️ Bewerbung verbessern":lang==="fr"?"✍️ Améliorer candidature":lang==="it"?"✍️ Migliorare candidatura":"✍️ Improve application"}</button>
+            <button className="btn b-outd b-sm" onClick={()=>{setAtsRes(null);setAtsCv("");setAtsJob("");}}>🔄</button>
+          </div>
+        </div>}
+      </>}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ ZEUGNIS ANALYSE ══════════════════
+  if(page==="zeugnis") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr am"><h1>{t.zeugnis.title}</h1><p>{t.zeugnis.sub}</p></div>
+    <div className="abody">
+      <ToolBanner pageId="zeugnis"/>
+      {err&&<div className="err">⚠️ {err}</div>}
+      {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
+        <div className="card">
+          <div className="ct">{t.zeugnis.title}</div><div className="cs">{t.zeugnis.sub}</div>
+          <div className="field"><label>{t.zeugnis.textLbl}</label><textarea value={zText} onChange={e=>setZText(e.target.value)} placeholder={t.zeugnis.textPh} style={{minHeight:180}}/></div>
+          <button className="btn b-em" onClick={runZeugnis} disabled={zLoad||!zText.trim()}>{zLoad?t.zeugnis.loading:t.zeugnis.btn}</button>
+        </div>
+        {zRes&&<div style={{marginTop:16}}>
+          {/* Overall */}
+          <div className="card" style={{marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
+              <div className={`z-grade ${zRes.grade}`}>{zRes.grade}</div>
+              <div>
+                <div style={{fontFamily:"var(--hd)",fontSize:20,fontWeight:800,marginBottom:4}}>{t.zeugnis.overall}: {zRes.grade_text}</div>
+                <div style={{fontSize:13,color:"var(--mu)",lineHeight:1.65}}>{zRes.overall}</div>
+              </div>
+            </div>
+          </div>
+          {/* Phrases */}
+          <div className="card" style={{marginBottom:12}}>
+            <h4 style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,marginBottom:14}}>{t.zeugnis.phrases}</h4>
+            {(zRes.phrases||[]).map((ph,i)=>(
+              <div key={i} className="z-item">
+                <div className={`z-grade ${ph.rating}`} style={{fontSize:14,width:36,height:36}}>{ph.rating}</div>
+                <div className="z-content">
+                  <div className="z-phrase">«{ph.original}»</div>
+                  <div className="z-meaning">💡 {ph.decoded}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Tips */}
+          <div className="card">
+            <h4 style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,marginBottom:14}}>{t.zeugnis.tips}</h4>
+            {(zRes.tips||[]).map((tip,i)=><div key={i} style={{display:"flex",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bos)",fontSize:13,color:"var(--mu)",lineHeight:1.65}}>
+              <span style={{color:"var(--am)",flexShrink:0}}>→</span>{tip}
+            </div>)}
+          </div>
+          <button className="btn b-outd b-sm" style={{marginTop:12}} onClick={()=>{setZRes(null);setZText("");}}>🔄 {lang==="de"?"Neues Zeugnis":lang==="fr"?"Nouveau certificat":lang==="it"?"Nuovo certificato":"New reference"}</button>
+        </div>}
+      </>}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ JOB MATCHING ══════════════════
+  if(page==="jobmatch") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr vi"><h1>{t.jobmatch.title}</h1><p>{t.jobmatch.sub}</p></div>
+    <div className="abody">
+      <ToolBanner pageId="jobmatch"/>
+      {err&&<div className="err">⚠️ {err}</div>}
+      {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
+        <div className="card">
+          <div className="ct">{t.jobmatch.title}</div><div className="cs">{t.jobmatch.sub}</div>
+          <div className="field"><label>{t.jobmatch.skillsLbl}</label><textarea value={jmSkills||prof.skills} onChange={e=>setJmSkills(e.target.value)} placeholder={t.jobmatch.skillsPh} style={{minHeight:100}}/></div>
+          <div className="fg2">
+            <div className="field"><label>{t.jobmatch.eduLbl}</label><input value={jmEdu||prof.ausbildung} onChange={e=>setJmEdu(e.target.value)} placeholder={t.jobmatch.eduPh}/></div>
+            <div className="field"><label>{t.jobmatch.prefLbl}</label><input value={jmPref} onChange={e=>setJmPref(e.target.value)} placeholder={t.jobmatch.prefPh}/></div>
+          </div>
+          <button className="btn b-em" onClick={runJM} disabled={jmLoad||!jmSkills&&!prof.skills}>{jmLoad?t.jobmatch.loading:t.jobmatch.btn}</button>
+        </div>
+        {jmRes&&<div style={{marginTop:16}}>
+          {(jmRes.matches||[]).map((m,i)=>(
+            <div key={i} className="jm-result">
+              <div className="jm-top">
+                <div className="jm-rank">#{m.rank}</div>
+                <div className="jm-info">
+                  <div className="jm-title">{m.title}</div>
+                  <div style={{fontSize:12,color:"var(--mu)"}}>{m.industry} {m.salary&&`· ${m.salary}`}</div>
+                </div>
+                <div className="jm-bar-wrap">
+                  <div className="jm-pct">{m.fit}%</div>
+                  <div className="jm-bar"><div className="jm-bar-fi" style={{width:`${m.fit}%`}}/></div>
+                </div>
+              </div>
+              <div className="jm-body">
+                {m.description}
+                <div className="jm-chips">{(m.skills_match||[]).map((s,j)=><span key={j} className="jm-chip">✓ {s}</span>)}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{marginTop:14,display:"flex",gap:9}}>
+            <button className="btn b-em" style={{flex:1}} onClick={()=>navTo("app")}>{lang==="de"?"✍️ Jetzt bewerben →":lang==="fr"?"✍️ Postuler →":lang==="it"?"✍️ Candidarsi →":"✍️ Apply now →"}</button>
+            <button className="btn b-outd b-sm" onClick={()=>setJmRes(null)}>🔄</button>
+          </div>
+        </div>}
+      </>}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ LINKEDIN ══════════════════
+  if(page==="linkedin") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr bl"><h1>{t.linkedin.title}</h1><p>{t.linkedin.sub}</p></div>
+    <div className="abody">
+      <ToolBanner pageId="linkedin"/>
+      {err&&<div className="err">⚠️ {err}</div>}
+      {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
+        <div className="card">
+          <div className="ct">{t.linkedin.title}</div><div className="cs">{t.linkedin.sub}</div>
+          <div className="field"><label>{t.linkedin.analyzeLabel}</label><textarea value={liData.text} onChange={e=>setLiData(d=>({...d,text:e.target.value}))} placeholder={t.linkedin.analyzePh} style={{minHeight:100}}/></div>
+          <div className="fg2">
+            <div className="field"><label>{t.linkedin.roleLbl}</label><input value={liData.role} onChange={e=>setLiData(d=>({...d,role:e.target.value}))} placeholder={t.linkedin.rolePh}/></div>
+            <div className="field"><label>{t.linkedin.achLbl}</label><input value={liData.ach} onChange={e=>setLiData(d=>({...d,ach:e.target.value}))} placeholder={t.linkedin.achPh}/></div>
+          </div>
+          <button className="btn b-bl" onClick={runLI} disabled={liLoad}>{liLoad?t.linkedin.load:t.linkedin.btn}</button>
+        </div>
+        {liRes&&<>
+          <div className="li-res" style={{marginTop:14}}><h4>🔵 {t.linkedin.resH}</h4><div style={{fontSize:16,fontWeight:600,color:"#0a66c2"}}>{liRes.headline}</div><button className="btn b-outd b-sm" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(liRes.headline)}>📋 {t.linkedin.copy}</button></div>
+          <div className="li-res"><h4>📝 {t.linkedin.resA}</h4><div style={{fontSize:14,lineHeight:1.8,color:"var(--ink)",whiteSpace:"pre-wrap"}}>{liRes.about}</div><button className="btn b-outd b-sm" style={{marginTop:10}} onClick={()=>navigator.clipboard.writeText(liRes.about)}>📋 {t.linkedin.copy}</button></div>
+          <div className="li-res"><h4>🏷️ {t.linkedin.resS}</h4><div className="li-skills">{(liRes.skills||[]).map((s,i)=><span key={i} className="li-sk">{s}</span>)}</div></div>
+          <button className="btn b-outd b-sm" style={{marginTop:10}} onClick={()=>{setLiRes(null);}}>🔄 {lang==="de"?"Neu":lang==="fr"?"Nouveau":lang==="it"?"Nuovo":"New"}</button>
+        </>}
+      </>}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ CHECKLIST ══════════════════
+  if(page==="checklist") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr dk"><h1>{t.checklist.title}</h1><p>{t.checklist.sub}</p></div>
+    <div className="abody">
+      {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
+        {(()=>{const done=t.checklist.items.filter(i=>ck[i.id]).length,tot=t.checklist.items.length,pct=Math.round(done/tot*100);return(
+          <div className="cl-sb">
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:7,color:"var(--em2)"}}>{t.checklist.score(done,tot)}</div>
+              <div className="cl-bar"><div className="cl-fi" style={{width:`${pct}%`}}/></div>
+            </div>
+            <div className="cl-pct">{pct}%</div>
+          </div>);})()}
+        {t.checklist.items.every(i=>ck[i.id])&&<div className="ok" style={{textAlign:"center",marginBottom:14}}>{t.checklist.perfect}</div>}
+        <div className="card">
+          {t.checklist.items.map(item=>(
+            <div key={item.id} className="cl-row" onClick={()=>setCk(c=>({...c,[item.id]:!c[item.id]}))}>
+              <div className={`cl-box ${ck[item.id]?"on":""}`}>{ck[item.id]&&"✓"}</div>
+              <div className="cl-text"><h5 className={ck[item.id]?"d":""}>{item.t}</h5><p>{item.d}</p></div>
+            </div>
+          ))}
+        </div>
+      </>}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ INTERVIEW COACH ══════════════════
+  if(page==="coach") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr dk"><h1>{t.coach.title}</h1><p>{t.coach.sub}</p></div>
+    <div className="abody">
+      <ToolBanner pageId="coach"/>
+      {err&&<div className="err">⚠️ {err}</div>}
+      {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:!icReady?(
+        <div className="card">
+          <div className="ct">{t.coach.ready}</div><div className="cs">{t.coach.readySub}</div>
+          {!job.title&&<div className="err" style={{marginBottom:14}}>{t.coach.noJob}</div>}
+          {job.title&&<div className="ok" style={{marginBottom:16}}>💼 {t.coach.qOf(0).replace("0/5","–")} {job.title}{job.company?` @ ${job.company}`:""}</div>}
+          <div className="frow"><button className="btn b-outd" onClick={()=>navTo("app")}>{t.app.back}</button><button className="btn b-em" onClick={startIC} disabled={icLoad||!job.title}>{icLoad?t.coach.prep:t.coach.start}</button></div>
+        </div>
+      ):(
+        <>
+          {icScore&&<div className="score-box">
+            <div style={{display:"flex",gap:20,flexWrap:"wrap",alignItems:"flex-start"}}>
+              <div><div className="score-n">{icScore.score}<span>/100</span></div><div className="score-bar"><div className="score-fi" style={{width:`${icScore.score}%`}}/></div></div>
+              <div style={{flex:1}}><div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700,marginBottom:9}}>{t.coach.result}</div><div style={{fontSize:13,lineHeight:1.7,color:"rgba(11,11,18,.7)",marginBottom:7}}>{icScore.feedback}</div>{icScore.staerken&&<div style={{fontSize:12,color:"var(--em2)",marginBottom:3}}>{t.coach.strengths} {icScore.staerken.join(", ")}</div>}{icScore.verbesserung&&<div style={{fontSize:12,color:"var(--mu)"}}>{t.coach.tip} {icScore.verbesserung}</div>}</div>
+            </div>
+          </div>}
+          <div className="card">
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div className="ct" style={{fontSize:17,margin:0}}>{t.coach.title}</div>
+              <div style={{fontSize:12,color:"var(--mu)",fontWeight:600}}>{t.coach.qOf(Math.min(icN,5))}</div>
+            </div>
+            <div className="chat" ref={chatRef}>
+              {icMsgs.map((m,i)=><div key={i} className={`msg ${m.r==="u"?"u":""}`}>
+                <div className={`msg-av ${m.r==="ai"?"ai":"us"}`}>{m.r==="ai"?"🤖":"👤"}</div>
+                <div className="msg-b">{m.t}</div>
+              </div>)}
+              {icLoad&&<div className="msg"><div className="msg-av ai">🤖</div><div className="msg-b" style={{color:"var(--mu)"}}>…</div></div>}
+            </div>
+            {!icScore&&<div className="ic-inp" style={{marginTop:14}}>
+              <textarea value={icIn} onChange={e=>setIcIn(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!icLoad){e.preventDefault();sendIC();}}} placeholder={t.coach.ph} disabled={icLoad}/>
+              <button className="btn b-em" onClick={sendIC} disabled={icLoad||!icIn.trim()}>{t.coach.send}</button>
+            </div>}
+            {icScore&&<button className="btn b-dk b-w" style={{marginTop:14}} onClick={()=>{setIcReady(false);setIcScore(null);setIcMsgs([]);setIcN(0);}}>{t.coach.newIC}</button>}
+          </div>
+        </>
+      )}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ EXCEL GENERATOR ══════════════════
+  if(page==="excel") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr" style={{background:"linear-gradient(135deg,#166534,#15803d)",padding:"48px 28px 0",textAlign:"center"}}>
+      <h1 style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>📊 {t.nav.excel}</h1>
+      <p style={{fontSize:14,color:"rgba(255,255,255,.4)",paddingBottom:34}}>{L("Professionelle Excel-Tabellen mit Formeln – für jeden Bereich.","Professional Excel spreadsheets with formulas – for any purpose.","Tableaux Excel professionnels avec formules – pour tous.","Fogli Excel professionali con formule – per tutti.")}</p>
+    </div>
+    <div className="abody">
+      <ToolBanner pageId="excel"/>
+      {err&&<div className="err">⚠️ {err}</div>}
+      {!pro?<div className="card"><LockMsg sub={L("Der Excel-Generator ist in Pro enthalten. CHF 19.90/Monat.","The Excel generator is included in Pro. CHF 19.90/month.","Le générateur Excel est inclus dans Pro. CHF 19.90/mois.","Il generatore Excel è incluso in Pro. CHF 19.90/mese.")}/></div>:<>
+        <div className="card">
+          <div className="ct">📊 {t.nav.excel}</div>
+          <div className="cs">{L("Beschreibe deine Aufgabe – die KI erstellt die perfekte Struktur mit Formeln.","Describe your task – AI creates the perfect structure with formulas.","Décrivez votre tâche – l'IA crée la structure parfaite avec formules.","Descrivi il tuo compito – l'IA crea la struttura perfetta con formule.")}</div>
+          {/* Examples */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:14}}>
+            {[
+              L("Budget-Übersicht Haushalt","Household budget overview","Budget ménage","Budget domestico"),
+              L("Reisekostenabrechnung","Travel expense report","Frais de déplacement","Nota spese viaggio"),
+              L("Stundenerfassung / Lohnabrechnung","Time tracking / Payroll","Suivi des heures / Paie","Rilevazione ore / Buste paga"),
+              L("Lehrplan-Noten-Tracker","Grade tracker","Suivi de notes","Tracker voti"),
+              L("Projektplan mit Meilensteinen","Project plan with milestones","Plan de projet","Piano di progetto"),
+              L("Inventarliste Shop","Shop inventory list","Liste d'inventaire","Lista inventario"),
+            ].map((ex,i)=><button key={i} className="btn b-outd b-sm" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>setXlTask(ex)}>{ex}</button>)}
+          </div>
+          <div className="field"><label>{L("Deine Aufgabe *","Your task *","Votre tâche *","Il tuo compito *")}</label>
+            <textarea value={xlTask} onChange={e=>setXlTask(e.target.value)} placeholder={L("z.B. Ich brauche eine Haushaltsbuchhaltung mit monatlichen Kategorien, Soll/Ist-Vergleich und Jahressummen.","e.g. I need a household budget with monthly categories, target/actual comparison and yearly totals.","ex. J'ai besoin d'un budget ménage avec catégories mensuelles, comparaison prévu/réel et totaux annuels.","es. Ho bisogno di un budget domestico con categorie mensili, confronto obiettivo/reale e totali annuali.")} style={{minHeight:100}}/></div>
+          <button className="btn b-em" onClick={runXL} disabled={xlLoad||!xlTask.trim()}>{xlLoad?L("Erstelle…","Creating…","Création…","Creando…"):L("📊 Excel erstellen","📊 Create Excel","📊 Créer Excel","📊 Crea Excel")}</button>
+        </div>
+
+        {xlRes&&<div style={{marginTop:16}}>
+          <div className="card" style={{background:"linear-gradient(135deg,rgba(22,101,52,.04),white)",border:"1.5px solid rgba(22,101,52,.2)",marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:16}}>
+              <div>
+                <div style={{fontFamily:"var(--hd)",fontSize:22,fontWeight:800,letterSpacing:"-.5px",marginBottom:5}}>📊 {xlRes.title}</div>
+                <div style={{fontSize:13,color:"var(--mu)",lineHeight:1.7}}>{xlRes.description}</div>
+              </div>
+              <button className="btn b-em b-sm" onClick={downloadCSV} style={{flexShrink:0}}>📥 {L("CSV herunterladen","Download CSV","Télécharger CSV","Scarica CSV")}</button>
+            </div>
+
+            {(xlRes.sheets||[]).map((sh,si)=>(
+              <div key={si} style={{marginBottom:16}}>
+                <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700,marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{background:"rgba(22,101,52,.1)",color:"#166534",padding:"2px 10px",borderRadius:20,fontSize:12,fontWeight:700}}>📋 {sh.name}</span>
+                  <span style={{fontSize:12,color:"var(--mu)",fontWeight:400}}>{sh.description}</span>
+                </div>
+                {/* Table preview */}
+                <div style={{overflowX:"auto",borderRadius:10,border:"1.5px solid var(--bo)",marginBottom:12}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                    <thead>
+                      <tr style={{background:"#166534"}}>{(sh.headers||[]).map((h,i)=><th key={i} style={{padding:"9px 14px",textAlign:"left",color:"white",fontWeight:700,whiteSpace:"nowrap"}}>{h}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {(sh.sample_rows||[]).map((row,ri)=><tr key={ri} style={{background:ri%2===0?"white":"#f9fafb"}}>
+                        {row.map((cell,ci)=><td key={ci} style={{padding:"8px 14px",borderBottom:"1px solid var(--bos)",color:"var(--ink)"}}>{cell}</td>)}
+                      </tr>)}
+                      <tr style={{background:"#f0fdf4",fontWeight:700}}>
+                        {(sh.headers||[]).map((_,i)=><td key={i} style={{padding:"8px 14px",color:"#166534",fontSize:12}}>{i===0?L("↳ Formeln","↳ Formulas","↳ Formules","↳ Formule"):""}</td>)}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                {/* Formulas */}
+                {sh.formulas?.length>0&&<>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:8,color:"#166534"}}>📐 {L("Enthaltene Formeln","Included formulas","Formules incluses","Formule incluse")}</div>
+                  {sh.formulas.map((f,fi)=>(
+                    <div key={fi} style={{display:"flex",gap:10,padding:"9px 0",borderBottom:"1px solid var(--bos)",alignItems:"flex-start"}}>
+                      <div style={{background:"#dcfce7",color:"#166534",padding:"3px 10px",borderRadius:6,fontFamily:"monospace",fontSize:12,flexShrink:0,fontWeight:700}}>{f.cell}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontFamily:"monospace",fontSize:12,color:"#166534",marginBottom:3,background:"#f0fdf4",padding:"3px 8px",borderRadius:4,display:"inline-block"}}>{f.formula}</div>
+                        <div style={{fontSize:12,color:"var(--mu)",marginTop:3}}>{f.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </>}
+                {sh.formatting_tips?.length>0&&<div style={{marginTop:10,padding:"10px 14px",background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.2)",borderRadius:10}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"#92400e",marginBottom:6}}>🎨 {L("Formatierungstipps","Formatting tips","Conseils de mise en forme","Consigli di formattazione")}</div>
+                  {sh.formatting_tips.map((tip,ti)=><div key={ti} style={{fontSize:12,color:"rgba(11,11,18,.6)",lineHeight:1.6,paddingLeft:4}}>→ {tip}</div>)}
+                </div>}
+              </div>
+            ))}
+          </div>
+
+          {/* General tips */}
+          <div className="card">
+            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700,marginBottom:12}}>💡 {L("Excel-Profi-Tipps","Excel pro tips","Conseils Excel pro","Consigli Excel pro")}</div>
+            {(xlRes.excel_tips||[]).map((tip,i)=><div key={i} style={{display:"flex",gap:9,padding:"9px 0",borderBottom:"1px solid var(--bos)",fontSize:13,color:"var(--mu)",lineHeight:1.65}}>
+              <span style={{color:"#166534",flexShrink:0}}>✓</span>{tip}
+            </div>)}
+            {xlRes.download_note&&<div style={{marginTop:14,padding:"10px 14px",background:"var(--em3)",border:"1px solid rgba(16,185,129,.2)",borderRadius:10,fontSize:13,color:"var(--em2)"}}>{xlRes.download_note}</div>}
+          </div>
+          <div style={{marginTop:12,display:"flex",gap:9}}>
+            <button className="btn b-em" style={{flex:1}} onClick={downloadCSV}>📥 {L("CSV für Excel herunterladen","Download CSV for Excel","Télécharger CSV pour Excel","Scarica CSV per Excel")}</button>
+            <button className="btn b-outd b-sm" onClick={()=>{setXlRes(null);setXlTask("");}}>🔄</button>
+          </div>
+        </div>}
+      </>}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ POWERPOINT MAKER ══════════════════
+  if(page==="pptx") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <Nav dark/>
+    <div className="page-hdr" style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",padding:"48px 28px 0",textAlign:"center"}}>
+      <h1 style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>📽️ {t.nav.pptx}</h1>
+      <p style={{fontSize:14,color:"rgba(255,255,255,.4)",paddingBottom:34}}>{L("Professionelle Präsentationen für Schule, Uni & Arbeit.","Professional presentations for school, uni & work.","Présentations professionnelles pour école, université & travail.","Presentazioni professionali per scuola, università e lavoro.")}</p>
+    </div>
+    <div className="abody">
+      <ToolBanner pageId="pptx"/>
+      {err&&<div className="err">⚠️ {err}</div>}
+      {!pro?<div className="card"><LockMsg sub={L("Der PowerPoint-Maker ist in Pro enthalten. CHF 19.90/Monat.","The PowerPoint maker is included in Pro. CHF 19.90/month.","Le créateur PowerPoint est inclus dans Pro. CHF 19.90/mois.","Il creatore PowerPoint è incluso in Pro. CHF 19.90/mese.")}/></div>:<>
+        <div className="card">
+          <div className="ct">📽️ {t.nav.pptx}</div>
+          <div className="cs">{L("Beschreibe dein Thema – die KI erstellt eine komplette Präsentation mit Inhalt, Struktur und Sprechernotizen.","Describe your topic – AI creates a complete presentation with content, structure and speaker notes.","Décrivez votre sujet – l'IA crée une présentation complète.","Descrivi il tuo argomento – l'IA crea una presentazione completa.")}</div>
+          {/* Examples */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:14}}>
+            {[
+              L("Mein Ferienbericht","My holiday report","Mon rapport de vacances","Il mio rapporto di vacanza"),
+              L("Klimawandel für die Schule","Climate change for school","Changement climatique scolaire","Cambiamento climatico"),
+              L("Businessplan für Startup","Business plan for startup","Business plan startup","Business plan startup"),
+              L("Jahresbericht Verein","Annual association report","Rapport annuel association","Relazione annuale associazione"),
+              L("Produktpräsentation","Product presentation","Présentation produit","Presentazione prodotto"),
+            ].map((ex,i)=><button key={i} className="btn b-outd b-sm" style={{fontSize:12,padding:"5px 12px"}} onClick={()=>setPpTask(ex)}>{ex}</button>)}
+          </div>
+          <div className="field"><label>{L("Thema / Aufgabe *","Topic / Task *","Sujet / Tâche *","Argomento / Compito *")}</label>
+            <textarea value={ppTask} onChange={e=>setPpTask(e.target.value)} placeholder={L("z.B. Eine Präsentation über die Vor- und Nachteile von KI für Gymnasiasten, Dauer ca. 10 Minuten.","e.g. A presentation about the pros and cons of AI for high school students, duration approx. 10 minutes.","ex. Une présentation sur les avantages et inconvénients de l'IA pour lycéens, durée environ 10 minutes.","es. Una presentazione sui pro e contro dell'IA per studenti, durata circa 10 minuti.")} style={{minHeight:90}}/></div>
+          <div className="fg2">
+            <div className="field"><label>{L("Anzahl Folien","Number of slides","Nombre de diapositives","Numero di diapositive")}</label>
+              <select value={ppSlides} onChange={e=>setPpSlides(e.target.value)}>
+                {[5,6,8,10,12,15].map(n=><option key={n} value={n}>{n} {L("Folien","slides","diapositives","diapositive")}</option>)}
+              </select>
+            </div>
+            <div className="field"><label>{L("Ton / Stil","Tone / Style","Ton / Style","Tono / Stile")}</label>
+              <select value={ppTone} onChange={e=>setPpTone(e.target.value)}>
+                <option value="professional">{L("Professionell","Professional","Professionnel","Professionale")}</option>
+                <option value="academic">{L("Akademisch / Schularbeit","Academic / School","Académique","Accademico")}</option>
+                <option value="creative">{L("Kreativ & Modern","Creative & Modern","Créatif & Moderne","Creativo & Moderno")}</option>
+                <option value="minimal">{L("Minimalistisch","Minimalist","Minimaliste","Minimalista")}</option>
+                <option value="startup">{L("Startup / Pitch","Startup / Pitch","Startup / Pitch","Startup / Pitch")}</option>
+              </select>
+            </div>
+          </div>
+          <button className="btn b-bl" onClick={runPP} disabled={ppLoad||!ppTask.trim()}>{ppLoad?L("Erstelle Folien…","Creating slides…","Création des diapositives…","Creando diapositive…"):L("📽️ Präsentation erstellen","📽️ Create presentation","📽️ Créer présentation","📽️ Crea presentazione")}</button>
+        </div>
+
+        {ppRes&&<div style={{marginTop:16}}>
+          {/* Header */}
+          <div style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",borderRadius:"var(--r2)",padding:28,marginBottom:14,color:"white",textAlign:"center"}}>
+            <div style={{fontFamily:"var(--hd)",fontSize:26,fontWeight:800,letterSpacing:"-1px",marginBottom:6}}>{ppRes.title}</div>
+            {ppRes.subtitle&&<div style={{fontSize:15,color:"rgba(255,255,255,.6)",marginBottom:10}}>{ppRes.subtitle}</div>}
+            <div style={{display:"flex",gap:20,justifyContent:"center",flexWrap:"wrap"}}>
+              {ppRes.theme_suggestion&&<span style={{fontSize:12,background:"rgba(255,255,255,.1)",padding:"4px 12px",borderRadius:20}}>🎨 {ppRes.theme_suggestion}</span>}
+              {ppRes.estimated_duration&&<span style={{fontSize:12,background:"rgba(255,255,255,.1)",padding:"4px 12px",borderRadius:20}}>⏱️ {ppRes.estimated_duration}</span>}
+              <span style={{fontSize:12,background:"rgba(255,255,255,.1)",padding:"4px 12px",borderRadius:20}}>📋 {(ppRes.slides||[]).length} {L("Folien","slides","diapositives","diapositive")}</span>
+            </div>
+          </div>
+
+          {/* Slides */}
+          {(ppRes.slides||[]).map((slide,i)=>(
+            <div key={i} style={{background:"white",border:"1.5px solid var(--bo)",borderRadius:"var(--r2)",marginBottom:10,overflow:"hidden"}}>
+              <div style={{background:i===0?"linear-gradient(135deg,#1e3a5f,#2563eb)":"var(--dk3)",padding:"14px 20px",display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:32,height:32,background:"rgba(255,255,255,.12)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"var(--hd)",fontSize:13,fontWeight:800,color:"white",flexShrink:0}}>{slide.slide}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,color:"white"}}>{slide.title}</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,.4)",textTransform:"uppercase",letterSpacing:"1px",marginTop:2}}>{slide.layout}</div>
+                </div>
+                {slide.design_tip&&<div style={{fontSize:11,color:"rgba(255,255,255,.4)",maxWidth:160,textAlign:"right",lineHeight:1.4}}>💡 {slide.design_tip}</div>}
+              </div>
+              <div style={{padding:"16px 20px"}}>
+                {(slide.content||[]).map((item,ci)=>(
+                  <div key={ci} style={{display:"flex",gap:10,padding:"6px 0",borderBottom:ci<slide.content.length-1?"1px solid var(--bos)":"none",fontSize:13,color:"var(--ink)",lineHeight:1.6}}>
+                    <span style={{color:"var(--bl)",flexShrink:0,fontWeight:700}}>→</span>{item}
+                  </div>
+                ))}
+                {slide.speaker_note&&<div style={{marginTop:10,padding:"9px 13px",background:"#fffbf0",border:"1px solid rgba(245,158,11,.2)",borderRadius:8,fontSize:12,color:"#92400e",display:"flex",gap:7,lineHeight:1.6}}>
+                  <span style={{flexShrink:0}}>🎤</span><span>{slide.speaker_note}</span>
+                </div>}
+              </div>
+            </div>
+          ))}
+
+          {/* Design tips */}
+          {ppRes.design_tips?.length>0&&<div className="card" style={{marginBottom:12}}>
+            <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,marginBottom:12}}>🎨 {L("Design-Tipps für PowerPoint","Design tips for PowerPoint","Conseils design PowerPoint","Consigli design PowerPoint")}</div>
+            {ppRes.design_tips.map((tip,i)=><div key={i} style={{display:"flex",gap:9,padding:"8px 0",borderBottom:"1px solid var(--bos)",fontSize:13,color:"var(--mu)",lineHeight:1.65}}><span style={{color:"var(--bl)",flexShrink:0}}>→</span>{tip}</div>)}
+          </div>}
+
+          {/* Copy all content */}
+          <div className="card">
+            <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,marginBottom:10}}>📋 {L("Gesamten Inhalt kopieren","Copy all content","Copier tout le contenu","Copia tutto il contenuto")}</div>
+            <div className="r-doc" style={{maxHeight:240,fontSize:12}}>
+              {`${ppRes.title}\n${ppRes.subtitle||""}\n\n`+
+               (ppRes.slides||[]).map(s=>`FOLIE ${s.slide}: ${s.title}\n${(s.content||[]).map(c=>`• ${c}`).join("\n")}\n[Sprechernotiz: ${s.speaker_note||""}]`).join("\n\n")}
+            </div>
+            <div style={{marginTop:10,display:"flex",gap:9}}>
+              <button className="btn b-outd b-sm" onClick={()=>{
+                const txt=`${ppRes.title}\n${ppRes.subtitle||""}\n\n`+(ppRes.slides||[]).map(s=>`FOLIE ${s.slide}: ${s.title}\n${(s.content||[]).map(c=>`• ${c}`).join("\n")}\n[Sprechernotiz: ${s.speaker_note||""}]`).join("\n\n");
+                navigator.clipboard.writeText(txt);}}>📋 {L("Alles kopieren","Copy all","Tout copier","Copia tutto")}</button>
+              <button className="btn b-outd b-sm" onClick={()=>{setPpRes(null);setPpTask("");}}>🔄 {L("Neu","New","Nouveau","Nuovo")}</button>
+            </div>
+          </div>
+        </div>}
+      </>}
+    </div>
+    <Footer/>
+  </>);
+
+  // ══════════════════ LEGAL ══════════════════
+  const LD=()=>new Date().toLocaleDateString("de-CH",{month:"long",year:"numeric"});
+  const LS=({ch})=><>{<style>{FONTS+CSS}</style>}<Nav/><div className="legal">{ch}</div><Footer/></>;
+  if(page==="agb") return <LS ch={<>
+    <h1>AGB / CGV / CGC / T&C</h1><div className="legal-d">Stand: {LD()} · {C.domain}</div>
+    <h2>1. Geltungsbereich</h2><p>{C.name} ({C.domain}) wird betrieben von {C.owner}, {C.address}. Mit der Nutzung akzeptierst du diese AGB.</p>
+    <h2>2. Leistungen</h2><p>{C.name} ist ein KI-gestützter All-in-One Career & Produktivitäts-Copilot mit 18+ Tools, u.a.: Bewerbungsgenerator, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker, Gehaltsverhandlungs-Coach, Networking-Nachrichten, Kündigung, 30-60-90-Tage-Plan, Referenzschreiben, Lehrstellen-Bewerbung, Lernplan, Zusammenfassung, E-Mail-Assistent, Meeting-Protokoll, Übersetzer. Es wird kein Erfolg garantiert.</p>
+    <h2>3. Abonnement & Zahlung</h2><p>Gratis: 1 Bewerbungsgenerierung/Monat. Pro: CHF 19.90/Monat (monatlich kündbar) oder CHF 14.90/Monat (jährlich = CHF 178.80/Jahr). Pro enthält: Unbegrenzte Bewerbungen, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker. Zahlung via Stripe (Twint, Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay, SEPA, Klarna). Automatische Verlängerung. Kündigung jederzeit per E-Mail.</p>
+    <h2>4. Haftung</h2><p>Keine Haftung für Qualität generierter Inhalte, Vollständigkeit der KI-Analysen oder indirekte Schäden.</p>
+    <h2>5. Recht & Gerichtsstand</h2><p>Schweizer Recht. Gerichtsstand: Zürich. Kontakt: <a href={`mailto:${C.email}`}>{C.email}</a></p>
+  </>}/>;
+  if(page==="datenschutz") return <LS ch={<>
+    <h1>Datenschutz / Privacy</h1><div className="legal-d">DSG (CH) · DSGVO (EU) · Stand: {LD()}</div>
+    <h2>Verantwortlich</h2><p>{C.owner}, {C.address} · <a href={`mailto:${C.email}`}>{C.email}</a></p>
+    <h2>Erhobene Daten</h2><ul><li>Eingabedaten (Lebenslauf, Zeugnisse, Profildaten) – werden nicht dauerhaft gespeichert</li><li>Nutzungsstatistiken: IP-Adresse (anonymisiert, 30 Tage)</li><li>Zahlungsdaten: ausschliesslich via Stripe (PCI-DSS-konform)</li></ul>
+    <h2>KI-Verarbeitung</h2><p>Eingaben werden zur Verarbeitung an Anthropic (anthropic.com) übermittelt. Anthropic verarbeitet keine Daten für eigene Zwecke.</p>
+    <h2>Drittanbieter</h2><p>Stripe (stripe.com/privacy) · Anthropic (anthropic.com/privacy)</p>
+    <h2>Deine Rechte</h2><p>Auskunft, Berichtigung, Löschung jederzeit: <a href={`mailto:${C.email}`}>{C.email}</a></p>
+    <h2>Sicherheit</h2><p>HTTPS/TLS. Keine Marketing-Cookies. Kein Verkauf von Daten.</p>
+  </>}/>;
+  if(page==="impressum") return <LS ch={<>
+    <h1>Impressum</h1><div className="legal-d">Art. 12 DSG</div>
+    <h2>Betreiber</h2>
+    <p><strong>JTSP</strong><br/>{C.address}<br/><a href={`mailto:${C.email}`}>{C.email}</a><br/>{C.domain}</p>
+    <h2>Erfinder & Gründer</h2>
+    <p><strong>JTSP</strong> – Erfinder und Gründer von {C.name}. Idee, Konzept und Vision für den ersten vollständigen AI Career & Produktivitäts-Copilot der Schweiz.</p>
+    <h2>Datenschutzbeauftragter</h2>
+    <p>Bei Datenschutzanfragen: <a href={`mailto:${C.email}`}>{C.email}</a></p>
+    <h2>Haftungsausschluss</h2><p>Schweizer Recht · Gerichtsstand: Zürich</p>
+  </>}/>;
+  // ══════════════════ GENERIC TOOLS ROUTING ══════════════════
+  const activeTool = GENERIC_TOOLS.find(g => g.id === page);
+  if (activeTool) return (
+    <>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+      <Nav dark/>
+      <GenericToolPage tool={activeTool} lang={lang} pro={pro} setPw={setPw} setPage={setPage} yearly={yearly} C={C} proUsage={proUsage} setProUsage={setProUsage}/>
+      <Footer/>
+    </>
+  );
+
+  return null;
+}
