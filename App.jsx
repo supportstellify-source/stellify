@@ -23,6 +23,8 @@ const C = {
   MODEL_FULL: "llama-3.3-70b-versatile",   // Smart, für Bewerbungen etc.
   // ─────────────────────────────────────────────
   FREE_MAX_TOKENS: 500,
+  ADMIN_SECRET: "stellify-admin-2024",
+  CODE_SECRET: "stf_v1_secret_xK9mP",
 };
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -41,6 +43,25 @@ const isPro  = () => { try { return localStorage.getItem("stf_pro")==="true"; } 
 const actPro = () => { try { localStorage.setItem("stf_pro","true"); } catch {}};
 const saveEmail = (e) => { try { localStorage.setItem("stf_email",e); } catch {}};
 const clearUser = () => { try { localStorage.removeItem("stf_pro"); localStorage.removeItem("stf_email"); } catch {}};
+
+// ── Pro-Code Generator (Web Crypto, deterministisch) ──
+const generateCode = async (email) => {
+  const secret = "stf_v1_secret_xK9mP";
+  const data = new TextEncoder().encode(secret + email.toLowerCase().trim());
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hex = hashArray.map(b=>b.toString(16).padStart(2,"0")).join("");
+  // Format: STF-XXXX-XXXX (8 uppercase hex chars)
+  const code = "STF-" + hex.slice(0,4).toUpperCase() + "-" + hex.slice(4,8).toUpperCase();
+  return code;
+};
+
+const verifyCode = async (email, code) => {
+  const expected = await generateCode(email.toLowerCase().trim());
+  return code.toUpperCase() === expected.toUpperCase();
+};
+
+
 
 // 🧠 MODEL ROUTING
 const HAIKU_TOOLS = ["free","email","protokoll","uebersetzer","networking","kuendigung","lernplan","zusammenfassung","gehalt","plan306090","referenz","lehrstelle"];
@@ -446,6 +467,7 @@ const mkT = (lang) => {
       ats:    "ATS-Check",
       zeugnis:L("Zeugnis","Certificat","Certificato","Reference"),
       jobs:   L("Job-Matching","Jobs","Lavori","Job Match"),
+      coach:  L("Interview-Coach","Interview Coach","Coach entretien","Coach colloquio"),
     },
     hero:{
       eye: L(`✦ ${C.name} – ${C.tagline}`,`✦ ${C.name} – Copilote IA Carrière Suisse`,`✦ ${C.name} – Copilota IA Carriera Svizzera`,`✦ ${C.name} – ${C.tagline}`),
@@ -2740,7 +2762,7 @@ Antworte NUR mit JSON:
   const Footer=()=>(
     <footer>
       {/* Trust bar above footer */}
-      <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:28,marginBottom:36,maxWidth:1200,margin:"0 auto 0",padding:"0 0 24px"}}>
+      <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",maxWidth:1200,margin:"0 auto",padding:"0 0 36px",marginBottom:0}}>
         <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:"10px 32px"}}>
           {[
             {ico:"🔒",txt:lang==="de"?"Keine Datenspeicherung":lang==="fr"?"Aucun stockage de données":lang==="it"?"Nessuna memorizzazione":"No data storage"},
@@ -2778,6 +2800,7 @@ Antworte NUR mit JSON:
         </div>
         <div className="fcol">
           <h5>{lang==="de"?"Schule & Produktivität":lang==="fr"?"École & Productivité":lang==="it"?"Scuola & Produttività":"School & Productivity"}</h5>
+          <button onClick={()=>navTo("li2job")} style={{fontWeight:700,color:"rgba(255,255,255,.6)"}}>🔗 {lang==="de"?"LinkedIn → Bewerbung":lang==="fr"?"LinkedIn → Candidature":lang==="it"?"LinkedIn → Candidatura":"LinkedIn → Application"}</button>
           {GENERIC_TOOLS.map(g=><button key={g.id} onClick={()=>navTo(g.id)}>{g.ico} {g.t[lang]}</button>)}
         </div>
         <div className="fcol"><h5>{t.legal.legalL}</h5>
@@ -2799,12 +2822,14 @@ Antworte NUR mit JSON:
     </footer>
   );
 
-  const doLogin=()=>{
+  const doLogin=async()=>{
     if(!pwEmail.includes("@")){setPwErr(lang==="de"?"Bitte gültige E-Mail eingeben":"Please enter a valid email");return;}
-    if(pwCode.toUpperCase()==="STELLIFYPRO"||pwCode.length>=6){
+    setPwErr(lang==="de"?"⏳ Wird geprüft...":"⏳ Verifying...");
+    const valid = await verifyCode(pwEmail, pwCode);
+    if(valid){
       actPro(); saveEmail(pwEmail); setPro(true); setUserEmail(pwEmail); setPw(false); setPwErr(""); setPwLoginMode(false);
     } else {
-      setPwErr(lang==="de"?"Code mind. 6 Zeichen. Den Code findest du in der Stripe-Bestätigungsmail.":"Code min. 6 chars. Find it in your Stripe confirmation email.");
+      setPwErr(lang==="de"?"❌ Ungültiger Code. Stelle sicher, dass E-Mail und Code übereinstimmen.":"❌ Invalid code. Make sure email and code match.");
     }
   };
   const PW=()=>(
@@ -4954,6 +4979,151 @@ VERHALTEN:
     <p>Bei Datenschutzanfragen: <a href={`mailto:${C.email}`}>{C.email}</a></p>
     <h2>Haftungsausschluss</h2><p>Schweizer Recht · Gerichtsstand: Zürich</p>
   </>}/>;
+
+  // ══════════════════ ADMIN ══════════════════
+  if(page==="admin") {
+    const AdminPage = () => {
+      const [adminPw, setAdminPw] = useState("");
+      const [adminAuth, setAdminAuth] = useState(()=>{
+        try{return sessionStorage.getItem("stf_admin")==="1";}catch{return false;}
+      });
+      const [genEmail, setGenEmail] = useState("");
+      const [genCode, setGenCode] = useState("");
+      const [history, setHistory] = useState(()=>{
+        try{return JSON.parse(localStorage.getItem("stf_admin_hist")||"[]");}catch{return [];}
+      });
+
+      const checkPw = () => {
+        if(adminPw === C.ADMIN_SECRET){
+          try{sessionStorage.setItem("stf_admin","1");}catch{}
+          setAdminAuth(true);
+        } else {
+          alert("Falsches Passwort");
+        }
+      };
+
+      const genCodeForEmail = async () => {
+        if(!genEmail.includes("@")) return;
+        const code = await generateCode(genEmail.toLowerCase().trim());
+        setGenCode(code);
+        const entry = {email: genEmail.toLowerCase().trim(), code, date: new Date().toLocaleDateString("de-CH")};
+        const newHist = [entry, ...history.slice(0,49)];
+        setHistory(newHist);
+        try{localStorage.setItem("stf_admin_hist", JSON.stringify(newHist));}catch{}
+      };
+
+      const copyCode = (code) => {
+        navigator.clipboard.writeText(code);
+      };
+
+      const mailtoLink = (email, code) => {
+        const subject = encodeURIComponent("Dein Stellify Pro-Aktivierungscode");
+        const body = encodeURIComponent(
+          `Hallo,\n\nVielen Dank für dein Stellify Pro-Abonnement!\n\nDein persönlicher Aktivierungscode lautet:\n\n${code}\n\nSo aktivierst du Pro:\n1. Geh auf stellify.ch\n2. Klick auf «Pro freischalten» oder «Bereits Pro? Einloggen»\n3. Gib deine E-Mail-Adresse ein: ${email}\n4. Gib deinen Aktivierungscode ein: ${code}\n5. Klick «Aktivieren ✓»\n\nDein Code ist persönlich und nur mit deiner E-Mail-Adresse gültig.\n\nBei Fragen: support@stellify.ch\n\nHerzliche Grüsse\nDas Stellify-Team`
+        );
+        return `mailto:${email}?subject=${subject}&body=${body}`;
+      };
+
+      if(!adminAuth) return (
+        <>{<style>{FONTS+CSS}</style>}
+        <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"var(--dk2)",border:"1px solid rgba(255,255,255,.1)",borderRadius:20,padding:40,maxWidth:360,width:"100%",textAlign:"center"}}>
+            <div style={{fontSize:36,marginBottom:12}}>🔐</div>
+            <h2 style={{color:"white",marginBottom:8,fontFamily:"var(--hd)"}}>Admin-Bereich</h2>
+            <p style={{color:"rgba(255,255,255,.4)",fontSize:13,marginBottom:20}}>Nur für Stellify-Betreiber</p>
+            <input type="password" placeholder="Admin-Passwort"
+              value={adminPw} onChange={e=>setAdminPw(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&checkPw()}
+              style={{width:"100%",padding:"12px 16px",border:"1.5px solid rgba(255,255,255,.15)",borderRadius:12,fontSize:14,background:"rgba(255,255,255,.07)",color:"white",outline:"none",boxSizing:"border-box",marginBottom:12}}
+            />
+            <button onClick={checkPw} style={{width:"100%",padding:12,background:"var(--em)",border:"none",borderRadius:12,color:"white",fontWeight:700,fontSize:14,cursor:"pointer"}}>
+              Einloggen →
+            </button>
+            <button onClick={()=>navTo("landing")} style={{marginTop:12,background:"none",border:"none",color:"rgba(255,255,255,.3)",fontSize:12,cursor:"pointer"}}>← Zurück zur Website</button>
+          </div>
+        </div>
+        </>
+      );
+
+      return (
+        <>{<style>{FONTS+CSS}</style>}
+        <div style={{minHeight:"100vh",background:"var(--bg)",padding:"40px 20px"}}>
+          <div style={{maxWidth:680,margin:"0 auto"}}>
+
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:32}}>
+              <div>
+                <div style={{fontFamily:"var(--hd)",fontSize:24,fontWeight:900,color:"white"}}>✦ Stellify Admin</div>
+                <div style={{fontSize:13,color:"rgba(255,255,255,.4)",marginTop:4}}>Pro-Code Generator · Kundenübersicht</div>
+              </div>
+              <button onClick={()=>navTo("landing")} style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 16px",color:"rgba(255,255,255,.6)",fontSize:13,cursor:"pointer"}}>← Website</button>
+            </div>
+
+            {/* Code Generator */}
+            <div style={{background:"var(--dk2)",border:"1px solid rgba(16,185,129,.2)",borderRadius:16,padding:24,marginBottom:24}}>
+              <h3 style={{color:"white",marginBottom:4,fontSize:16,fontFamily:"var(--hd)"}}>🎯 Pro-Code generieren</h3>
+              <p style={{color:"rgba(255,255,255,.4)",fontSize:13,marginBottom:16}}>Jeder Code ist einzigartig und nur mit der eingegebenen E-Mail gültig.</p>
+              <div style={{display:"flex",gap:10,marginBottom:12}}>
+                <input type="email" placeholder="Kunden-E-Mail (z.B. max@muster.ch)"
+                  value={genEmail} onChange={e=>setGenEmail(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&genCodeForEmail()}
+                  style={{flex:1,padding:"11px 14px",border:"1.5px solid rgba(255,255,255,.15)",borderRadius:10,fontSize:13,background:"rgba(255,255,255,.07)",color:"white",outline:"none",boxSizing:"border-box"}}
+                />
+                <button onClick={genCodeForEmail} style={{padding:"11px 20px",background:"var(--em)",border:"none",borderRadius:10,color:"white",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>
+                  Code generieren
+                </button>
+              </div>
+              {genCode&&(
+                <div style={{background:"rgba(16,185,129,.08)",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:12,padding:16}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                    <div>
+                      <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginBottom:4}}>Code für {genEmail}</div>
+                      <div style={{fontFamily:"monospace",fontSize:22,fontWeight:900,color:"var(--em)",letterSpacing:3}}>{genCode}</div>
+                    </div>
+                    <button onClick={()=>copyCode(genCode)} style={{padding:"8px 16px",background:"rgba(16,185,129,.2)",border:"1px solid var(--em)",borderRadius:8,color:"var(--em)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+                      📋 Kopieren
+                    </button>
+                  </div>
+                  <a href={mailtoLink(genEmail, genCode)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"10px",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"white",textDecoration:"none",fontSize:13,fontWeight:600}}>
+                    ✉️ Code per E-Mail senden (Mail-App öffnen)
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* History */}
+            {history.length>0&&(
+              <div style={{background:"var(--dk2)",border:"1px solid rgba(255,255,255,.08)",borderRadius:16,padding:24}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+                  <h3 style={{color:"white",fontSize:16,fontFamily:"var(--hd)",margin:0}}>📋 Generierte Codes ({history.length})</h3>
+                  <button onClick={()=>{setHistory([]);try{localStorage.removeItem("stf_admin_hist");}catch{}}} style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.3)",borderRadius:8,padding:"5px 12px",color:"#f87171",fontSize:11,cursor:"pointer"}}>Löschen</button>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {history.map((h,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"rgba(255,255,255,.04)",borderRadius:10,border:"1px solid rgba(255,255,255,.06)"}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,color:"rgba(255,255,255,.8)",fontWeight:600}}>{h.email}</div>
+                        <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>{h.date}</div>
+                      </div>
+                      <div style={{fontFamily:"monospace",fontSize:14,fontWeight:700,color:"var(--em)",letterSpacing:2}}>{h.code}</div>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>copyCode(h.code)} style={{padding:"5px 10px",background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.2)",borderRadius:7,color:"var(--em)",fontSize:11,cursor:"pointer"}}>📋</button>
+                        <a href={mailtoLink(h.email,h.code)} style={{padding:"5px 10px",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:7,color:"rgba(255,255,255,.6)",fontSize:11,cursor:"pointer",textDecoration:"none"}}>✉️</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+        </>
+      );
+    };
+    return <AdminPage/>;
+  }
+
   // ══════════════════ GENERIC TOOLS ROUTING ══════════════════
   const activeTool = GENERIC_TOOLS.find(g => g.id === page);
   if (activeTool) return (
