@@ -2865,22 +2865,30 @@ Antworte NUR mit JSON:
           <button className="btn b-out b-sm" style={{marginTop:6,width:"100%"}} onClick={()=>setPw(false)}>{t.modal.close}</button>
         </>) : (<>
           <div style={{fontSize:28,marginBottom:8}}>🔑</div>
-          <h2 style={{fontSize:18}}>Pro-Account aktivieren</h2>
-          <p style={{fontSize:13,color:"var(--mu)"}}>Nach dem Kauf erhältst du einen Aktivierungscode per E-Mail.</p>
+          <h2 style={{fontSize:18,color:"white",fontFamily:"var(--hd)"}}>Pro-Account aktivieren</h2>
+          <div style={{background:"rgba(16,185,129,.08)",border:"1px solid rgba(16,185,129,.2)",borderRadius:10,padding:"10px 14px",fontSize:12,color:"rgba(255,255,255,.6)",lineHeight:1.6,marginBottom:12}}>
+            Nach dem Kauf erhältst du eine E-Mail von <strong style={{color:"var(--em)"}}>support@stellify.ch</strong> mit deinem persönlichen Aktivierungscode (Format: <span style={{fontFamily:"monospace",color:"var(--em)"}}>STF-XXXX-XXXX</span>).
+          </div>
           <input
-            type="email" placeholder="E-Mail-Adresse"
-            value={pwEmail} onChange={e=>setPwEmail(e.target.value)}
-            style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--bo)",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box"}}
+            type="email" placeholder="Deine E-Mail-Adresse (wie beim Kauf)"
+            value={pwEmail} onChange={e=>{setPwEmail(e.target.value);setPwErr("");}}
+            onKeyDown={e=>e.key==="Enter"&&document.getElementById("stf-code-input")?.focus()}
+            style={{width:"100%",padding:"11px 14px",border:"1.5px solid var(--bo)",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box",background:"rgba(255,255,255,.05)",color:"white",outline:"none"}}
+            autoFocus
           />
           <input
-            type="text" placeholder="Aktivierungscode (z.B. STELLIFYPRO)"
-            value={pwCode} onChange={e=>setPwCode(e.target.value)}
+            id="stf-code-input"
+            type="text" placeholder="Aktivierungscode (z.B. STF-A1B2-C3D4)"
+            value={pwCode} onChange={e=>{setPwCode(e.target.value.toUpperCase());setPwErr("");}}
             onKeyDown={e=>e.key==="Enter"&&doLogin()}
-            style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--bo)",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box"}}
+            style={{width:"100%",padding:"11px 14px",border:"1.5px solid var(--bo)",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box",background:"rgba(255,255,255,.05)",color:"white",outline:"none",fontFamily:"monospace",letterSpacing:1}}
           />
-          {pwErr&&<div style={{color:"#ef4444",fontSize:12,marginBottom:8}}>{pwErr}</div>}
-          <button className="btn b-em b-w" onClick={doLogin}>Aktivieren ✓</button>
-          <button className="btn b-out b-sm" style={{marginTop:8,width:"100%",fontSize:11}} onClick={()=>setPwLoginMode(false)}>← Zurück</button>
+          {pwErr&&<div style={{background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.2)",borderRadius:8,padding:"8px 12px",color:"#f87171",fontSize:12,marginBottom:8}}>{pwErr}</div>}
+          <button className="btn b-em b-w" onClick={doLogin} style={{marginBottom:6}}>Aktivieren ✓</button>
+          <div style={{textAlign:"center",fontSize:11,color:"rgba(255,255,255,.3)",marginBottom:8}}>
+            Kein Code erhalten? <a href="mailto:support@stellify.ch?subject=Aktivierungscode fehlt" style={{color:"var(--em)",textDecoration:"none"}}>support@stellify.ch</a>
+          </div>
+          <button className="btn b-out b-sm" style={{marginTop:4,width:"100%",fontSize:11}} onClick={()=>setPwLoginMode(false)}>← Zurück</button>
           <button className="btn b-out b-sm" style={{marginTop:6,width:"100%"}} onClick={()=>setPw(false)}>{t.modal.close}</button>
         </>)}
       </div>
@@ -5017,9 +5025,36 @@ VERHALTEN:
       };
 
       const mailtoLink = (email, code) => {
-        const subject = encodeURIComponent("Dein Stellify Pro-Aktivierungscode");
+        const subject = encodeURIComponent("✦ Dein Stellify Pro-Aktivierungscode");
         const body = encodeURIComponent(
-          `Hallo,\n\nVielen Dank für dein Stellify Pro-Abonnement!\n\nDein persönlicher Aktivierungscode lautet:\n\n${code}\n\nSo aktivierst du Pro:\n1. Geh auf stellify.ch\n2. Klick auf «Pro freischalten» oder «Bereits Pro? Einloggen»\n3. Gib deine E-Mail-Adresse ein: ${email}\n4. Gib deinen Aktivierungscode ein: ${code}\n5. Klick «Aktivieren ✓»\n\nDein Code ist persönlich und nur mit deiner E-Mail-Adresse gültig.\n\nBei Fragen: support@stellify.ch\n\nHerzliche Grüsse\nDas Stellify-Team`
+`Hallo ${email.split("@")[0]},
+
+vielen Dank für dein Stellify Pro-Abonnement! 🎉
+
+Dein persönlicher Aktivierungscode lautet:
+
+🔑 ${code}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SO AKTIVIERST DU PRO (2 Minuten):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Geh auf https://stellify.ch
+2. Klick auf «Pro freischalten» (goldener Button)
+3. Klick «✦ Bereits Pro? Einloggen»
+4. E-Mail eingeben: ${email}
+5. Code eingeben: ${code}
+6. Klick «Aktivieren ✓»
+
+Das war's – du hast sofort Zugriff auf alle 18+ Pro-Tools!
+
+Dein Code ist persönlich und nur mit deiner E-Mail-Adresse gültig.
+
+Bei Fragen jederzeit: support@stellify.ch
+
+Herzliche Grüsse
+Das Stellify-Team ✦
+https://stellify.ch`
         );
         return `mailto:${email}?subject=${subject}&body=${body}`;
       };
@@ -5059,10 +5094,20 @@ VERHALTEN:
               <button onClick={()=>navTo("landing")} style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 16px",color:"rgba(255,255,255,.6)",fontSize:13,cursor:"pointer"}}>← Website</button>
             </div>
 
+            {/* Ablauf Info */}
+            <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.2)",borderRadius:14,padding:18,marginBottom:20,display:"flex",gap:16,flexWrap:"wrap"}}>
+              {[["1. Kunde kauft","Stripe sendet dir eine Benachrichtigung per E-Mail"],["2. Du kommst hierher","E-Mail eingeben → Code generieren → Senden"],["3. Kunde aktiviert","Gibt E-Mail + Code auf stellify.ch ein → fertig"]].map(([t,d],i)=>(
+                <div key={i} style={{flex:1,minWidth:160}}>
+                  <div style={{fontWeight:700,fontSize:13,color:"var(--em)",marginBottom:3}}>{t}</div>
+                  <div style={{fontSize:12,color:"rgba(255,255,255,.4)",lineHeight:1.5}}>{d}</div>
+                </div>
+              ))}
+            </div>
+
             {/* Code Generator */}
             <div style={{background:"var(--dk2)",border:"1px solid rgba(16,185,129,.2)",borderRadius:16,padding:24,marginBottom:24}}>
-              <h3 style={{color:"white",marginBottom:4,fontSize:16,fontFamily:"var(--hd)"}}>🎯 Pro-Code generieren</h3>
-              <p style={{color:"rgba(255,255,255,.4)",fontSize:13,marginBottom:16}}>Jeder Code ist einzigartig und nur mit der eingegebenen E-Mail gültig.</p>
+              <h3 style={{color:"white",marginBottom:4,fontSize:16,fontFamily:"var(--hd)"}}>🎯 Pro-Code generieren & senden</h3>
+              <p style={{color:"rgba(255,255,255,.4)",fontSize:13,marginBottom:16}}>Jeder Code ist einzigartig und <strong style={{color:"rgba(255,255,255,.6)"}}>nur mit der eingegebenen E-Mail gültig</strong>.</p>
               <div style={{display:"flex",gap:10,marginBottom:12}}>
                 <input type="email" placeholder="Kunden-E-Mail (z.B. max@muster.ch)"
                   value={genEmail} onChange={e=>setGenEmail(e.target.value)}
@@ -5108,7 +5153,7 @@ VERHALTEN:
                       <div style={{fontFamily:"monospace",fontSize:14,fontWeight:700,color:"var(--em)",letterSpacing:2}}>{h.code}</div>
                       <div style={{display:"flex",gap:6}}>
                         <button onClick={()=>copyCode(h.code)} style={{padding:"5px 10px",background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.2)",borderRadius:7,color:"var(--em)",fontSize:11,cursor:"pointer"}}>📋</button>
-                        <a href={mailtoLink(h.email,h.code)} style={{padding:"5px 10px",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:7,color:"rgba(255,255,255,.6)",fontSize:11,cursor:"pointer",textDecoration:"none"}}>✉️</button>
+                        <a href={mailtoLink(h.email,h.code)} style={{padding:"5px 10px",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:7,color:"rgba(255,255,255,.6)",fontSize:11,cursor:"pointer",textDecoration:"none",display:"inline-flex",alignItems:"center"}}>✉️</a>
                       </div>
                     </div>
                   ))}
