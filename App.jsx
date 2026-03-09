@@ -3520,15 +3520,16 @@ NOTE: Incluse in tutte le diapositive`),
               ))}
             </div>
             {/* Price strip – schlank */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginTop:22,flexWrap:"wrap"}}>
-              <div style={{display:"inline-flex",alignItems:"center",gap:12,background:"white",border:"1.5px solid rgba(16,185,129,.22)",borderRadius:40,padding:"10px 10px 10px 20px",boxShadow:"0 2px 12px rgba(16,185,129,.07)"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginTop:28,flexWrap:"wrap"}}>
+              <div style={{display:"inline-flex",alignItems:"center",gap:14,background:"white",border:"1.5px solid rgba(16,185,129,.22)",borderRadius:40,padding:"12px 14px 12px 24px",boxShadow:"0 2px 12px rgba(16,185,129,.07)"}}>
                 <div style={{fontSize:13,color:"var(--mu)",fontWeight:500}}>
                   {lang==="de"?"Ab":lang==="fr"?"Dès":lang==="it"?"Da":"From"}{" "}
                   <span style={{fontFamily:"var(--hd)",fontSize:17,fontWeight:800,color:"var(--ink)"}}>CHF {C.priceY}</span>
                   <span style={{fontSize:12,color:"var(--mu)"}}>/Mo.</span>
+                  <span style={{fontSize:11,color:"var(--mu)",marginLeft:3}}>{lang==="de"?"(bei Jahresabo)":lang==="fr"?"(annuel)":lang==="it"?"(annuale)":"(yearly)"}</span>
                   <span style={{marginLeft:8,fontSize:11,background:"rgba(16,185,129,.1)",color:"var(--em2)",borderRadius:20,padding:"2px 9px",fontWeight:700}}>🔥 –25%</span>
                 </div>
-                <button onClick={()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"})} style={{background:"var(--em)",color:"white",border:"none",borderRadius:25,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                <button onClick={()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"})} style={{background:"var(--em)",color:"white",border:"none",borderRadius:25,padding:"10px 20px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
                   {lang==="de"?"Jetzt starten →":lang==="fr"?"Commencer →":lang==="it"?"Inizia →":"Get started →"}
                 </button>
               </div>
