@@ -2728,7 +2728,7 @@ Antworte NUR mit JSON:
         </>)}
       </div>
     </div>
-  );};
+  );
 
   const UsageBar=()=>!pro?(
     <div className="ubar">
