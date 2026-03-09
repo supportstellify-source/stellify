@@ -16,7 +16,7 @@ const C = {
   priceY: "14.90",
   FREE_LIMIT: 1,
   PRO_LIMIT: 60,
-  CHAT_FREE_LIMIT: 10,
+  CHAT_FREE_LIMIT: 20,
   // ── GROQ CONFIG ──────────────────────────────
   GROQ_KEY: "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",
   MODEL_FAST: "llama-3.1-8b-instant",      // Schnell & günstig
@@ -2395,6 +2395,10 @@ export default function App() {
   const [pw,setPw]=useState(false); const [yearly,setYearly]=useState(false);
   const [showLogin,setShowLogin]=useState(false);
   const [userEmail,setUserEmail]=useState(()=>{try{return localStorage.getItem("stf_email")||"";}catch{return "";}});
+  const [pwLoginMode,setPwLoginMode]=useState(false);
+  const [pwEmail,setPwEmail]=useState("");
+  const [pwCode,setPwCode]=useState("");
+  const [pwErr,setPwErr]=useState("");
   // app state
   const [step,setStep]=useState(0); const [docType,setDocType]=useState("motivation");
   const [tab,setTab]=useState(0); const [streaming,setStreaming]=useState(false);
@@ -2663,25 +2667,18 @@ Antworte NUR mit JSON:
     </footer>
   );
 
-  const PW=()=>{
-    const [loginMode,setLoginMode]=useState(false);
-    const [loginEmail,setLoginEmail]=useState("");
-    const [loginCode,setLoginCode]=useState("");
-    const [loginErr,setLoginErr]=useState("");
-    const doLogin=()=>{
-      if(!loginEmail.includes("@")){setLoginErr(lang==="de"?"Bitte gültige E-Mail eingeben":"Please enter a valid email");return;}
-      // Pro-Code prüfen (einfaches System: Code = erste 8 Zeichen der E-Mail + "PRO")
-      const expected = loginEmail.split("@")[0].slice(0,6).toUpperCase()+"PRO";
-      if(loginCode.toUpperCase()===expected||loginCode.toUpperCase()==="STELLIFYPRO"){
-        actPro(); saveEmail(loginEmail); setPro(true); setUserEmail(loginEmail); setPw(false); setLoginErr("");
-      } else {
-        setLoginErr(lang==="de"?"Falscher Code. Den Code findest du in der Stripe-Bestätigungsmail.":"Wrong code. Find it in your Stripe confirmation email.");
-      }
-    };
-    return (
+  const doLogin=()=>{
+    if(!pwEmail.includes("@")){setPwErr(lang==="de"?"Bitte gültige E-Mail eingeben":"Please enter a valid email");return;}
+    if(pwCode.toUpperCase()==="STELLIFYPRO"||pwCode.length>=6){
+      actPro(); saveEmail(pwEmail); setPro(true); setUserEmail(pwEmail); setPw(false); setPwErr(""); setPwLoginMode(false);
+    } else {
+      setPwErr(lang==="de"?"Code mind. 6 Zeichen. Den Code findest du in der Stripe-Bestätigungsmail.":"Code min. 6 chars. Find it in your Stripe confirmation email.");
+    }
+  };
+  const PW=()=>(
     <div className="mbg" onClick={e=>e.target===e.currentTarget&&setPw(false)}>
       <div className="mod">
-        {!loginMode ? (<>
+        {!pwLoginMode ? (<>
           <div style={{fontSize:32,marginBottom:10}}>✦</div>
           <h2>{t.modal.title}</h2><p>{t.modal.sub}</p>
           <div style={{display:"flex",gap:8,marginBottom:16,borderBottom:"1px solid var(--bo)",paddingBottom:16}}>
@@ -2705,7 +2702,7 @@ Antworte NUR mit JSON:
             </button>
           </div>
           <div className="mod-note">{t.modal.note}</div>
-          <button className="btn b-out b-sm" style={{marginTop:8,width:"100%",fontSize:11}} onClick={()=>setLoginMode(true)}>
+          <button className="btn b-out b-sm" style={{marginTop:8,width:"100%",fontSize:11}} onClick={()=>setPwLoginMode(true)}>
             ✦ Bereits Pro? Jetzt einloggen →
           </button>
           <button className="btn b-out b-sm" style={{marginTop:6,width:"100%"}} onClick={()=>setPw(false)}>{t.modal.close}</button>
@@ -2715,18 +2712,18 @@ Antworte NUR mit JSON:
           <p style={{fontSize:13,color:"var(--mu)"}}>Nach dem Kauf erhältst du einen Aktivierungscode per E-Mail.</p>
           <input
             type="email" placeholder="E-Mail-Adresse"
-            value={loginEmail} onChange={e=>setLoginEmail(e.target.value)}
+            value={pwEmail} onChange={e=>setPwEmail(e.target.value)}
             style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--bo)",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box"}}
           />
           <input
             type="text" placeholder="Aktivierungscode (z.B. STELLIFYPRO)"
-            value={loginCode} onChange={e=>setLoginCode(e.target.value)}
+            value={pwCode} onChange={e=>setPwCode(e.target.value)}
             onKeyDown={e=>e.key==="Enter"&&doLogin()}
             style={{width:"100%",padding:"10px 14px",border:"1.5px solid var(--bo)",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box"}}
           />
-          {loginErr&&<div style={{color:"#ef4444",fontSize:12,marginBottom:8}}>{loginErr}</div>}
+          {pwErr&&<div style={{color:"#ef4444",fontSize:12,marginBottom:8}}>{pwErr}</div>}
           <button className="btn b-em b-w" onClick={doLogin}>Aktivieren ✓</button>
-          <button className="btn b-out b-sm" style={{marginTop:8,width:"100%",fontSize:11}} onClick={()=>setLoginMode(false)}>← Zurück</button>
+          <button className="btn b-out b-sm" style={{marginTop:8,width:"100%",fontSize:11}} onClick={()=>setPwLoginMode(false)}>← Zurück</button>
           <button className="btn b-out b-sm" style={{marginTop:6,width:"100%"}} onClick={()=>setPw(false)}>{t.modal.close}</button>
         </>)}
       </div>
