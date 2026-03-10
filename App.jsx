@@ -12,16 +12,17 @@ const C = {
   owner: "JTSP",
   stripeMonthly: "https://buy.stripe.com/MONTHLY_LINK",
   stripeYearly:  "https://buy.stripe.com/YEARLY_LINK",
-  priceM: "19.90",
-  priceY: "14.90",
+  priceM: "24.90",
+  priceY: "18.90",
   FREE_LIMIT: 1,
   PRO_LIMIT: 60,
   CHAT_FREE_LIMIT: 20,
-  FAMILY_LIMIT: 3,
+  FAMILY_LIMIT: 4,
+  TEAM_LIMIT: 10,
   stripeFamily: "https://buy.stripe.com/FAMILY_LINK",
-  stripeUnlimited: "https://buy.stripe.com/UNLIMITED_LINK",
-  priceFamily: "29.90",
-  priceUnlimited: "49.90",
+  stripeTeam: "https://buy.stripe.com/TEAM_LINK",
+  priceFamily: "39.90",
+  priceUnlimited: "69.90",
   ADMIN_EMAIL: "admin@stellify.ch",
   ADMIN_PW: "Stellify2025!",
   // ── GROQ CONFIG ──────────────────────────────
@@ -69,7 +70,7 @@ function authClearSession() {
 function authRegister(email, pw, plan) {
   const users = authGetUsers();
   if(users.find(u=>u.email.toLowerCase()===email.toLowerCase())) return {ok:false,err:"E-Mail bereits registriert."};
-  const user = {email:email.toLowerCase(), pw, plan:plan||"free", seats:plan==="family"?3:1, members:[email.toLowerCase()], activatedAt:Date.now()};
+  const user = {email:email.toLowerCase(), pw, plan:plan||"free", seats:plan==="family"?4:plan==="team"?10:1, members:[email.toLowerCase()], activatedAt:Date.now()};
   users.push(user);
   authSaveUsers(users);
   authSetSession({email:user.email, plan:user.plan});
@@ -87,14 +88,14 @@ function authUpgradePlan(email, plan) {
   const idx = users.findIndex(u=>u.email.toLowerCase()===email.toLowerCase());
   if(idx>=0){
     users[idx].plan = plan;
-    if(plan==="family") users[idx].seats = 3;
-    if(plan==="unlimited") users[idx].seats = 9999;
+    if(plan==="family") users[idx].seats = 4;
+    if(plan==="team") users[idx].seats = 10;
     authSaveUsers(users);
     authSetSession({email:users[idx].email, plan});
     return users[idx];
   }
   // Neuer User via Stripe
-  const user = {email:email.toLowerCase(), pw:"", plan, seats:plan==="family"?3:plan==="unlimited"?9999:1, members:[email.toLowerCase()], activatedAt:Date.now()};
+  const user = {email:email.toLowerCase(), pw:"", plan, seats:plan==="family"?4:plan==="team"?10:1, members:[email.toLowerCase()], activatedAt:Date.now()};
   users.push(user);
   authSaveUsers(users);
   authSetSession({email:user.email, plan});
@@ -341,7 +342,7 @@ h1.hh em{font-style:normal;color:var(--em)}
 @keyframes sp{to{transform:rotate(360deg)}}
 .cursor{display:inline-block;width:2px;height:1em;background:var(--em);margin-left:1px;animation:blink .8s step-end infinite;vertical-align:text-bottom}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
-.r-doc{background:#fafafa;border:1.5px solid var(--bo);border-radius:12px;padding:22px;font-size:14px;line-height:1.9;color:var(--ink);white-space:pre-wrap;max-height:460px;overflow-y:auto;font-family:var(--bd)}
+.r-doc{background:#fafafa;border:1.5px solid var(--bo);border-radius:12px;padding:22px;font-size:14px;line-height:1.9;color:var(--ink);white-space:pre-wrap;max-height:460px;overflow-y:auto;font-family:var(--bd);min-height:80px}
 .r-doc::-webkit-scrollbar{width:4px}.r-doc::-webkit-scrollbar-thumb{background:rgba(16,185,129,.3);border-radius:4px}
 .r-edit{background:white;border:1.5px solid var(--em);border-radius:12px;padding:22px;font-size:14px;line-height:1.9;color:var(--ink);width:100%;min-height:340px;outline:none;font-family:var(--bd);resize:vertical;box-shadow:0 0 0 3px rgba(16,185,129,.07)}
 .r-bar{display:flex;gap:7px;justify-content:flex-end;margin-bottom:10px;flex-wrap:wrap}
@@ -537,11 +538,11 @@ const mkT = (lang) => {
         {n:"18+",   l:L("KI-Tools","AI tools","outils IA","strumenti IA")},
         {n:"3'000+",l:L("Dokumente erstellt","docs created","documents créés","documenti creati")},
         {n:"4",     l:L("Sprachen","languages","langues","lingue")},
-        {n:"CHF 19.90",l:L("statt CHF 300 Berater","vs CHF 300 advisor","vs CHF 300 conseil","vs CHF 300 consulente")},
+        {n:"CHF 24.90",l:L("statt CHF 300 Berater","vs CHF 300 advisor","vs CHF 300 conseil","vs CHF 300 consulente")},
       ],
     },
     tools:{
-      label: L("6 Tools. Ein Copilot.","6 Outils. Un Copilote.","6 Strumenti. Un Copilota.","6 Tools. One Copilot."),
+      label: L("20+ Tools. Ein Copilot.","20+ Outils. Un Copilote.","20+ Strumenti. Un Copilota.","20+ Tools. One Copilot."),
       title: L("Alles für deine Karriere in der Schweiz.","Tout pour votre carrière en Suisse.","Tutto per la tua carriera in Svizzera.","Everything for your career in Switzerland."),
       sub:   L("Kein Hin-und-Her zwischen verschiedenen Apps. Alles an einem Ort.","Fini les allers-retours entre apps. Tout en un endroit.","Niente avanti e indietro tra app. Tutto in un posto.","No more switching between apps. Everything in one place."),
       items:[
@@ -576,8 +577,8 @@ const mkT = (lang) => {
     },
     how:{
       label:L("Wie es funktioniert","Comment ça marche","Come funziona","How it works"),
-      title:L("Profil einmal anlegen. Alle 6 Tools nutzen.","Créez votre profil une fois. Utilisez les 6 outils.","Crea il profilo una volta. Usa tutti i 6 strumenti.","Set up your profile once. Use all 6 tools."),
-      sub:  L("Dein Profil ist die Basis für alle Tools.","Votre profil est la base de tous les outils.","Il tuo profilo è la base per tutti gli strumenti.","Your profile is the basis for all tools."),
+      title:L("Profil einmal anlegen. Alle 20+ Tools nutzen.","Créez votre profil une fois. Utilisez les 20+ outils.","Crea il profilo una volta. Usa tutti i 20+ strumenti.","Set up your profile once. Use all 20+ tools."),
+      sub:  L("Dein Profil ist die Basis für alle 20+ Tools.","Votre profil est la base de tous les 20+ outils.","Il tuo profilo è la base per tutti i 20+ strumenti.","Your profile is the basis for all 20+ tools."),
       steps:L(
         [{n:"01",t:"Profil anlegen",p:"Stelle, Erfahrung, Skills – einmal eingeben oder CV hochladen. Die KI liest alles automatisch."},{n:"02",t:"Tool wählen",p:"Bewerbung schreiben, ATS prüfen, Zeugnis analysieren, Jobs finden oder Interview üben."},{n:"03",t:"Live-Ergebnis",p:"Das Ergebnis erscheint Wort für Wort in Echtzeit – du siehst sofort, wie dein Dokument entsteht."}],
         [{n:"01",t:"Créer le profil",p:"Poste, expérience, compétences – entrer une fois ou uploader un CV. L'IA lit tout automatiquement."},{n:"02",t:"Choisir l'outil",p:"Rédiger candidature, ATS, analyser certificat, trouver emplois ou s'entraîner."},{n:"03",t:"Résultat en direct",p:"Le résultat apparaît mot par mot en temps réel – vous voyez votre document prendre forme instantanément."}],
@@ -617,42 +618,42 @@ const mkT = (lang) => {
         {id:"free",name:L("Gratis","Gratuit","Gratuito","Free"),price:0,
          note:L("Für immer kostenlos","Gratuit pour toujours","Sempre gratuito","Free forever"),
          list:L([`${C.FREE_LIMIT} Generierungen / Monat`,"Motivationsschreiben","Lebenslauf","CV hochladen","Text kopieren"],[`${C.FREE_LIMIT} générations / mois`,"Lettre de motivation","CV","Upload CV","Copier"],[`${C.FREE_LIMIT} generazioni / mese`,"Lettera motivazione","CV","Upload CV","Copia"],[`${C.FREE_LIMIT} generations / month`,"Cover letter","CV","Upload CV","Copy text"]),
-         no:L(["LinkedIn","ATS-Check","Zeugnis-Analyse","Job-Matching","Interview-Coach","PDF-Export","E-Mail senden"],["LinkedIn","ATS","Analyse certificat","Matching","Coach","PDF","E-mail"],["LinkedIn","ATS","Analisi certificato","Matching","Coach","PDF","E-mail"],["LinkedIn","ATS check","Reference analysis","Job matching","Interview coach","PDF export","Email send"]),
+         no:L(["LinkedIn","ATS-Check","Zeugnis-Analyse","Job-Matching","Interview-Coach","PDF-Export","E-Mail senden","Bewerbungs-Tracker","KI-Gehaltsrechner","20+ weitere Tools"],["LinkedIn","ATS check","Reference analysis","Job matching","Interview coach","PDF export","Email send","Application tracker","Salary calculator","20+ more tools"],["LinkedIn","ATS","Analyse certificat","Matching","Coach","PDF","E-mail","Tracker","Calculateur salaire","20+ autres outils"],["LinkedIn","ATS","Analisi certificato","Matching","Coach","PDF","E-mail","Tracker","Calcolatore stipendio","20+ altri strumenti"]),
          btn:L("Kostenlos starten","Commencer gratuitement","Inizia gratis","Start for free"),btnS:"b-out"},
-        {id:"pro",name:"Pro",priceM:19.90,priceY:14.90,best:true,
+        {id:"pro",name:"Pro",priceM:24.90,priceY:18.90,best:true,
          note:L("1 Person · Monatlich kündbar","1 person · Cancel monthly","1 personne · Résiliable","1 persona · Annullabile"),
-         yearNote:L("🔥 CHF 14.90/Mo. bei Jahresabo – CHF 178.80/Jahr","🔥 CHF 14.90/mo with annual plan – CHF 178.80/year","🔥 CHF 14.90/mois avec abonnement annuel","🔥 CHF 14.90/mese con abbonamento annuale"),
+         yearNote:L("🔥 CHF 18.90/Mo. bei Jahresabo – CHF 226.80/Jahr","🔥 CHF 18.90/mo with annual plan – CHF 226.80/year","🔥 CHF 18.90/mois avec abonnement annuel","🔥 CHF 18.90/mese con abbonamento annuale"),
          list:L(
            ["✍️ Unbegrenzte Bewerbungen","💼 LinkedIn Analyse & Optimierung","🤖 ATS-Simulation mit Score","📜 Zeugnis-Analyse & Decoder","🎯 Job-Matching (Top 5 Profile)","🎤 Interview-Coach (Note 0–100)","📊 Excel-Generator mit Formeln","📽️ PowerPoint-Maker","💰 KI-Gehaltsrechner Schweiz","📋 Bewerbungs-Tracker","✍️ LinkedIn-Post Generator","✅ Alle 20+ Tools · Alle 4 Sprachen"],
            ["✍️ Unlimited applications","💼 LinkedIn analysis","🤖 ATS simulation","📜 Work reference analysis","🎯 Job matching (Top 5)","🎤 Interview coach","📊 Excel generator","📽️ PowerPoint maker","💰 Swiss salary calculator","📋 Application tracker","✍️ LinkedIn post generator","✅ All 20+ tools · All 4 languages"],
            ["✍️ Documents illimités","💼 LinkedIn","🤖 ATS","📜 Certificat","🎯 Matching","🎤 Coach","📊 Excel","📽️ PowerPoint","💰 Calculateur salaire","📋 Tracker","✍️ Posts LinkedIn","✅ Tous les 20+ outils"],
            ["✍️ Documenti illimitati","💼 LinkedIn","🤖 ATS","📜 Certificato","🎯 Matching","🎤 Coach","📊 Excel","📽️ PowerPoint","💰 Calcolatore stipendio","📋 Tracker","✍️ Post LinkedIn","✅ Tutti i 20+ strumenti"]
          ),
-         btn:L("Jetzt Pro werden → CHF 19.90/Mo.","Become Pro → CHF 19.90/mo","Devenir Pro → CHF 19.90/mois","Diventa Pro → CHF 19.90/mese"),btnS:"b-em"},
-        {id:"family",name:L("Familie 👨‍👩‍👧","Family 👨‍👩‍👧","Famille 👨‍👩‍👧","Famiglia 👨‍👩‍👧"),priceM:29.90,priceY:24.90,best:false,
-         note:L("3 Personen · Gemeinsam sparen","3 people · Save together","3 personnes · Économisez","3 persone · Risparmiate"),
-         yearNote:L("🔥 CHF 24.90/Mo. bei Jahresabo – CHF 298.80/Jahr","🔥 CHF 24.90/mo annual – CHF 298.80/year","🔥 CHF 24.90/mois annuel","🔥 CHF 24.90/mese annuale"),
+         btn:L("Jetzt Pro werden → CHF 24.90/Mo.","Become Pro → CHF 24.90/mo","Devenir Pro → CHF 24.90/mois","Diventa Pro → CHF 24.90/mese"),btnS:"b-em"},
+        {id:"family",name:L("Familie 👨‍👩‍👧","Family 👨‍👩‍👧","Famille 👨‍👩‍👧","Famiglia 👨‍👩‍👧"),priceM:39.90,priceY:29.90,best:false,
+         note:L(`${C.PRO_LIMIT} Generierungen/Mo. pro Person · alle Tools`,`${C.PRO_LIMIT} generations/mo per person · all tools`,`${C.PRO_LIMIT} générations/mois par personne · tous les outils`,`${C.PRO_LIMIT} generazioni/mese per persona · tutti gli strumenti`),
+         yearNote:L("🔥 CHF 29.90/Mo. bei Jahresabo – CHF 358.80/Jahr","🔥 CHF 29.90/mo annual – CHF 358.80/year","🔥 CHF 29.90/mois annuel","🔥 CHF 29.90/mese annuale"),
          list:L(
-           ["👥 3 Personen-Accounts","✍️ Alle Pro-Funktionen für jede Person","💼 LinkedIn für alle Mitglieder","📋 Geteilter Bewerbungs-Tracker","🎤 Interview-Coach für alle","✅ Alle 20+ Tools · Alle 4 Sprachen","🔐 Jedes Mitglied eigenes Login","👑 Admin verwaltet Mitglieder"],
-           ["👥 3 person accounts","✍️ All Pro features per person","💼 LinkedIn for all members","📋 Shared application tracker","🎤 Interview coach for all","✅ All 20+ tools","🔐 Each member own login","👑 Admin manages members"],
-           ["👥 3 comptes","✍️ Toutes les fonctions Pro","💼 LinkedIn pour tous","📋 Tracker partagé","🎤 Coach pour tous","✅ Tous les outils","🔐 Login individuel","👑 Admin gère les membres"],
-           ["👥 3 account","✍️ Tutte le funzioni Pro","💼 LinkedIn per tutti","📋 Tracker condiviso","🎤 Coach per tutti","✅ Tutti gli strumenti","🔐 Login individuale","👑 Admin gestisce membri"]
+           ["✅ Alle 20+ Tools für alle Mitglieder","✍️ Unbegrenzte Bewerbungen","💼 LinkedIn → Bewerbung","🤖 ATS-Check & Zeugnis-Analyse","🎯 Job-Matching & Interview-Coach","💰 KI-Gehaltsrechner Schweiz","📋 Bewerbungs-Tracker","👨‍👩‍👧 Bis 4 Familienmitglieder","💡 ~50% günstiger als 4× Pro"],
+           ["✅ All 20+ tools for all members","✍️ Unlimited applications","💼 LinkedIn → Application","🤖 ATS check & reference analysis","🎯 Job matching & interview coach","💰 Swiss salary calculator","📋 Application tracker","👨‍👩‍👧 Up to 4 family members","💡 ~50% cheaper than 4× Pro"],
+           ["✅ Tous 20+ outils pour tous","✍️ Documents illimités","💼 LinkedIn → Candidature","🤖 ATS & analyse certificat","🎯 Matching & coach entretien","💰 Calculateur salaire suisse","📋 Tracker candidatures","👨‍👩‍👧 Jusqu'à 4 membres","💡 ~50% moins cher que 4× Pro"],
+           ["✅ Tutti 20+ strumenti per tutti","✍️ Documenti illimitati","💼 LinkedIn → Candidatura","🤖 ATS & analisi certificato","🎯 Matching & coach colloquio","💰 Calcolatore stipendio svizzero","📋 Tracker candidature","👨‍👩‍👧 Fino a 4 membri","💡 ~50% più economico di 4× Pro"]
          ),
-         btn:L("Familie starten → CHF 29.90/Mo.","Start family → CHF 29.90/mo","Famille → CHF 29.90/mois","Famiglia → CHF 29.90/mese"),btnS:"b-em"},
-        {id:"unlimited",name:L("Unlimited ♾️","Unlimited ♾️","Illimité ♾️","Illimitato ♾️"),priceM:49.90,priceY:39.90,best:false,
-         note:L("Unbegrenzte Mitglieder · Für Teams","Unlimited members · For teams","Membres illimités · Pour équipes","Membri illimitati · Per team"),
-         yearNote:L("🔥 CHF 39.90/Mo. bei Jahresabo – CHF 478.80/Jahr","🔥 CHF 39.90/mo annual","🔥 CHF 39.90/mois annuel","🔥 CHF 39.90/mese annuale"),
+         btn:L("Familie starten → CHF 39.90/Mo.","Start family → CHF 39.90/mo","Famille → CHF 39.90/mois","Famiglia → CHF 39.90/mese"),btnS:"b-em"},
+        {id:"team",name:L("Team 🏢","Team 🏢","Team 🏢","Team 🏢"),priceM:69.90,priceY:54.90,best:false,
+         note:L(`Unbegrenzte Nutzung · ${C.PRO_LIMIT} Generierungen/Mo. pro Person`,`Unlimited usage · ${C.PRO_LIMIT} generations/mo per person`,`Usage illimité · ${C.PRO_LIMIT} générations/mois par personne`,`Utilizzo illimitato · ${C.PRO_LIMIT} generazioni/mese per persona`),
+         yearNote:L("🔥 CHF 54.90/Mo. bei Jahresabo – CHF 658.80/Jahr","🔥 CHF 54.90/mo annual","🔥 CHF 54.90/mois annuel","🔥 CHF 54.90/mese annuale"),
          list:L(
-           ["♾️ Unbegrenzte Mitglieder","✍️ Alle Pro-Funktionen","💼 LinkedIn für alle","📊 Team-Dashboard","🎤 Interview-Coach für alle","✅ Alle 20+ Tools","🔐 Individuelle Logins","🛡️ Priority Support","📈 Nutzungsstatistiken"],
-           ["♾️ Unlimited members","✍️ All Pro features","💼 LinkedIn for all","📊 Team dashboard","🎤 Interview coach","✅ All 20+ tools","🔐 Individual logins","🛡️ Priority support","📈 Usage stats"],
-           ["♾️ Membres illimités","✍️ Tout en Pro","💼 LinkedIn","📊 Dashboard","🎤 Coach","✅ Tout","🔐 Logins","🛡️ Support prioritaire","📈 Stats"],
-           ["♾️ Membri illimitati","✍️ Tutto Pro","💼 LinkedIn","📊 Dashboard","🎤 Coach","✅ Tutto","🔐 Login","🛡️ Supporto prioritario","📈 Statistiche"]
+           ["🏢 Bis 10 Personen","✅ Alle 20+ Tools für alle","✍️ Unbegrenzte Bewerbungen","💼 LinkedIn → Bewerbung","🤖 ATS-Check & Zeugnis-Analyse","🎯 Job-Matching & Interview-Coach","💰 KI-Gehaltsrechner Schweiz","📋 Bewerbungs-Tracker","🛡️ Priority Support"],
+           ["🏢 Up to 10 people","✅ All 20+ tools for all","✍️ Unlimited applications","💼 LinkedIn → Application","🤖 ATS check & reference analysis","🎯 Job matching & interview coach","💰 Swiss salary calculator","📋 Application tracker","🛡️ Priority support"],
+           ["🏢 Jusqu'à 10 personnes","✅ Tous 20+ outils pour tous","✍️ Documents illimités","💼 LinkedIn → Candidature","🤖 ATS & certificats","🎯 Matching & coach","💰 Calculateur salaire","📋 Tracker","🛡️ Support prioritaire"],
+           ["🏢 Fino a 10 persone","✅ Tutti 20+ strumenti per tutti","✍️ Documenti illimitati","💼 LinkedIn → Candidatura","🤖 ATS & certificati","🎯 Matching & coach","💰 Calcolatore stipendio","📋 Tracker","🛡️ Supporto prioritario"]
          ),
-         btn:L("Unlimited starten → CHF 49.90/Mo.","Start Unlimited → CHF 49.90/mo","Illimité → CHF 49.90/mois","Illimitato → CHF 49.90/mese"),btnS:"b-out"},
+         btn:L("Team starten → CHF 69.90/Mo.","Start team → CHF 69.90/mo","Démarrer équipe → CHF 69.90/mois","Avvia team → CHF 69.90/mese"),btnS:"b-out"},
       ],
-      valTitle:L("CHF 19.90 – lohnt sich das?","CHF 19.90 – ça vaut la peine?","CHF 19.90 – vale la pena?","CHF 19.90 – is it worth it?"),
+      valTitle:L("CHF 24.90 – lohnt sich das?","CHF 24.90 – ça vaut la peine?","CHF 24.90 – vale la pena?","CHF 24.90 – is it worth it?"),
       valPts:L(
-        ["Ein Karriereberater kostet CHF 200–400 / Sitzung","Ein schlechter ATS-Score = dein CV wird nie gelesen","Zeugnis nicht verstanden = falscher Job","Stellify spart Zeit & Geld bei jeder Bewerbung"],
+        ["Ein Karriereberater kostet CHF 200–400 / Sitzung","Eine schlechte Bewerbung = verpasste Stelle","Zeugnis nicht verstanden = falscher Job","1 erfolgreiche Bewerbung = Abo hat sich gerechnet","Ein schlechter ATS-Score = CV wird nie gelesen","Stellify spart dir 3–5 Std. pro Bewerbung"],
         ["Un conseiller coûte CHF 200–400 / séance","Mauvais score ATS = votre CV n'est jamais lu","Certificat mal compris = mauvais emploi","1 mois de candidature réussie rembourse tout"],
         ["Un consulente costa CHF 200–400 / seduta","Score ATS basso = il tuo CV non viene mai letto","Certificato non capito = lavoro sbagliato","1 mese di candidatura riuscita ripaga tutto"],
         ["A career advisor costs CHF 200–400 / session","Bad ATS score = your CV is never read","Reference misunderstood = wrong job","1 successful application month pays for everything"]
@@ -666,7 +667,7 @@ const mkT = (lang) => {
     cta:{
       title:L("Deine Karriere verdient","Votre carrière mérite","La tua carriera merita","Your career deserves"),
       italic:L("deinen persönlichen Copilot.","votre copilote personnel.","il tuo copilota personale.","your personal copilot."),
-      sub:L("Kostenlos starten. 6 Tools. Schweizer Standard. Pro jederzeit kündbar.","Commencer gratuitement. 6 outils. Standard suisse. Pro résiliable.","Inizia gratis. 6 strumenti. Standard svizzero. Pro cancellabile.","Start free. 6 tools. Swiss standard. Pro cancellable anytime."),
+      sub:L("Kostenlos starten. 20+ Tools. Schweizer Standard. Jederzeit kündbar.","Commencer gratuitement. 20+ outils. Standard suisse. Résiliable.","Inizia gratis. 20+ strumenti. Standard svizzero. Cancellabile.","Start free. 20+ tools. Swiss standard. Cancel anytime."),
       btn:L("Jetzt kostenlos starten →","Commencer gratuitement →","Inizia gratis ora →","Start for free now →"),
     },
     app:{
@@ -674,7 +675,7 @@ const mkT = (lang) => {
       sub:L("Live-Streaming · Schweizer Format · 60 Sekunden","Streaming live · Format suisse · 60 secondes","Streaming live · Formato svizzero · 60 secondi","Live streaming · Swiss format · 60 seconds"),
       steps:L(["Stelle","Profil","Dokument"],["Poste","Profil","Document"],["Posto","Profilo","Documento"],["Position","Profile","Document"]),
       uLeft:(n)=>L(`kostenlose Generierung${n!==1?"en":""} übrig`,`génération${n!==1?"s":""} restante${n!==1?"s":""}`,`generazion${n!==1?"i":"e"} rimast${n!==1?"e":"a"}`,`free generation${n!==1?"s":""} remaining`),
-      proActive:L("✦ Pro aktiv – alle 18+ Tools freigeschaltet","✦ Pro active – all 18+ tools unlocked","✦ Pro actif – 18+ outils disponibles","✦ Pro attivo – 18+ strumenti disponibili"),
+      proActive:L("✦ Pro aktiv – alle 20+ Tools freigeschaltet","✦ Pro active – all 20+ tools unlocked","✦ Pro actif – 20+ outils disponibles","✦ Pro attivo – 20+ strumenti disponibili"),
       branches:L(
         ["Technologie / IT","Finanzen / Versicherung","Gesundheit / Pharma","Marketing","Handel","Industrie","Bildung / Forschung","Öffentlicher Dienst","Tourismus","Andere"],
         ["Technologie / IT","Finance / Assurance","Santé / Pharma","Marketing","Commerce","Industrie","Éducation","Service public","Tourisme","Autre"],
@@ -739,7 +740,7 @@ const mkT = (lang) => {
       miss:L("✗ Fehlende Keywords","✗ Mots-clés manquants","✗ Keywords mancanti","✗ Missing keywords"),
       tips:L("💡 Optimierungstipps","💡 Conseils d'optimisation","💡 Consigli di ottimizzazione","💡 Optimization tips"),
       prompt:(cv,job,desc)=>L(
-        `Du bist ein ATS-System (Applicant Tracking System) für Schweizer HR. Analysiere diesen Lebenslauf für die Stelle "${job}". Antworte NUR mit JSON:\n{"score":82,"grade":"Gut","summary":"2 Sätze zur Gesamtbewertung","keywords_found":["Python","Projektmanagement","Deutsch"],"keywords_missing":["Scrum","SQL","Englisch"],"tips":["Tipp 1 (konkret)","Tipp 2","Tipp 3"]}\nStelle: ${job}\nInserat: ${desc||"nicht angegeben"}\nLebenslauf:\n${cv}`,
+        `Du bist ein KI-Simulator für ATS-Systeme (Applicant Tracking Software). Analysiere diesen Lebenslauf für die Stelle "${job}" auf Keyword-Match und Vollständigkeit. Hinweis: Score ist KI-Schätzung, kein offizieller Wert. Antworte NUR mit JSON:\n{"score":82,"grade":"Gut","summary":"2 Sätze zur Gesamtbewertung","keywords_found":["Python","Projektmanagement","Deutsch"],"keywords_missing":["Scrum","SQL","Englisch"],"tips":["Tipp 1 (konkret)","Tipp 2","Tipp 3"]}\nStelle: ${job}\nInserat: ${desc||"nicht angegeben"}\nLebenslauf:\n${cv}`,
         `Tu es un système ATS pour RH suisses. Analyse ce CV pour le poste "${job}". Réponds UNIQUEMENT avec JSON:\n{"score":82,"grade":"Bien","summary":"2 phrases","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Conseil 1","Conseil 2","Conseil 3"]}\nPoste: ${job}\nAnnonce: ${desc||"non fournie"}\nCV:\n${cv}`,
         `Sei un sistema ATS per HR svizzeri. Analizza questo CV per il posto "${job}". Rispondi SOLO con JSON:\n{"score":82,"grade":"Bene","summary":"2 frasi","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Consiglio 1","Consiglio 2","Consiglio 3"]}\nPosto: ${job}\nAnnuncio: ${desc||"non fornito"}\nCV:\n${cv}`,
         `You are an ATS system for Swiss HR. Analyze this CV for the position "${job}". Reply ONLY with JSON:\n{"score":82,"grade":"Good","summary":"2 sentences","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Tip 1","Tip 2","Tip 3"]}\nPosition: ${job}\nJob ad: ${desc||"not provided"}\nCV:\n${cv}`
@@ -756,7 +757,7 @@ const mkT = (lang) => {
       phrases:L("Entschlüsselte Formulierungen","Formulations déchiffrées","Formulazioni decifrate","Decoded phrases"),
       tips:L("💡 Was du tun solltest","💡 Ce que vous devriez faire","💡 Cosa dovresti fare","💡 What you should do"),
       prompt:(text)=>L(
-        `Du bist Experte für Schweizer Arbeitszeugnisse. Analysiere dieses Zeugnis und entschlüssle den Schweizer Zeugnis-Code. Antworte NUR mit JSON:\n{"grade":"A","grade_text":"Sehr gut","overall":"2-3 Sätze zur Gesamtbewertung","phrases":[{"original":"hat die ihm übertragenen Aufgaben stets zu unserer vollsten Zufriedenheit erledigt","decoded":"Bestnote – entspricht einer 6","rating":"A"},{"original":"war bemüht","decoded":"Schwache Formulierung – bedeutet mangelhafte Leistung","rating":"D"}],"tips":["Tipp 1","Tipp 2"]}\nZeugnis:\n${text}`,
+        `Du bist Schweizer HR-Experte und kennst den vollständigen Zeugnis-Code des Schweizerischen Obligationenrechts (OR). Analysiere dieses Zeugnis und entschlüssle jede Formulierung gemäss dem offiziellen Schweizer Zeugnis-Decoder ("stets zu unserer vollsten Zufriedenheit" = sehr gut, "zu unserer vollsten Zufriedenheit" = gut, "zu unserer Zufriedenheit" = befriedigend, "im Grossen und Ganzen" = genügend, "war bemüht" = ungenügend). Antworte NUR mit JSON:\n{"grade":"A","grade_text":"Sehr gut","overall":"2-3 Sätze zur Gesamtbewertung","phrases":[{"original":"hat die ihm übertragenen Aufgaben stets zu unserer vollsten Zufriedenheit erledigt","decoded":"Bestnote – entspricht einer 6","rating":"A"},{"original":"war bemüht","decoded":"Schwache Formulierung – bedeutet mangelhafte Leistung","rating":"D"}],"tips":["Tipp 1","Tipp 2"]}\nZeugnis:\n${text}`,
         `Tu es expert en certificats de travail suisses. Analyse ce certificat. Réponds UNIQUEMENT avec JSON:\n{"grade":"A","grade_text":"Très bien","overall":"2-3 phrases","phrases":[{"original":"phrase originale","decoded":"sens réel","rating":"A"}],"tips":["Conseil"]}\nCertificat:\n${text}`,
         `Sei esperto di certificati di lavoro svizzeri. Analizza questo certificato. Rispondi SOLO con JSON:\n{"grade":"A","grade_text":"Molto bene","overall":"2-3 frasi","phrases":[{"original":"frase originale","decoded":"significato reale","rating":"A"}],"tips":["Consiglio"]}\nCertificato:\n${text}`,
         `You are an expert in Swiss work references. Analyse this reference. Reply ONLY with JSON:\n{"grade":"A","grade_text":"Excellent","overall":"2-3 sentences","phrases":[{"original":"original phrase","decoded":"real meaning","rating":"A"}],"tips":["Tip"]}\nReference:\n${text}`
@@ -834,11 +835,11 @@ const mkT = (lang) => {
       resA:L("📝 About-Sektion","📝 Section About","📝 Sezione About","📝 About section"),
       resS:L("🏷️ Empfohlene Skills","🏷️ Compétences","🏷️ Skills consigliati","🏷️ Recommended skills"),
       copy:L("Kopieren","Copier","Copia","Copy"),
-      prompt:(d)=>`You are a LinkedIn career coach for the Swiss job market. Optimize this profile. Reply ONLY with valid JSON.\nLanguage: ${L("Schweizer Hochdeutsch","français","italiano","English")}\nCurrent text: ${d.text||"not provided"}\nTarget role: ${d.role||"not provided"}\nAchievements: ${d.ach||"not provided"}\nCurrent job: ${d.beruf||"not provided"} | Experience: ${d.erfahrung||0} years | Skills: ${d.skills||"not provided"}\nRequired JSON: {"headline":"max 220 chars","about":"3-4 paragraphs first person ~250 words","skills":["Skill1","Skill2","Skill3","Skill4","Skill5","Skill6","Skill7","Skill8","Skill9","Skill10"]}`,
+      prompt:(d)=>`You are a LinkedIn career coach for the Swiss job market. Optimize this profile. Reply ONLY with valid JSON. Write the headline and about section in ${L("Schweizer Hochdeutsch (kein ß)","français","italiano","English")}.\nCurrent text: ${d.text||"not provided"}\nTarget role: ${d.role||"not provided"}\nAchievements: ${d.ach||"not provided"}\nCurrent job: ${d.beruf||"not provided"} | Experience: ${d.erfahrung||0} years | Skills: ${d.skills||"not provided"}\nRequired JSON: {"headline":"max 220 chars","about":"3-4 paragraphs first person ~250 words","skills":["Skill1","Skill2","Skill3","Skill4","Skill5","Skill6","Skill7","Skill8","Skill9","Skill10"]}`,
     },
     modal:{
       title:`${C.name} Pro`,
-      sub:L("Alle 6 KI-Tools freischalten.","Débloquer les 6 outils IA.","Sblocca i 6 strumenti IA.","Unlock all 6 AI tools."),
+      sub:L("Alle 20+ KI-Tools freischalten.","Débloquer les 20+ outils IA.","Sblocca i 20+ strumenti IA.","Unlock all 20+ AI tools."),
       feats:L([["✍️","Bewerbungen"],["🤖","ATS"],["📜","Zeugnis"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
               [["✍️","Candidatures"],["🤖","ATS"],["📜","Certificat"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
               [["✍️","Candidature"],["🤖","ATS"],["📜","Certificato"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
@@ -907,7 +908,7 @@ const GENERIC_TOOLS = [
   },
   { id:"kuendigung", ico:"📤", color:"#dc2626", cat:"karriere",
     t:{de:"Kündigung schreiben",en:"Resignation Letter",fr:"Lettre de démission",it:"Lettera di dimissioni"},
-    sub:{de:"Professionelle Kündigung im Schweizer Format, rechtlich korrekt.",en:"Professional resignation letter in Swiss format, legally correct.",fr:"Lettre de démission professionnelle au format suisse.",it:"Lettera di dimissioni professionale nel formato svizzero."},
+    sub:{de:"Entwurf im Schweizer Format – bitte Kündigungsfristen im Arbeitsvertrag prüfen.",en:"Draft in Swiss format – please verify notice periods in your employment contract.",fr:"Brouillon au format suisse – vérifiez les délais dans votre contrat de travail.",it:"Bozza in formato svizzero – verifica i termini nel contratto di lavoro."},
     inputs:[
       {k:"name",  lbl:{de:"Dein Name",en:"Your name",fr:"Votre nom",it:"Il tuo nome"},ph:{de:"Max Mustermann",en:"John Doe",fr:"Jean Dupont",it:"Mario Rossi"},req:true},
       {k:"firma", lbl:{de:"Arbeitgeber / Firma",en:"Employer / Company",fr:"Employeur / Entreprise",it:"Datore di lavoro / Azienda"},ph:{de:"Musterfirma AG, Zürich",en:"Example Corp, Zurich",fr:"Exemple SA, Zurich",it:"Esempio SA, Zurigo"},req:true},
@@ -915,7 +916,7 @@ const GENERIC_TOOLS = [
       {k:"grund", lbl:{de:"Grund (optional – erscheint NICHT im Brief)",en:"Reason (optional – will NOT appear in letter)",fr:"Raison (optionnel – n'apparaît PAS dans la lettre)",it:"Motivo (opzionale – NON appare nella lettera)"},ph:{de:"z.B. Neuer Job, bessere Perspektiven",en:"e.g. New job, better opportunities",fr:"ex. Nouvel emploi",it:"es. Nuovo lavoro"},req:false},
     ],
     prompt:(v,l)=>({
-      de:`Schreibe eine professionelle Kündigung auf Schweizer Hochdeutsch (kein ß). Schweizer Recht, neutrale Formulierung, Dank für die Zusammenarbeit.\nName: ${v.name} | Firma: ${v.firma} | Letzter Tag: ${v.datum}\nNICHT erwähnen: ${v.grund||"–"}. Vollständiger Brief mit Datum, Anschrift, Betreff.`,
+      de:`Schreibe eine professionelle Kündigung auf Schweizer Hochdeutsch (kein ß) gemäss Schweizer Obligationenrecht (OR Art. 335). Neutrale, sachliche Formulierung. Dank für die Zusammenarbeit. Kein Grund angeben.\nName: ${v.name} | Firma: ${v.firma} | Letzter Arbeitstag: ${v.datum}\nNICHT erwähnen: ${v.grund||"–"}. Vollständiger Brief: Ort/Datum, vollständige Anschrift, Betreff, Anrede, Kündigung per Datum, Dankesformel, freundliche Grüsse, Unterschrift. Einschreiben-Hinweis am Ende.`,
       en:`Write a professional resignation letter in English for the Swiss job market.\nName: ${v.name} | Company: ${v.firma} | Last day: ${v.datum}\nDO NOT mention: ${v.grund||"–"}. Complete letter with date, address, subject line.`,
       fr:`Rédige une lettre de démission professionnelle en français pour le marché suisse.\nNom: ${v.name} | Entreprise: ${v.firma} | Dernier jour: ${v.datum}\nNE PAS mentionner: ${v.grund||"–"}. Lettre complète.`,
       it:`Scrivi una lettera di dimissioni professionale in italiano per il mercato svizzero.\nNome: ${v.name} | Azienda: ${v.firma} | Ultimo giorno: ${v.datum}\nNON menzionare: ${v.grund||"–"}. Lettera completa.`,
@@ -937,7 +938,7 @@ const GENERIC_TOOLS = [
   },
   { id:"referenz", ico:"🏆", color:"#b45309", cat:"karriere",
     t:{de:"Referenzschreiben",en:"Reference Letter",fr:"Lettre de référence",it:"Lettera di referenza"},
-    sub:{de:"Für Arbeitgeber, die ein professionelles Zeugnis schreiben müssen.",en:"For employers who need to write a professional reference.",fr:"Pour les employeurs qui doivent rédiger une référence professionnelle.",it:"Per datori di lavoro che devono scrivere una referenza professionale."},
+    sub:{de:"KI erstellt einen Entwurf – Arbeitgeber prüft und unterschreibt. Kein Ersatz für rechtliche Beratung.",en:"AI creates a draft – employer reviews and signs. Not a substitute for legal advice.",fr:"L'IA crée un brouillon – l'employeur vérifie et signe. Ne remplace pas un conseil juridique.",it:"L'IA crea una bozza – il datore verifica e firma. Non sostituisce la consulenza legale."},
     inputs:[
       {k:"mitarb",lbl:{de:"Name des Mitarbeiters",en:"Employee name",fr:"Nom de l'employé(e)",it:"Nome del dipendente"},ph:{de:"Max Mustermann",en:"John Doe",fr:"Jean Dupont",it:"Mario Rossi"},req:true},
       {k:"stelle", lbl:{de:"Stelle & Dauer",en:"Position & duration",fr:"Poste & durée",it:"Posto & durata"},ph:{de:"z.B. Projektleiter, 3 Jahre",en:"e.g. Project manager, 3 years",fr:"ex. Chef de projet, 3 ans",it:"es. Project manager, 3 anni"},req:true},
@@ -1162,7 +1163,7 @@ Crea:
   // ── GEHALTSRECHNER ──
   { id:"gehaltsrechner", ico:"💰", color:"#059669", cat:"karriere",
     t:{de:"KI-Gehaltsrechner Schweiz",en:"AI Salary Calculator Switzerland",fr:"Calculateur salaire IA Suisse",it:"Calcolatore stipendio IA Svizzera"},
-    sub:{de:"Realistisches Jahresgehalt nach Jobtitel, Branche, Kanton & Erfahrung – mit Verhandlungstipps.",en:"Realistic annual salary by job title, industry, canton & experience – with negotiation tips.",fr:"Salaire annuel réaliste par titre, secteur, canton & expérience – avec conseils.",it:"Stipendio annuale realistico per titolo, settore, cantone & esperienza – con consigli."},
+    sub:{de:"Gehaltsschätzung nach Jobtitel, Branche, Kanton & Erfahrung – Richtwerte, keine Garantie.",en:"Salary estimate by job title, industry, canton & experience – indicative values, not guaranteed.",fr:"Estimation salariale par titre, secteur, canton & expérience – valeurs indicatives.",it:"Stima salariale per titolo, settore, cantone & esperienza – valori indicativi."},
     inputs:[
       {k:"job",    lbl:{de:"Jobtitel *",en:"Job title *",fr:"Titre du poste *",it:"Titolo del posto *"},ph:{de:"z.B. Senior Software Engineer, HR Business Partner, Projektleiter",en:"e.g. Senior Software Engineer, HR Business Partner, Project Manager",fr:"ex. Ingénieur logiciel senior, Chef de projet",it:"es. Senior Software Engineer, Project Manager"},req:true},
       {k:"branche",lbl:{de:"Branche *",en:"Industry *",fr:"Secteur *",it:"Settore *"},type:"select",opts:{de:["IT & Software","Finanzen & Banking","Gesundheitswesen","Ingenieurwesen","Marketing & Kommunikation","Recht & Compliance","Bildung","Logistik","Personalwesen (HR)","Beratung","Gastronomie","Bau & Architektur"],en:["IT & Software","Finance & Banking","Healthcare","Engineering","Marketing","Legal","Education","Logistics","HR","Consulting","Hospitality","Construction"],fr:["IT & Logiciels","Finance","Santé","Ingénierie","Marketing","Juridique","Éducation","Logistique","RH","Conseil","Hôtellerie","Construction"],it:["IT & Software","Finanza","Sanità","Ingegneria","Marketing","Legale","Istruzione","Logistica","HR","Consulenza","Ospitalità","Costruzione"]},req:true},
@@ -1171,7 +1172,7 @@ Crea:
       {k:"abschluss",lbl:{de:"Höchster Abschluss",en:"Highest degree",fr:"Diplôme le plus élevé",it:"Titolo di studio più alto"},type:"select",opts:{de:["Lehre / Berufsausbildung","Berufsmaturität","Bachelor","Master / Lizentiat","Doktorat / PhD"],en:["Apprenticeship","Vocational Maturity","Bachelor","Master","PhD"],fr:["Apprentissage","Maturité professionnelle","Bachelor","Master","Doctorat"],it:["Apprendistato","Maturità professionale","Bachelor","Master","Dottorato"]},req:false},
     ],
     prompt:(v,l)=>(({
-      de:`Du bist Schweizer Gehaltsexperte 2025/26. Analysiere den Arbeitsmarkt und erstelle eine realistische Gehaltsschätzung. Antworte NUR mit JSON (kein Markdown):
+      de:`Du bist Schweizer Gehaltsexperte 2025/26. Erstelle eine Gehaltsschätzung basierend auf Marktdaten (Salarium BFS, Lohnrechner, Michael Page, Robert Half). Antworte NUR mit JSON (kein Markdown). Wichtig: Alle Angaben sind Richtwerte, keine Garantien.
 {"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% über dem Schweizer Median","kanton_faktor":"Zürich: +8% vs CH-Durchschnitt","tipps":["Tipp 1","Tipp 2","Tipp 3"],"verhandlungstipp":"Konkreter Satz für die Verhandlung","branchentrend":"Einschätzung zur Gehaltsentwicklung"}
 Profil: Jobtitel: ${v.job} | Branche: ${v.branche||"k.A."} | Kanton: ${v.kanton||"Schweiz"} | Erfahrung: ${v.erfahrung||"k.A."} | Abschluss: ${v.abschluss||"k.A."}`,
       en:`You are a Swiss salary expert 2025/26. Analyse the job market and create a realistic salary estimate. Reply ONLY with JSON (no markdown):
@@ -2186,31 +2187,31 @@ function FaqSection({lang, email}) {
   const faqs=lang==="de"?[
     {q:"Wie sicher sind meine Daten?",a:"Deine Daten werden nicht gespeichert. Jede Anfrage wird direkt an die Anthropic API gesendet und danach nicht protokolliert. Kein Training auf deinen Daten."},
     {q:"Kann ich jederzeit kündigen?",a:"Ja – du kannst monatlich kündigen, ohne Mindestlaufzeit oder versteckte Gebühren. Über Stripe verwaltest du dein Abo selbst."},
-    {q:"Was passiert nach den 60 Generierungen?",a:"Nach 60 Pro-Generierungen pro Monat wird dein Limit am 1. des nächsten Monats automatisch zurückgesetzt. Du kannst aber trotzdem gratis 1× die Kernfunktion nutzen."},
+    {q:"Wie viele Generierungen habe ich?",a:`Gratis: ${C.FREE_LIMIT} Generierung${C.FREE_LIMIT!==1?"en":""} zum Testen. Pro, Familie & Team: je ${C.PRO_LIMIT} Generierungen/Monat pro Person. Das Kontingent erneuert sich am 1. des Folgemonats automatisch.`},
     {q:"Funktioniert Stellify für alle Branchen?",a:"Ja. Die KI ist auf den Schweizer Jobmarkt trainiert und kennt Gepflogenheiten aus IT, Finanzen, Gesundheit, Bildung, Gastronomie und mehr."},
     {q:"Welche Sprachen werden unterstützt?",a:"Vollständig auf Deutsch, Englisch, Französisch und Italienisch – ideal für Jobs in allen Sprachregionen der Schweiz."},
-    {q:"Gibt es einen Studentenrabatt?",a:"Aktuell nicht, aber der Jahrespreis (CHF 14.90/Mo.) macht das Abo für alle erschwinglich. Meld dich bei uns für spezielle Konditionen."},
+    {q:"Gibt es einen Studentenrabatt?",a:"Aktuell nicht, aber der Jahrespreis (CHF 18.90/Mo.) macht das Abo für alle erschwinglich. Meld dich bei uns für spezielle Konditionen."},
   ]:lang==="fr"?[
     {q:"Mes données sont-elles sécurisées?",a:"Vos données ne sont pas stockées. Chaque requête est envoyée directement à l'API Anthropic et n'est pas enregistrée."},
     {q:"Puis-je résilier à tout moment?",a:"Oui – résiliation mensuelle possible, sans durée minimale ni frais cachés."},
-    {q:"Que se passe-t-il après 60 générations?",a:"Après 60 générations Pro par mois, votre limite est automatiquement réinitialisée le 1er du mois suivant."},
+    {q:"Combien de générations par plan?",a:"Gratuit: 1 génération. Pro: 60/mois par personne. Famille: 60/mois par personne (3 personnes). Unlimited: 60/mois par personne, membres illimités. Le quota se renouvelle automatiquement le 1er du mois suivant."},
     {q:"Fonctionne pour tous les secteurs?",a:"Oui. L'IA connaît les habitudes du marché suisse dans tous les secteurs."},
     {q:"Quelles langues sont supportées?",a:"Allemand, anglais, français et italien – idéal pour toutes les régions linguistiques."},
-    {q:"Y a-t-il une réduction étudiants?",a:"Pas actuellement, mais le prix annuel (CHF 14.90/mois) est accessible à tous."},
+    {q:"Y a-t-il une réduction étudiants?",a:"Pas actuellement, mais le prix annuel (CHF 18.90/mois) est accessible à tous."},
   ]:lang==="it"?[
     {q:"I miei dati sono sicuri?",a:"I tuoi dati non vengono salvati. Ogni richiesta viene inviata direttamente all'API Anthropic e non viene registrata."},
     {q:"Posso cancellare in qualsiasi momento?",a:"Sì – cancellazione mensile possibile, senza durata minima o costi nascosti."},
     {q:"Cosa succede dopo 60 generazioni?",a:"Dopo 60 generazioni Pro al mese, il limite si ripristina automaticamente il 1° del mese successivo."},
     {q:"Funziona per tutti i settori?",a:"Sì. L'IA conosce le abitudini del mercato svizzero in tutti i settori."},
     {q:"Quali lingue sono supportate?",a:"Tedesco, inglese, francese e italiano – ideale per tutte le regioni linguistiche."},
-    {q:"C'è uno sconto studenti?",a:"Al momento no, ma il prezzo annuale (CHF 14.90/mese) è accessibile a tutti."},
+    {q:"C'è uno sconto studenti?",a:"Al momento no, ma il prezzo annuale (CHF 18.90/mese) è accessibile a tutti."},
   ]:[
     {q:"Is my data secure?",a:"Your data is not stored. Each request is sent directly to the Anthropic API and not logged. No training on your data."},
     {q:"Can I cancel at any time?",a:"Yes – monthly cancellation possible, no minimum term or hidden fees. Manage your subscription directly via Stripe."},
     {q:"What happens after 60 generations?",a:"After 60 Pro generations per month, your limit resets automatically on the 1st of the following month."},
     {q:"Does it work for all industries?",a:"Yes. The AI is trained on the Swiss job market and knows conventions across IT, finance, health, education, hospitality and more."},
     {q:"Which languages are supported?",a:"Fully available in German, English, French and Italian – ideal for jobs across all Swiss language regions."},
-    {q:"Is there a student discount?",a:"Not currently, but the annual price (CHF 14.90/mo.) makes the subscription affordable for everyone."},
+    {q:"Is there a student discount?",a:"Not currently, but the annual price (CHF 18.90/mo.) makes the subscription affordable for everyone."},
   ];
   return(
     <section className="sec sec-w" id="faq">
@@ -2968,6 +2969,100 @@ function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
 
 // ════════════════════════════════════════
 // 🛡️ ADMIN DASHBOARD
+function MemberPanel({ lang, session, onClose }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const [members, setMembers] = React.useState([]);
+  const [newEmail, setNewEmail] = React.useState("");
+  const [err, setErr] = React.useState("");
+  const [ok, setOk] = React.useState("");
+  const maxSeats = session.plan==="family" ? 4 : 10;
+  const planLabel = session.plan==="family" ? L("Familie","Family","Famille","Famiglia") : "Team";
+
+  React.useEffect(()=>{
+    const users = JSON.parse(localStorage.getItem("stf_auth_users")||"[]");
+    const owner = users.find(u=>u.email.toLowerCase()===session.email.toLowerCase());
+    setMembers(owner?.members||[session.email]);
+  },[]);
+
+  const add = () => {
+    setErr(""); setOk("");
+    if(!newEmail.trim()) return;
+    const res = authAddMember(session.email, newEmail.trim());
+    if(res.ok){
+      setMembers(m=>[...m, newEmail.trim().toLowerCase()]);
+      setNewEmail("");
+      setOk(L("Mitglied hinzugefügt ✓","Member added ✓","Membre ajouté ✓","Membro aggiunto ✓"));
+    } else { setErr(res.err); }
+  };
+
+  const remove = (email) => {
+    if(email.toLowerCase()===session.email.toLowerCase()) return;
+    const users = JSON.parse(localStorage.getItem("stf_auth_users")||"[]");
+    const owner = users.find(u=>u.email.toLowerCase()===session.email.toLowerCase());
+    if(owner){ owner.members = owner.members.filter(m=>m!==email.toLowerCase()); localStorage.setItem("stf_auth_users", JSON.stringify(users)); }
+    setMembers(m=>m.filter(x=>x!==email.toLowerCase()));
+  };
+
+  return (
+    <div className="mbg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="mod" style={{maxWidth:460,textAlign:"left"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div>
+            <h2 style={{fontSize:20,margin:0}}>👥 {planLabel}-{L("Mitglieder","Members","Membres","Membri")}</h2>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:3}}>{members.length}/{maxSeats} {L("Plätze belegt","seats used","places occupées","posti occupati")}</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,.4)",fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+
+        {/* Mitgliederliste */}
+        <div style={{marginBottom:16}}>
+          {members.map((m,i)=>(
+            <div key={m} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:"rgba(255,255,255,.04)",borderRadius:9,marginBottom:6,border:"1px solid rgba(255,255,255,.07)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:9}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,var(--em),#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"white"}}>{m[0].toUpperCase()}</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:"white"}}>{m}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,.3)"}}>{i===0?L("Admin (du)","Admin (you)","Admin (vous)","Admin (tu)"):L("Mitglied","Member","Membre","Membro")}</div>
+                </div>
+              </div>
+              {i>0&&<button onClick={()=>remove(m)} style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.2)",color:"#f87171",borderRadius:7,padding:"4px 9px",fontSize:11,cursor:"pointer",fontWeight:600}}>
+                {L("Entfernen","Remove","Retirer","Rimuovi")}
+              </button>}
+            </div>
+          ))}
+        </div>
+
+        {/* E-Mail hinzufügen */}
+        {members.length < maxSeats ? (
+          <div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginBottom:8}}>{L("E-Mail-Adresse des neuen Mitglieds eingeben:","Enter the email address of the new member:","Entrez l'adresse e-mail du nouveau membre:","Inserisci l'indirizzo e-mail del nuovo membro:")}</div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={newEmail} onChange={e=>setNewEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()}
+                placeholder="name@beispiel.ch" type="email"
+                style={{flex:1,padding:"9px 12px",borderRadius:9,border:"1.5px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"white",fontFamily:"var(--bd)",fontSize:13,outline:"none"}}/>
+              <button onClick={add} className="btn b-em b-sm">{L("Hinzufügen","Add","Ajouter","Aggiungi")}</button>
+            </div>
+            {err&&<div style={{color:"#f87171",fontSize:12,marginTop:7}}>{err}</div>}
+            {ok&&<div style={{color:"var(--em)",fontSize:12,marginTop:7}}>{ok}</div>}
+            <div style={{fontSize:11,color:"rgba(255,255,255,.25)",marginTop:10,lineHeight:1.6}}>
+              {L("Das Mitglied muss sich mit dieser E-Mail bei Stellify registrieren, um Zugang zu erhalten.","The member must register at Stellify with this email to gain access.","Le membre doit s'inscrire sur Stellify avec cet e-mail pour accéder.","Il membro deve registrarsi su Stellify con questa email per accedere.")}
+            </div>
+          </div>
+        ) : (
+          <div style={{textAlign:"center",padding:"16px",background:"rgba(245,158,11,.08)",borderRadius:10,border:"1px solid rgba(245,158,11,.2)",fontSize:13,color:"rgba(245,158,11,.8)"}}>
+            {L(`Alle ${maxSeats} Plätze belegt.`,`All ${maxSeats} seats used.`,`Les ${maxSeats} places sont occupées.`,`Tutti i ${maxSeats} posti sono occupati.`)}
+          </div>
+        )}
+
+        <button className="btn b-out b-sm" style={{width:"100%",marginTop:18,borderColor:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.5)"}} onClick={onClose}>
+          {L("Schliessen","Close","Fermer","Chiudi")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 function AdminDashboard({ lang, onClose }) {
   const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
   const [tab, setTab] = useState("users");
@@ -2983,11 +3078,11 @@ function AdminDashboard({ lang, onClose }) {
     total: users.length,
     pro: users.filter(u=>u.plan==="pro").length,
     family: users.filter(u=>u.plan==="family").length,
-    unlimited: users.filter(u=>u.plan==="unlimited").length,
+    team: users.filter(u=>u.plan==="team").length,
     free: users.filter(u=>!u.plan||u.plan==="free").length,
   };
 
-  const PLAN_COLORS = {pro:"#10b981",family:"#6366f1",unlimited:"#f59e0b",free:"rgba(255,255,255,.2)"};
+  const PLAN_COLORS = {pro:"#10b981",family:"#6366f1",team:"#f59e0b",free:"rgba(255,255,255,.2)"};
 
   return (
     <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
@@ -3002,7 +3097,7 @@ function AdminDashboard({ lang, onClose }) {
 
         {/* Stats */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
-          {[["👥","Total",stats.total,"rgba(255,255,255,.06)"],["✦","Pro",stats.pro,"rgba(16,185,129,.1)"],["👨‍👩‍👧","Familie",stats.family,"rgba(99,102,241,.1)"],["♾️","Unlim.",stats.unlimited,"rgba(245,158,11,.1)"]].map(([ico,lbl,val,bg])=>(
+          {[["👥","Total",stats.total,"rgba(255,255,255,.06)"],["✦","Pro",stats.pro,"rgba(16,185,129,.1)"],["👨‍👩‍👧","Familie",stats.family,"rgba(99,102,241,.1)"],["🏢","Team",stats.team,"rgba(245,158,11,.1)"]].map(([ico,lbl,val,bg])=>(
             <div key={lbl} style={{background:bg,border:"1px solid rgba(255,255,255,.08)",borderRadius:12,padding:"12px 14px",textAlign:"center"}}>
               <div style={{fontSize:20}}>{ico}</div>
               <div style={{fontFamily:"var(--hd)",fontSize:22,fontWeight:800,color:"white",lineHeight:1}}>{val}</div>
@@ -3027,7 +3122,7 @@ function AdminDashboard({ lang, onClose }) {
           {filtered.map(u=>(
             <div key={u.email} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
               <div style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
-                {u.plan==="family"?"👨‍👩‍👧":u.plan==="unlimited"?"♾️":u.plan==="pro"?"✦":"👤"}
+                {u.plan==="family"?"👨‍👩‍👧":u.plan==="team"?"🏢":u.plan==="pro"?"✦":"👤"}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:700,color:"white",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
@@ -3119,7 +3214,7 @@ function ProfileManager({ lang, onClose, onSelect }) {
         </div>
 
         <div className="fg2" style={{gap:10}}>
-          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Name *","Name *","Nom *","Nome *")}</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder={L("z.B. Max Muster","e.g. John Doe","ex. Jean Dupont","es. Mario Rossi")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Vorname & Nachname *","First & Last Name *","Prénom & Nom *","Nome & Cognome *")}</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder={L("z.B. Max Muster","e.g. John Smith","ex. Jean Dupont","es. Mario Rossi")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
           <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Aktueller Beruf","Current job","Emploi actuel","Lavoro attuale")}</label><input value={form.beruf} onChange={e=>setForm(f=>({...f,beruf:e.target.value}))} placeholder={L("z.B. Product Manager","e.g. Product Manager","ex. Chef de produit","es. Product Manager")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
           <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Erfahrung (Jahre)","Experience (years)","Expérience (ans)","Esperienza (anni)")}</label><input value={form.erfahrung} onChange={e=>setForm(f=>({...f,erfahrung:e.target.value}))} placeholder="z.B. 5" type="number" min="0" max="50" style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
           <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Sprachen","Languages","Langues","Lingue")}</label><input value={form.sprachen} onChange={e=>setForm(f=>({...f,sprachen:e.target.value}))} placeholder={L("z.B. DE, EN, FR","e.g. EN, DE, FR","ex. FR, DE, EN","es. IT, DE, EN")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
@@ -3139,7 +3234,10 @@ function ProfileManager({ lang, onClose, onSelect }) {
     <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
       <div className="mod" style={{maxWidth:480,textAlign:"left",maxHeight:"85vh",overflowY:"auto"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
-          <h2 style={{fontSize:22,margin:0}}>{L("Profile","Profiles","Profils","Profili")}</h2>
+          <div>
+            <h2 style={{fontSize:22,margin:0,marginBottom:2}}>{L("Meine Profile","My Profiles","Mes Profils","I miei Profili")}</h2>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",fontWeight:400}}>{L("Profildaten für die KI (Name, Beruf, Skills…)","Your data for the AI (name, job, skills…)","Vos données pour l'IA (nom, métier, skills…)","I tuoi dati per l'IA (nome, lavoro, skill…)")}</div>
+          </div>
           <button onClick={openNew} className="btn b-em b-sm">+ {L("Neu","New","Nouveau","Nuovo")}</button>
         </div>
 
@@ -3188,6 +3286,7 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState("login");
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   // Multi-Profil
   const [showProfiles, setShowProfiles] = useState(false);
   const [activeProfile, setActiveProfile] = useState(()=>{
@@ -3268,7 +3367,7 @@ export default function App() {
     }
     setUsage(getU().count); setProUsage(getProCount());
     const sess = authGetSession();
-    if(sess) { setAuthSession(sess); if(sess.plan==="pro"||sess.plan==="family"||sess.plan==="unlimited") setPro(true); else setPro(isPro()); }
+    if(sess) { setAuthSession(sess); if(sess.plan==="pro"||sess.plan==="family"||sess.plan==="team") setPro(true); else setPro(isPro()); }
     else setPro(isPro());
   },[page]);
   useEffect(()=>{if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight;},[icMsgs]);
@@ -3390,6 +3489,10 @@ Antworte NUR mit JSON:
                 style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(245,158,11,.3)",background:"rgba(245,158,11,.1)",color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer"}}>
                 🛡️ Admin
               </button>}
+              {(authSession.plan==="family"||authSession.plan==="team")&&!authSession.isAdmin&&<button onClick={()=>setShowMembers(true)}
+                style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(99,102,241,.3)",background:"rgba(99,102,241,.08)",color:"#818cf8",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                👥 {lang==="de"?"Mitglieder":lang==="fr"?"Membres":lang==="it"?"Membri":"Members"}
+              </button>}
               <div style={{position:"relative"}} className="user-menu-wrap">
                 <button onClick={()=>{
                   if(window.confirm(lang==="de"?`Abmelden von ${authSession.email}?`:`Sign out from ${authSession.email}?`)){
@@ -3442,16 +3545,16 @@ Antworte NUR mit JSON:
   const Footer=()=>(
     <footer>
       {/* Trust bar above footer */}
-      <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:28,marginBottom:36,maxWidth:1200,margin:"0 auto 0",padding:"0 0 24px"}}>
-        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:"10px 32px"}}>
+      <div style={{background:"rgba(255,255,255,.025)",borderTop:"1px solid rgba(255,255,255,.05)",borderBottom:"1px solid rgba(255,255,255,.05)",padding:"12px 24px",marginBottom:40}}>
+        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:"8px 36px",maxWidth:900,margin:"0 auto"}}>
           {[
             {ico:"🔒",txt:lang==="de"?"Keine Datenspeicherung":lang==="fr"?"Aucun stockage de données":lang==="it"?"Nessuna memorizzazione":"No data storage"},
-            {ico:"🇨🇭",txt:lang==="de"?"Schweizer Unternehmen, Zug":lang==="fr"?"Société suisse, Zoug":lang==="it"?"Azienda svizzera, Zugo":"Swiss company, Zug"},
+            {ico:"🇨🇭",txt:lang==="de"?"Schweizer Unternehmen · Zug":lang==="fr"?"Société suisse · Zoug":lang==="it"?"Azienda svizzera · Zugo":"Swiss company · Zug"},
             {ico:"⚡",txt:lang==="de"?"Powered by Claude AI":lang==="fr"?"Propulsé par Claude AI":lang==="it"?"Alimentato da Claude AI":"Powered by Claude AI"},
-            {ico:"💳",txt:lang==="de"?"Sichere Zahlung via Stripe":lang==="fr"?"Paiement sécurisé via Stripe":lang==="it"?"Pagamento sicuro via Stripe":"Secure payment via Stripe"},
+            {ico:"🔐",txt:lang==="de"?"Sichere Zahlung via Stripe":lang==="fr"?"Paiement sécurisé via Stripe":lang==="it"?"Pagamento sicuro via Stripe":"Secure payment via Stripe"},
           ].map((tr,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:7,fontSize:12,color:"rgba(255,255,255,.3)",fontWeight:500}}>
-              <span>{tr.ico}</span><span>{tr.txt}</span>
+            <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"rgba(255,255,255,.32)",fontWeight:500,letterSpacing:".2px"}}>
+              <span style={{fontSize:13}}>{tr.ico}</span><span>{tr.txt}</span>
             </div>
           ))}
         </div>
@@ -3477,6 +3580,10 @@ Antworte NUR mit JSON:
           <button onClick={()=>navTo("excel")}>📊 {t.nav.excel}</button>
           <button onClick={()=>navTo("pptx")}>📽️ {t.nav.pptx}</button>
           <button onClick={()=>navTo("coach")}>🎤 {t.nav.coach}</button>
+          <button onClick={()=>navTo("li2job")}>🔗 {lang==="de"?"LinkedIn → Bewerbung":lang==="en"?"LinkedIn → Application":lang==="fr"?"LinkedIn → Candidature":"LinkedIn → Candidatura"}</button>
+          <button onClick={()=>navTo("gehaltsrechner")}>💰 {lang==="de"?"KI-Gehaltsrechner":"Salary calculator"}</button>
+          <button onClick={()=>navTo("lipost")}>✍️ {lang==="de"?"LinkedIn-Post Generator":"LinkedIn Post"}</button>
+          <button onClick={()=>navTo("tracker")}>📋 {lang==="de"?"Bewerbungs-Tracker":"Application Tracker"}</button>
         </div>
         <div className="fcol">
           <h5>{lang==="de"?"Schule & Produktivität":lang==="fr"?"École & Productivité":lang==="it"?"Scuola & Produttività":"School & Productivity"}</h5>
@@ -3487,7 +3594,7 @@ Antworte NUR mit JSON:
           <button onClick={()=>navTo("datenschutz")}>{t.legal.privacy}</button>
           <button onClick={()=>navTo("impressum")}>{t.legal.imprint}</button>
           <div style={{marginTop:16,fontSize:12,color:"rgba(255,255,255,.18)",lineHeight:1.6}}>
-            {lang==="de"?"Stellify ist kein Rechts- oder Karriereberater. Alle Angaben ohne Gewähr.":
+            {lang==="de"?"Stellify ist kein Rechts- oder Karriereberater. Alle KI-generierten Inhalte sind Entwürfe und Richtwerte – keine rechtsverbindlichen Dokumente. Alle Angaben ohne Gewähr.":
              lang==="fr"?"Stellify n'est pas un conseiller juridique ou de carrière.":
              lang==="it"?"Stellify non è un consulente legale o di carriera.":
              "Stellify is not a legal or career advisor. All information without guarantee."}
@@ -4318,10 +4425,11 @@ NOTE: Incluse in tutte le diapositive`),
     {showAuth&&<AuthModal lang={lang} onClose={()=>setShowAuth(false)} defaultMode={authMode}
       onSuccess={(user)=>{
         setAuthSession({email:user.email,plan:user.plan,isAdmin:user.isAdmin});
-        if(user.plan==="pro"||user.plan==="family"||user.plan==="unlimited"||user.isAdmin){actPro();setPro(true);}
+        if(user.plan==="pro"||user.plan==="family"||user.plan==="team"||user.isAdmin){actPro();setPro(true);}
         setShowAuth(false);
       }}/>}
     {showAdmin&&<AdminDashboard lang={lang} onClose={()=>setShowAdmin(false)}/>}
+    {showMembers&&<MemberPanel lang={lang} session={authSession} onClose={()=>setShowMembers(false)}/>}
   </>;
 
   if(page==="landing") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
@@ -4371,9 +4479,9 @@ NOTE: Incluse in tutte le diapositive`),
       <section style={{padding:"72px 0 48px",background:"var(--bg)"}} id="tools">
         <div className="con">
           <div className="sh shc">
-            <div className="seye">{lang==="de"?"✦ 18+ Tools – ein Abo":lang==="en"?"✦ 18+ Tools – one subscription":lang==="fr"?"✦ 18+ outils – un abonnement":"✦ 18+ strumenti – un abbonamento"}</div>
+            <div className="seye">{lang==="de"?"✦ 20+ Tools – ein Abo":lang==="en"?"✦ 20+ Tools – one subscription":lang==="fr"?"✦ 20+ outils – un abonnement":"✦ 20+ strumenti – un abbonamento"}</div>
             <h2 className="st">{lang==="de"?"Nicht nur für Jobsuchende.":lang==="en"?"Not just for job seekers.":lang==="fr"?"Pas seulement pour les chercheurs d'emploi.":"Non solo per chi cerca lavoro."}</h2>
-            <p className="ss" style={{margin:"0 auto"}}>{lang==="de"?"Karriere, Schule, Produktivität – alles in einem Abo für CHF 19.90/Monat.":lang==="en"?"Career, school, productivity – all in one subscription for CHF 19.90/month.":lang==="fr"?"Carrière, école, productivité – tout pour CHF 19.90/mois.":"Carriera, scuola, produttività – tutto per CHF 19.90/mese."}</p>
+            <p className="ss" style={{margin:"0 auto"}}>{lang==="de"?"Karriere, Schule, Produktivität – alles in einem Abo für CHF 24.90/Monat.":lang==="en"?"Career, school, productivity – all in one subscription for CHF 24.90/month.":lang==="fr"?"Carrière, école, productivité – tout pour CHF 24.90/mois.":"Carriera, scuola, produttività – tutto per CHF 24.90/mese."}</p>
             {/* Category pills */}
             <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:8,marginTop:24}}>
               {[
@@ -4536,7 +4644,7 @@ NOTE: Incluse in tutte le diapositive`),
                 <div style={{width:36,height:36,background:"rgba(139,92,246,.15)",border:"1.5px solid rgba(139,92,246,.3)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📋</div>
                 <div>
                   <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:800,color:"white",letterSpacing:"-.3px",lineHeight:1.2}}>{lang==="de"?"Bewerbungs-Tracker":lang==="en"?"Application Tracker":lang==="fr"?"Suivi candidatures":"Tracker candidature"}</div>
-                  <div style={{fontSize:10,fontWeight:700,color:"#a78bfa",letterSpacing:"1px",textTransform:"uppercase",marginTop:2}}>KOSTENLOS</div>
+                  <div style={{fontSize:10,fontWeight:700,color:"#a78bfa",letterSpacing:"1px",textTransform:"uppercase",marginTop:2}}>PRO</div>
                 </div>
               </div>
               <p style={{fontSize:12,color:"rgba(255,255,255,.45)",lineHeight:1.6,marginBottom:14}}>
@@ -4761,15 +4869,16 @@ NOTE: Incluse in tutte le diapositive`),
                 {tier.price===0&&<><div className="ppr">CHF 0<span> / {lang==="en"?"mo":"Mo."}</span></div><div className="pper">{tier.note}</div></>}
                 {tier.priceM&&<>
                   <div className="ppr">CHF {yearly ? Number(tier.priceY).toFixed(2) : Number(tier.priceM).toFixed(2)}<span> / {lang==="en"?"mo":"Mo."}</span></div>
-                  {yearly && tier.yearNote && <div style={{fontSize:11,color:"#f59e0b",fontWeight:600,marginBottom:4,marginTop:-4}}>{tier.yearNote}</div>}
-                  {!yearly && tier.yearNote && <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginBottom:4,marginTop:-4}}>{lang==="de"?`🔥 Jährlich: CHF ${Number(tier.priceY).toFixed(2)}/Mo. – spare ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:`🔥 Annual: CHF ${Number(tier.priceY).toFixed(2)}/mo`}</div>}
                   <div className="pper">
                     {yearly
-                      ? `CHF ${(tier.priceY*12).toFixed(2)} / ${lang==="en"?"year":"Jahr"} · ${lang==="de"?"jährlich abgerechnet":lang==="en"?"billed once yearly":lang==="fr"?"facturé annuellement":"fatturato annualmente"}`
-                      : (lang==="de"?`Spare 25% – nur CHF ${Number(tier.priceY).toFixed(2)}/Mo. bei Jahresabo`:
-                         lang==="en"?`Save 25% – only CHF ${Number(tier.priceY).toFixed(2)}/mo with annual plan`:
-                         lang==="fr"?`Économisez 25% – CHF ${Number(tier.priceY).toFixed(2)}/mois en annuel`:
-                         `Risparmia 25% – CHF ${Number(tier.priceY).toFixed(2)}/mese annuale`)
+                      ? (lang==="de"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/Mo. · spare ${Math.round((1-(tier.priceY/tier.priceM))*100)}% · CHF ${(tier.priceY*12).toFixed(2)}/Jahr`:
+                         lang==="en"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/mo · save ${Math.round((1-(tier.priceY/tier.priceM))*100)}% · CHF ${(tier.priceY*12).toFixed(2)}/year`:
+                         lang==="fr"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/mois · économisez ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
+                         `🔥 CHF ${Number(tier.priceY).toFixed(2)}/mese · risparmia ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`)
+                      : (lang==="de"?`Jährlich nur CHF ${Number(tier.priceY).toFixed(2)}/Mo. → ${Math.round((1-(tier.priceY/tier.priceM))*100)}% sparen`:
+                         lang==="en"?`Annual plan: CHF ${Number(tier.priceY).toFixed(2)}/mo → save ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
+                         lang==="fr"?`Annuel: CHF ${Number(tier.priceY).toFixed(2)}/mois → économisez ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
+                         `Annuale: CHF ${Number(tier.priceY).toFixed(2)}/mese → risparmia ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`)
                     }
                   </div>
                 </>}
@@ -4780,7 +4889,7 @@ NOTE: Incluse in tutte le diapositive`),
                 </ul>
                 {tier.id==="free"&&<button className="btn b-out b-w" style={{borderColor:"rgba(255,255,255,.18)",color:"white"}} onClick={()=>navTo("app")}>{tier.btn}</button>}
                 {tier.id==="pro"&&<button className={`btn ${tier.btnS} b-w`} onClick={()=>window.open(stripeLink(),"_blank")}>{tier.btn}</button>}
-                {(tier.id==="family"||tier.id==="unlimited")&&<button className={`btn b-out b-w`} style={{borderColor:tier.id==="unlimited"?"rgba(245,158,11,.4)":"rgba(139,92,246,.4)",color:tier.id==="unlimited"?"rgba(245,158,11,.85)":"rgba(167,139,250,.85)"}} onClick={()=>window.open(tier.id==="unlimited"?C.stripeUnlimited:C.stripeFamily,"_blank")}>{tier.btn}</button>}
+                {(tier.id==="family"||tier.id==="team")&&<button className={`btn b-out b-w`} style={{borderColor:tier.id==="team"?"rgba(245,158,11,.4)":"rgba(139,92,246,.4)",color:tier.id==="team"?"rgba(245,158,11,.85)":"rgba(167,139,250,.85)"}} onClick={()=>window.open(tier.id==="team"?C.stripeTeam:C.stripeFamily,"_blank")}>{tier.btn}</button>}
                 {tier.id==="team"&&<button className={`btn b-out b-w`} style={{borderColor:"rgba(245,158,11,.3)",color:"rgba(245,158,11,.8)"}} onClick={()=>window.open(`mailto:${C.email}`)}>{tier.btn}</button>}
               </div>
             ))}
@@ -4867,7 +4976,7 @@ NOTE: Incluse in tutte le diapositive`),
         <div className="ct">{lang==="de"?"Dokument wählen":lang==="fr"?"Choisir le document":lang==="it"?"Scegli il documento":"Choose document"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
           {[{k:"motivation",ico:"✍️",t:lang==="de"?"Motivationsschreiben":lang==="fr"?"Lettre de motivation":lang==="it"?"Lettera di motivazione":"Cover letter",d:lang==="de"?"Persönlich, überzeugend.":lang==="fr"?"Personnelle, convaincante.":lang==="it"?"Personale, convincente.":"Personal, convincing."},
-            {k:"lebenslauf",ico:"📋",t:"Curriculum Vitae",d:lang==="de"?"Schweizer Format.":lang==="fr"?"Format suisse.":lang==="it"?"Formato svizzero.":"Swiss format."},
+            {k:"lebenslauf",ico:"📄",t:"Curriculum Vitae",d:lang==="de"?"Schweizer Format.":lang==="fr"?"Format suisse.":lang==="it"?"Formato svizzero.":"Swiss format."},
             {k:"beide",ico:"🚀",t:lang==="de"?"Beides":lang==="fr"?"Les deux":lang==="it"?"Entrambi":"Both",d:lang==="de"?"Vollständiges Dossier.":lang==="fr"?"Dossier complet.":lang==="it"?"Dossier completo.":"Complete dossier.",full:true}
           ].map(d=><button key={d.k} className={`tool-card ${docType===d.k?"":""}`} style={{cursor:"pointer",border:`1.5px solid ${docType===d.k?"var(--em)":"var(--bo)"}`,background:docType===d.k?"var(--em3)":"white",gridColumn:d.full?"1/-1":"auto"}} onClick={()=>setDocType(d.k)}>
             <div style={{fontSize:22,marginBottom:6}}>{d.ico}</div>
@@ -4894,7 +5003,7 @@ NOTE: Incluse in tutte le diapositive`),
                   <button className="btn b-outd b-sm" onClick={()=>navTo("checklist")}>✅ {lang==="de"?"Checkliste":lang==="en"?"Checklist":lang==="fr"?"Checklist":"Checklist"}</button>
           <button className="btn b-outd b-sm" onClick={()=>{setStep(2);setResults({motivation:"",lebenslauf:""});setEditing(false);}}>🔄 {t.app.regen}</button>
         </div>}
-        {editing&&!streaming?<textarea className="r-edit" value={curDoc()} onChange={e=>setCurDoc(e.target.value)}/>:<div className="r-doc">{curDoc()}{streaming&&<span className="cursor"/>}</div>}
+        {editing&&!streaming?<textarea className="r-edit" value={curDoc()} onChange={e=>setCurDoc(e.target.value)}/>:<div className="r-doc">{curDoc()||(!streaming&&<span style={{color:"rgba(11,11,18,.25)",fontSize:13,fontStyle:"italic"}}>{lang==="de"?"Noch kein Inhalt – bitte erneut generieren.":lang==="fr"?"Pas encore de contenu – veuillez regénérer.":"No content yet – please generate again."}</span>)}{streaming&&<span className="cursor"/>}</div>}
       </div>}
 
       {step===3&&!streaming&&<>
@@ -5263,7 +5372,7 @@ NOTE: Incluse in tutte le diapositive`),
     <div className="abody">
       <ToolBanner pageId="excel"/>
       {err&&<div className="err">⚠️ {err}</div>}
-      {!pro?<div className="card"><LockMsg sub={L("Der Excel-Generator ist in Pro enthalten. CHF 19.90/Monat.","The Excel generator is included in Pro. CHF 19.90/month.","Le générateur Excel est inclus dans Pro. CHF 19.90/mois.","Il generatore Excel è incluso in Pro. CHF 19.90/mese.")}/></div>:<>
+      {!pro?<div className="card"><LockMsg sub={L("Der Excel-Generator ist in Pro enthalten. CHF 24.90/Monat.","The Excel generator is included in Pro. CHF 24.90/month.","Le générateur Excel est inclus dans Pro. CHF 24.90/mois.","Il generatore Excel è incluso in Pro. CHF 24.90/mese.")}/></div>:<>
         <div className="card">
           <div className="ct">📊 {t.nav.excel}</div>
           <div className="cs">{L("Beschreibe deine Aufgabe – die KI erstellt die perfekte Struktur mit Formeln.","Describe your task – AI creates the perfect structure with formulas.","Décrivez votre tâche – l'IA crée la structure parfaite avec formules.","Descrivi il tuo compito – l'IA crea la struttura perfetta con formule.")}</div>
@@ -5380,7 +5489,7 @@ NOTE: Incluse in tutte le diapositive`),
     <div className="abody">
       <ToolBanner pageId="pptx"/>
       {err&&<div className="err">⚠️ {err}</div>}
-      {!pro?<div className="card"><LockMsg sub={L("Der PowerPoint-Maker ist in Pro enthalten. CHF 19.90/Monat.","The PowerPoint maker is included in Pro. CHF 19.90/month.","Le créateur PowerPoint est inclus dans Pro. CHF 19.90/mois.","Il creatore PowerPoint è incluso in Pro. CHF 19.90/mese.")}/></div>:<>
+      {!pro?<div className="card"><LockMsg sub={L("Der PowerPoint-Maker ist in Pro enthalten. CHF 24.90/Monat.","The PowerPoint maker is included in Pro. CHF 24.90/month.","Le créateur PowerPoint est inclus dans Pro. CHF 24.90/mois.","Il creatore PowerPoint è incluso in Pro. CHF 24.90/mese.")}/></div>:<>
         <div className="card">
           <div className="ct">📽️ {t.nav.pptx}</div>
           <div className="cs">{L("Beschreibe dein Thema – die KI erstellt eine komplette Präsentation mit Inhalt, Struktur und Sprechernotizen.","Describe your topic – AI creates a complete presentation with content, structure and speaker notes.","Décrivez votre sujet – l'IA crée une présentation complète.","Descrivi il tuo argomento – l'IA crea una presentazione completa.")}</div>
@@ -5554,7 +5663,7 @@ VERHALTEN:
 - Wenn du etwas schreibst (z.B. ein Satz für eine Bewerbung), schreib ihn direkt aus
 - Empfehle passende Stellify-Tools wenn sinnvoll, aber zwinge nichts auf
 - Sei warm, direkt, professionell – wie ein erfahrener Karriere-Coach
-- Preis: Gratis (1× Bewerbung/Monat) oder Pro CHF 19.90/Mo`;
+- Preis: Gratis (1× Bewerbung/Monat) oder Pro CHF 24.90/Mo`;
 
     const TOOL_MAP2 = {
       "bewerbung":["app"],"bewerbungen":["app"],"linkedin":["linkedin"],"ats":["ats"],
@@ -5715,8 +5824,8 @@ VERHALTEN:
   if(page==="agb") return <LS ch={<>
     <h1>AGB / CGV / CGC / T&C</h1><div className="legal-d">Stand: {LD()} · {C.domain}</div>
     <h2>1. Geltungsbereich</h2><p>{C.name} ({C.domain}) wird betrieben von {C.owner}, {C.address}. Mit der Nutzung akzeptierst du diese AGB.</p>
-    <h2>2. Leistungen</h2><p>{C.name} ist ein KI-gestützter All-in-One Career & Produktivitäts-Copilot mit 18+ Tools, u.a.: Bewerbungsgenerator, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker, Gehaltsverhandlungs-Coach, Networking-Nachrichten, Kündigung, 30-60-90-Tage-Plan, Referenzschreiben, Lehrstellen-Bewerbung, Lernplan, Zusammenfassung, E-Mail-Assistent, Meeting-Protokoll, Übersetzer. Es wird kein Erfolg garantiert.</p>
-    <h2>3. Abonnement & Zahlung</h2><p>Gratis: 1 Bewerbungsgenerierung/Monat. Pro: CHF 19.90/Monat (monatlich kündbar) oder CHF 14.90/Monat (jährlich = CHF 178.80/Jahr). Pro enthält: Unbegrenzte Bewerbungen, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker. Zahlung via Stripe (Twint, Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay, SEPA, Klarna). Automatische Verlängerung. Kündigung jederzeit per E-Mail.</p>
+    <h2>2. Leistungen</h2><p>{C.name} ist ein KI-gestützter All-in-One Career & Produktivitäts-Copilot mit 20+ Tools, u.a.: Bewerbungsgenerator, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker, Gehaltsverhandlungs-Coach, Networking-Nachrichten, Kündigung, 30-60-90-Tage-Plan, Referenzschreiben, Lehrstellen-Bewerbung, Lernplan, Zusammenfassung, E-Mail-Assistent, Meeting-Protokoll, Übersetzer. Es wird kein Erfolg garantiert.</p>
+    <h2>3. Abonnement & Zahlung</h2><p>Gratis: 1 Bewerbungsgenerierung/Monat. Pro: CHF 24.90/Monat (monatlich kündbar) oder CHF 18.90/Monat (jährlich = CHF 226.80/Jahr). Pro enthält: Unbegrenzte Bewerbungen, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker. Zahlung via Stripe (Twint, Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay, SEPA, Klarna). Automatische Verlängerung. Kündigung jederzeit per E-Mail.</p>
     <h2>4. Haftung</h2><p>Keine Haftung für Qualität generierter Inhalte, Vollständigkeit der KI-Analysen oder indirekte Schäden.</p>
     <h2>5. Recht & Gerichtsstand</h2><p>Schweizer Recht. Gerichtsstand: Zürich. Kontakt: <a href={`mailto:${C.email}`}>{C.email}</a></p>
   </>}/>;
