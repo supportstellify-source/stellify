@@ -14,22 +14,22 @@ const C = {
   stripeYearly:  "https://buy.stripe.com/YEARLY_LINK",
   priceM: "19.90",
   priceY: "14.90",
-  priceUnlM: "39.90",
-  priceUnlY: "29.90",
-  stripeUnlimitedMonthly: "https://buy.stripe.com/UNLIMITED_MONTHLY",
-  stripeUnlimitedYearly:  "https://buy.stripe.com/UNLIMITED_YEARLY",
   FREE_LIMIT: 1,
   PRO_LIMIT: 60,
-  UNLIMITED_LIMIT: 999999,
   CHAT_FREE_LIMIT: 20,
+  FAMILY_LIMIT: 3,
+  stripeFamily: "https://buy.stripe.com/FAMILY_LINK",
+  stripeUnlimited: "https://buy.stripe.com/UNLIMITED_LINK",
+  priceFamily: "29.90",
+  priceUnlimited: "49.90",
+  ADMIN_EMAIL: "admin@stellify.ch",
+  ADMIN_PW: "Stellify2025!",
   // ── GROQ CONFIG ──────────────────────────────
-  GROQ_KEY: "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",
+  GROQ_KEY: "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",
   MODEL_FAST: "llama-3.1-8b-instant",      // Schnell & günstig
   MODEL_FULL: "llama-3.3-70b-versatile",   // Smart, für Bewerbungen etc.
   // ─────────────────────────────────────────────
   FREE_MAX_TOKENS: 500,
-  ADMIN_SECRET: "stellify-admin-2024",
-  CODE_SECRET: "stf_v1_secret_xK9mP",
 };
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -46,38 +46,76 @@ const getChatCount = () => getU().chatCount||0;
 const getProCount = () => getU().proCount||0;
 const isPro  = () => { try { return localStorage.getItem("stf_pro")==="true"; } catch { return false; }};
 const actPro = () => { try { localStorage.setItem("stf_pro","true"); } catch {}};
-const saveEmail = (e) => { try { localStorage.setItem("stf_email",e); } catch {}};
-const clearUser = () => { try { localStorage.removeItem("stf_pro"); localStorage.removeItem("stf_email"); localStorage.removeItem("stf_pw_hash"); localStorage.removeItem("stf_chat_email"); localStorage.removeItem("stf_unlimited"); } catch {}};
 
-// Simple password hash (browser-native)
-const hashPw = async (pw) => {
-  const data = new TextEncoder().encode("stf_salt_2024_" + pw);
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,32);
-};
-const savePwHash = (h) => { try { localStorage.setItem("stf_pw_hash", h); } catch {}};
-const getPwHash = () => { try { return localStorage.getItem("stf_pw_hash")||""; } catch { return ""; }};
-const isUnlimited = () => { try { return localStorage.getItem("stf_unlimited")==="true"; } catch { return false; }};
-const actUnlimited = () => { try { localStorage.setItem("stf_unlimited","true"); localStorage.setItem("stf_pro","true"); } catch {}};
+// ── AUTH SYSTEM ─────────────────────────────────────────────
+const AUTH_KEY = "stf_auth_users"; // [{email,pw,plan,seats,members,activatedAt}]
+const SESSION_KEY = "stf_session"; // {email,plan}
 
-// ── Pro-Code Generator (Web Crypto, deterministisch) ──
-const generateCode = async (email) => {
-  const secret = "stf_v1_secret_xK9mP";
-  const data = new TextEncoder().encode(secret + email.toLowerCase().trim());
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hex = hashArray.map(b=>b.toString(16).padStart(2,"0")).join("");
-  // Format: STF-XXXX-XXXX (8 uppercase hex chars)
-  const code = "STF-" + hex.slice(0,4).toUpperCase() + "-" + hex.slice(4,8).toUpperCase();
-  return code;
-};
-
-const verifyCode = async (email, code) => {
-  const expected = await generateCode(email.toLowerCase().trim());
-  return code.toUpperCase() === expected.toUpperCase();
-};
-
-
+function authGetUsers() {
+  try { return JSON.parse(localStorage.getItem(AUTH_KEY)||"[]"); } catch { return []; }
+}
+function authSaveUsers(users) {
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(users)); } catch {}
+}
+function authGetSession() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)||"null"); } catch { return null; }
+}
+function authSetSession(session) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch {}
+}
+function authClearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+function authRegister(email, pw, plan) {
+  const users = authGetUsers();
+  if(users.find(u=>u.email.toLowerCase()===email.toLowerCase())) return {ok:false,err:"E-Mail bereits registriert."};
+  const user = {email:email.toLowerCase(), pw, plan:plan||"free", seats:plan==="family"?3:1, members:[email.toLowerCase()], activatedAt:Date.now()};
+  users.push(user);
+  authSaveUsers(users);
+  authSetSession({email:user.email, plan:user.plan});
+  return {ok:true, user};
+}
+function authLogin(email, pw) {
+  const users = authGetUsers();
+  const user = users.find(u=>u.email.toLowerCase()===email.toLowerCase() && u.pw===pw);
+  if(!user) return {ok:false,err:"E-Mail oder Passwort falsch."};
+  authSetSession({email:user.email, plan:user.plan});
+  return {ok:true, user};
+}
+function authUpgradePlan(email, plan) {
+  const users = authGetUsers();
+  const idx = users.findIndex(u=>u.email.toLowerCase()===email.toLowerCase());
+  if(idx>=0){
+    users[idx].plan = plan;
+    if(plan==="family") users[idx].seats = 3;
+    if(plan==="unlimited") users[idx].seats = 9999;
+    authSaveUsers(users);
+    authSetSession({email:users[idx].email, plan});
+    return users[idx];
+  }
+  // Neuer User via Stripe
+  const user = {email:email.toLowerCase(), pw:"", plan, seats:plan==="family"?3:plan==="unlimited"?9999:1, members:[email.toLowerCase()], activatedAt:Date.now()};
+  users.push(user);
+  authSaveUsers(users);
+  authSetSession({email:user.email, plan});
+  return user;
+}
+function authGetUser(email) {
+  return authGetUsers().find(u=>u.email.toLowerCase()===email.toLowerCase())||null;
+}
+function authAddMember(ownerEmail, memberEmail) {
+  const users = authGetUsers();
+  const owner = users.find(u=>u.email.toLowerCase()===ownerEmail.toLowerCase());
+  if(!owner) return {ok:false,err:"Kein Account gefunden."};
+  if((owner.members||[]).length >= owner.seats) return {ok:false,err:`Maximale Anzahl (${owner.seats}) erreicht.`};
+  if((owner.members||[]).includes(memberEmail.toLowerCase())) return {ok:false,err:"Bereits Mitglied."};
+  owner.members = [...(owner.members||[]), memberEmail.toLowerCase()];
+  authSaveUsers(users);
+  return {ok:true};
+}
+function authIsAdmin(email,pw) {
+  return email.toLowerCase()===C.ADMIN_EMAIL.toLowerCase() && pw===C.ADMIN_PW;
+}
 
 // 🧠 MODEL ROUTING
 const HAIKU_TOOLS = ["free","email","protokoll","uebersetzer","networking","kuendigung","lernplan","zusammenfassung","gehalt","plan306090","referenz","lehrstelle"];
@@ -253,13 +291,13 @@ h1.hh em{font-style:normal;color:var(--em)}
 .btsw{width:50px;height:27px;background:rgba(255,255,255,.1);border-radius:20px;cursor:pointer;position:relative;border:1.5px solid rgba(255,255,255,.14);transition:background .2s;flex-shrink:0}
 .btsw.yr{background:var(--em)}.btt{position:absolute;top:3px;left:3px;width:17px;height:17px;background:white;border-radius:50%;transition:transform .2s}.btsw.yr .btt{transform:translateX(23px)}
 .save-t{background:rgba(245,158,11,.15);color:var(--am);border:1px solid rgba(245,158,11,.3);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
-.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:980px;margin:0 auto}
-.pc{border-radius:var(--r2);padding:32px;border:1.5px solid rgba(255,255,255,.08);background:var(--dk3);position:relative}
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:1160px;margin:0 auto}
+.pc{border-radius:var(--r2);padding:26px 22px;border:1.5px solid rgba(255,255,255,.08);background:var(--dk3);position:relative}
 .pc.hl{border-color:var(--em);background:rgba(16,185,129,.06)}.pc.hl2{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.04)}
 .bst{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--em);color:white;font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;white-space:nowrap}
 .ppl{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:10px}
 .ppl.em{color:var(--em)}.ppl.am{color:var(--am)}
-.ppr{font-family:var(--hd);font-size:46px;font-weight:800;color:white;line-height:1;margin-bottom:4px;letter-spacing:-2px}
+.ppr{font-family:var(--hd);font-size:38px;font-weight:800;color:white;line-height:1;margin-bottom:4px;letter-spacing:-2px}
 .ppr span{font-size:16px;font-weight:400;color:rgba(255,255,255,.3);font-family:var(--bd);letter-spacing:0}
 .pper{font-size:12px;color:rgba(255,255,255,.3);margin-bottom:24px}
 .pfl{list-style:none;margin-bottom:24px}
@@ -459,7 +497,7 @@ footer{background:var(--dk);padding:50px 28px 24px}
   .tool-card{padding:20px 16px}
   .tools-grid{gap:12px}
   .feat-g6{gap:12px}
-  .pgrid{gap:12px}
+  .pgrid{grid-template-columns:repeat(2,1fr);gap:12px}
   .fi{gap:24px}
   .fbot{font-size:10px}
   .legal{padding:32px 16px 60px}
@@ -483,7 +521,6 @@ const mkT = (lang) => {
       ats:    "ATS-Check",
       zeugnis:L("Zeugnis","Certificat","Certificato","Reference"),
       jobs:   L("Job-Matching","Jobs","Lavori","Job Match"),
-      coach:  L("Interview-Coach","Interview Coach","Coach entretien","Coach colloquio"),
     },
     hero:{
       eye: L(`✦ ${C.name} – ${C.tagline}`,`✦ ${C.name} – Copilote IA Carrière Suisse`,`✦ ${C.name} – Copilota IA Carriera Svizzera`,`✦ ${C.name} – ${C.tagline}`),
@@ -583,27 +620,35 @@ const mkT = (lang) => {
          no:L(["LinkedIn","ATS-Check","Zeugnis-Analyse","Job-Matching","Interview-Coach","PDF-Export","E-Mail senden"],["LinkedIn","ATS","Analyse certificat","Matching","Coach","PDF","E-mail"],["LinkedIn","ATS","Analisi certificato","Matching","Coach","PDF","E-mail"],["LinkedIn","ATS check","Reference analysis","Job matching","Interview coach","PDF export","Email send"]),
          btn:L("Kostenlos starten","Commencer gratuitement","Inizia gratis","Start for free"),btnS:"b-out"},
         {id:"pro",name:"Pro",priceM:19.90,priceY:14.90,best:true,
-         note:L("CHF 19.90/Monat · CHF 178.80/Jahr","CHF 19.90/month · CHF 178.80/year","CHF 19.90/mois · CHF 178.80/an","CHF 19.90/mese · CHF 178.80/anno"),
+         note:L("1 Person · Monatlich kündbar","1 person · Cancel monthly","1 personne · Résiliable","1 persona · Annullabile"),
+         yearNote:L("🔥 CHF 14.90/Mo. bei Jahresabo – CHF 178.80/Jahr","🔥 CHF 14.90/mo with annual plan – CHF 178.80/year","🔥 CHF 14.90/mois avec abonnement annuel","🔥 CHF 14.90/mese con abbonamento annuale"),
          list:L(
-           ["Unbegrenzte Bewerbungen","✍️ Motivationsschreiben & Lebenslauf","💼 LinkedIn Analyse & Optimierung","🤖 ATS-Simulation mit Score","📜 Zeugnis-Analyse & Decoder","🎯 Job-Matching (Top 5 Profile)","🎤 Interview-Coach (Note 0–100)","📊 Excel-Generator mit Formeln (NEU)","📽️ PowerPoint-Maker (NEU)","✅ Bewerbungs-Checkliste","✉️ E-Mail & PDF Export","Alle 4 Sprachen"],
-           ["Unlimited applications","✍️ Cover letter & CV","💼 LinkedIn analysis & optimization","🤖 ATS simulation with score","📜 Work reference analysis","🎯 Job matching (Top 5)","🎤 Interview coach (score 0–100)","📊 Excel generator with formulas (NEW)","📽️ PowerPoint maker (NEW)","✅ Application checklist","✉️ Email & PDF export","All 4 languages"],
-           ["Documents illimités","✍️ Lettre & CV","💼 LinkedIn analyse & optimisation","🤖 Simulation ATS avec score","📜 Analyse certificat de travail","🎯 Matching emploi (Top 5)","🎤 Coach entretien (note 0–100)","📊 Générateur Excel avec formules (NOUVEAU)","📽️ Créateur PowerPoint (NOUVEAU)","✅ Check-liste","✉️ E-mail & PDF","4 langues"],
-           ["Documenti illimitati","✍️ Lettera & CV","💼 LinkedIn analisi & ottimizzazione","🤖 Simulazione ATS con score","📜 Analisi certificato di lavoro","🎯 Job matching (Top 5)","🎤 Coach colloquio (voto 0–100)","📊 Generatore Excel con formule (NUOVO)","📽️ Creatore PowerPoint (NUOVO)","✅ Checklist","✉️ E-mail & PDF","4 lingue"]
+           ["✍️ Unbegrenzte Bewerbungen","💼 LinkedIn Analyse & Optimierung","🤖 ATS-Simulation mit Score","📜 Zeugnis-Analyse & Decoder","🎯 Job-Matching (Top 5 Profile)","🎤 Interview-Coach (Note 0–100)","📊 Excel-Generator mit Formeln","📽️ PowerPoint-Maker","💰 KI-Gehaltsrechner Schweiz","📋 Bewerbungs-Tracker","✍️ LinkedIn-Post Generator","✅ Alle 20+ Tools · Alle 4 Sprachen"],
+           ["✍️ Unlimited applications","💼 LinkedIn analysis","🤖 ATS simulation","📜 Work reference analysis","🎯 Job matching (Top 5)","🎤 Interview coach","📊 Excel generator","📽️ PowerPoint maker","💰 Swiss salary calculator","📋 Application tracker","✍️ LinkedIn post generator","✅ All 20+ tools · All 4 languages"],
+           ["✍️ Documents illimités","💼 LinkedIn","🤖 ATS","📜 Certificat","🎯 Matching","🎤 Coach","📊 Excel","📽️ PowerPoint","💰 Calculateur salaire","📋 Tracker","✍️ Posts LinkedIn","✅ Tous les 20+ outils"],
+           ["✍️ Documenti illimitati","💼 LinkedIn","🤖 ATS","📜 Certificato","🎯 Matching","🎤 Coach","📊 Excel","📽️ PowerPoint","💰 Calcolatore stipendio","📋 Tracker","✍️ Post LinkedIn","✅ Tutti i 20+ strumenti"]
          ),
          btn:L("Jetzt Pro werden → CHF 19.90/Mo.","Become Pro → CHF 19.90/mo","Devenir Pro → CHF 19.90/mois","Diventa Pro → CHF 19.90/mese"),btnS:"b-em"},
-        {id:"unlimited",name:L("Unlimited","Unlimited","Unlimited","Unlimited"),priceM:39.90,priceY:29.90,
-         note:L("Für Power-User & Profis","Pour les power-users","Per i power-user","For power users"),
+        {id:"family",name:L("Familie 👨‍👩‍👧","Family 👨‍👩‍👧","Famille 👨‍👩‍👧","Famiglia 👨‍👩‍👧"),priceM:29.90,priceY:24.90,best:false,
+         note:L("3 Personen · Gemeinsam sparen","3 people · Save together","3 personnes · Économisez","3 persone · Risparmiate"),
+         yearNote:L("🔥 CHF 24.90/Mo. bei Jahresabo – CHF 298.80/Jahr","🔥 CHF 24.90/mo annual – CHF 298.80/year","🔥 CHF 24.90/mois annuel","🔥 CHF 24.90/mese annuale"),
          list:L(
-           ["✦ Wirklich unbegrenzte Generierungen","Alle Pro-Features","Priorität-Support","KI-Modell: GPT-4 Klasse","Dokumenten-Archiv (bald)","API-Zugang (bald)"],
-           ["✦ Truly unlimited generations","All Pro features","Priority support","AI model: GPT-4 class","Document archive (soon)","API access (soon)"],
-           ["✦ Générations vraiment illimitées","Toutes les fonctions Pro","Support prioritaire","Modèle IA: classe GPT-4","Archive documents (bientôt)","Accès API (bientôt)"],
-           ["✦ Truly unlimited generations","All Pro features","Priority support","AI model: GPT-4 class","Document archive (soon)","API access (soon)"]
+           ["👥 3 Personen-Accounts","✍️ Alle Pro-Funktionen für jede Person","💼 LinkedIn für alle Mitglieder","📋 Geteilter Bewerbungs-Tracker","🎤 Interview-Coach für alle","✅ Alle 20+ Tools · Alle 4 Sprachen","🔐 Jedes Mitglied eigenes Login","👑 Admin verwaltet Mitglieder"],
+           ["👥 3 person accounts","✍️ All Pro features per person","💼 LinkedIn for all members","📋 Shared application tracker","🎤 Interview coach for all","✅ All 20+ tools","🔐 Each member own login","👑 Admin manages members"],
+           ["👥 3 comptes","✍️ Toutes les fonctions Pro","💼 LinkedIn pour tous","📋 Tracker partagé","🎤 Coach pour tous","✅ Tous les outils","🔐 Login individuel","👑 Admin gère les membres"],
+           ["👥 3 account","✍️ Tutte le funzioni Pro","💼 LinkedIn per tutti","📋 Tracker condiviso","🎤 Coach per tutti","✅ Tutti gli strumenti","🔐 Login individuale","👑 Admin gestisce membri"]
          ),
-         btn:L("Unlimited werden → CHF 39.90/Mo.","Become Unlimited → CHF 39.90/mo","Devenir Unlimited → CHF 39.90/mois","Become Unlimited → CHF 39.90/mo"),btnS:"b-out b-gold"},
-        {id:"team",name:L("Team","Équipe","Team","Team"),price:null,
-         note:L("Für Schulen & HR-Teams","Écoles & équipes RH","Scuole & team HR","Schools & HR teams"),
-         list:L(["Alles in Pro","Bis 25 Nutzer","Admin-Dashboard","Onboarding"],["Tout en Pro","25 utilisateurs","Dashboard","Onboarding"],["Tutto in Pro","25 utenti","Dashboard","Onboarding"],["Everything in Pro","Up to 25 users","Admin dashboard","Onboarding"]),
-         btn:L("Kontakt →","Contact →","Contatto →","Contact →"),btnS:"b-out"},
+         btn:L("Familie starten → CHF 29.90/Mo.","Start family → CHF 29.90/mo","Famille → CHF 29.90/mois","Famiglia → CHF 29.90/mese"),btnS:"b-em"},
+        {id:"unlimited",name:L("Unlimited ♾️","Unlimited ♾️","Illimité ♾️","Illimitato ♾️"),priceM:49.90,priceY:39.90,best:false,
+         note:L("Unbegrenzte Mitglieder · Für Teams","Unlimited members · For teams","Membres illimités · Pour équipes","Membri illimitati · Per team"),
+         yearNote:L("🔥 CHF 39.90/Mo. bei Jahresabo – CHF 478.80/Jahr","🔥 CHF 39.90/mo annual","🔥 CHF 39.90/mois annuel","🔥 CHF 39.90/mese annuale"),
+         list:L(
+           ["♾️ Unbegrenzte Mitglieder","✍️ Alle Pro-Funktionen","💼 LinkedIn für alle","📊 Team-Dashboard","🎤 Interview-Coach für alle","✅ Alle 20+ Tools","🔐 Individuelle Logins","🛡️ Priority Support","📈 Nutzungsstatistiken"],
+           ["♾️ Unlimited members","✍️ All Pro features","💼 LinkedIn for all","📊 Team dashboard","🎤 Interview coach","✅ All 20+ tools","🔐 Individual logins","🛡️ Priority support","📈 Usage stats"],
+           ["♾️ Membres illimités","✍️ Tout en Pro","💼 LinkedIn","📊 Dashboard","🎤 Coach","✅ Tout","🔐 Logins","🛡️ Support prioritaire","📈 Stats"],
+           ["♾️ Membri illimitati","✍️ Tutto Pro","💼 LinkedIn","📊 Dashboard","🎤 Coach","✅ Tutto","🔐 Login","🛡️ Supporto prioritario","📈 Statistiche"]
+         ),
+         btn:L("Unlimited starten → CHF 49.90/Mo.","Start Unlimited → CHF 49.90/mo","Illimité → CHF 49.90/mois","Illimitato → CHF 49.90/mese"),btnS:"b-out"},
       ],
       valTitle:L("CHF 19.90 – lohnt sich das?","CHF 19.90 – ça vaut la peine?","CHF 19.90 – vale la pena?","CHF 19.90 – is it worth it?"),
       valPts:L(
@@ -1113,6 +1158,66 @@ Crea:
 # PERCHÉ SEI IL CANDIDATO GIUSTO
 [3 argomenti forti e concreti]`,
     }[l]),
+  },
+  // ── GEHALTSRECHNER ──
+  { id:"gehaltsrechner", ico:"💰", color:"#059669", cat:"karriere",
+    t:{de:"KI-Gehaltsrechner Schweiz",en:"AI Salary Calculator Switzerland",fr:"Calculateur salaire IA Suisse",it:"Calcolatore stipendio IA Svizzera"},
+    sub:{de:"Realistisches Jahresgehalt nach Jobtitel, Branche, Kanton & Erfahrung – mit Verhandlungstipps.",en:"Realistic annual salary by job title, industry, canton & experience – with negotiation tips.",fr:"Salaire annuel réaliste par titre, secteur, canton & expérience – avec conseils.",it:"Stipendio annuale realistico per titolo, settore, cantone & esperienza – con consigli."},
+    inputs:[
+      {k:"job",    lbl:{de:"Jobtitel *",en:"Job title *",fr:"Titre du poste *",it:"Titolo del posto *"},ph:{de:"z.B. Senior Software Engineer, HR Business Partner, Projektleiter",en:"e.g. Senior Software Engineer, HR Business Partner, Project Manager",fr:"ex. Ingénieur logiciel senior, Chef de projet",it:"es. Senior Software Engineer, Project Manager"},req:true},
+      {k:"branche",lbl:{de:"Branche *",en:"Industry *",fr:"Secteur *",it:"Settore *"},type:"select",opts:{de:["IT & Software","Finanzen & Banking","Gesundheitswesen","Ingenieurwesen","Marketing & Kommunikation","Recht & Compliance","Bildung","Logistik","Personalwesen (HR)","Beratung","Gastronomie","Bau & Architektur"],en:["IT & Software","Finance & Banking","Healthcare","Engineering","Marketing","Legal","Education","Logistics","HR","Consulting","Hospitality","Construction"],fr:["IT & Logiciels","Finance","Santé","Ingénierie","Marketing","Juridique","Éducation","Logistique","RH","Conseil","Hôtellerie","Construction"],it:["IT & Software","Finanza","Sanità","Ingegneria","Marketing","Legale","Istruzione","Logistica","HR","Consulenza","Ospitalità","Costruzione"]},req:true},
+      {k:"kanton", lbl:{de:"Kanton / Region",en:"Canton / Region",fr:"Canton / Région",it:"Cantone / Regione"},type:"select",opts:{de:["Zürich","Genf","Basel-Stadt","Zug","Bern","Lausanne","Luzern","St. Gallen","Winterthur","Aarau","Thun","Chur","Sion/Sitten"],en:["Zurich","Geneva","Basel-City","Zug","Bern","Lausanne","Lucerne","St. Gallen","Winterthur","Aarau","Thun","Chur","Sion"],fr:["Zurich","Genève","Bâle-Ville","Zoug","Berne","Lausanne","Lucerne","Saint-Gall","Winterthour","Aarau","Thoune","Coire","Sion"],it:["Zurigo","Ginevra","Basilea-Città","Zugo","Berna","Losanna","Lucerna","San Gallo","Winterthur","Aarau","Thun","Coira","Sion"]},req:false},
+      {k:"erfahrung",lbl:{de:"Berufserfahrung",en:"Experience",fr:"Expérience",it:"Esperienza"},type:"select",opts:{de:["0–2 Jahre","3–5 Jahre","6–10 Jahre","11–15 Jahre","16+ Jahre"],en:["0–2 years","3–5 years","6–10 years","11–15 years","16+ years"],fr:["0–2 ans","3–5 ans","6–10 ans","11–15 ans","16+ ans"],it:["0–2 anni","3–5 anni","6–10 anni","11–15 anni","16+ anni"]},req:false},
+      {k:"abschluss",lbl:{de:"Höchster Abschluss",en:"Highest degree",fr:"Diplôme le plus élevé",it:"Titolo di studio più alto"},type:"select",opts:{de:["Lehre / Berufsausbildung","Berufsmaturität","Bachelor","Master / Lizentiat","Doktorat / PhD"],en:["Apprenticeship","Vocational Maturity","Bachelor","Master","PhD"],fr:["Apprentissage","Maturité professionnelle","Bachelor","Master","Doctorat"],it:["Apprendistato","Maturità professionale","Bachelor","Master","Dottorato"]},req:false},
+    ],
+    prompt:(v,l)=>(({
+      de:`Du bist Schweizer Gehaltsexperte 2025/26. Analysiere den Arbeitsmarkt und erstelle eine realistische Gehaltsschätzung. Antworte NUR mit JSON (kein Markdown):
+{"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% über dem Schweizer Median","kanton_faktor":"Zürich: +8% vs CH-Durchschnitt","tipps":["Tipp 1","Tipp 2","Tipp 3"],"verhandlungstipp":"Konkreter Satz für die Verhandlung","branchentrend":"Einschätzung zur Gehaltsentwicklung"}
+Profil: Jobtitel: ${v.job} | Branche: ${v.branche||"k.A."} | Kanton: ${v.kanton||"Schweiz"} | Erfahrung: ${v.erfahrung||"k.A."} | Abschluss: ${v.abschluss||"k.A."}`,
+      en:`You are a Swiss salary expert 2025/26. Analyse the job market and create a realistic salary estimate. Reply ONLY with JSON (no markdown):
+{"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% above Swiss median","kanton_faktor":"Zurich: +8% vs CH average","tipps":["Tip 1","Tip 2","Tip 3"],"verhandlungstipp":"Concrete negotiation sentence","branchentrend":"Industry salary outlook"}
+Profile: Job: ${v.job} | Industry: ${v.branche||"n/a"} | Canton: ${v.kanton||"Switzerland"} | Experience: ${v.erfahrung||"n/a"} | Degree: ${v.abschluss||"n/a"}`,
+      fr:`Tu es expert salarial suisse 2025/26. Crée une estimation salariale réaliste. Réponds UNIQUEMENT avec JSON:
+{"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% au-dessus de la médiane suisse","kanton_faktor":"Genève: +10% vs moyenne CH","tipps":["Conseil 1","Conseil 2","Conseil 3"],"verhandlungstipp":"Phrase concrète pour négocier","branchentrend":"Perspectives salariales du secteur"}
+Profil: Titre: ${v.job} | Secteur: ${v.branche||"n/d"} | Canton: ${v.kanton||"Suisse"} | Expérience: ${v.erfahrung||"n/d"} | Diplôme: ${v.abschluss||"n/d"}`,
+      it:`Sei un esperto di stipendi svizzeri 2025/26. Crea una stima salariale realistica. Rispondi SOLO con JSON:
+{"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% sopra la mediana svizzera","kanton_faktor":"Zurigo: +8% vs media CH","tipps":["Consiglio 1","Consiglio 2","Consiglio 3"],"verhandlungstipp":"Frase concreta per la negoziazione","branchentrend":"Prospettive salariali del settore"}
+Profilo: Titolo: ${v.job} | Settore: ${v.branche||"n/d"} | Cantone: ${v.kanton||"Svizzera"} | Esperienza: ${v.erfahrung||"n/d"} | Titolo: ${v.abschluss||"n/d"}`,
+    })[l]),
+  },
+  // ── LINKEDIN POST GENERATOR ──
+
+  { id:"lipost", ico:"✍️", color:"#0a66c2", cat:"karriere",
+    t:{de:"LinkedIn-Post Generator",en:"LinkedIn Post Generator",fr:"Générateur post LinkedIn",it:"Generatore post LinkedIn"},
+    sub:{de:"3 massgeschneiderte Posts – Swiss-Style, keine Corporate-Floskeln, sofort kopierbar.",en:"3 tailored posts – Swiss style, no corporate clichés, ready to copy.",fr:"3 posts sur mesure – style suisse, sans clichés d'entreprise, prêts à copier.",it:"3 post su misura – stile svizzero, senza cliché aziendali, pronti da copiare."},
+    inputs:[
+      {k:"typ",  lbl:{de:"Post-Typ *",en:"Post type *",fr:"Type de post *",it:"Tipo di post *"},type:"select",opts:{de:["🎉 Neue Stelle angetreten","📚 Weiterbildung / Zertifikat","💡 Erfahrung & Erkenntnisse teilen","🏆 Projekterfolg / Meilenstein","🔍 Offen für neue Möglichkeiten","💬 Fachliche Meinung zu Branchenthema"],en:["🎉 Started new position","📚 Training / Certificate","💡 Share experience & insights","🏆 Project success / Milestone","🔍 Open to opportunities","💬 Professional opinion on industry topic"],fr:["🎉 Nouveau poste","📚 Formation / Certificat","💡 Partager expérience","🏆 Succès projet","🔍 Ouvert aux opportunités","💬 Opinion professionnelle"],it:["🎉 Nuovo posto","📚 Formazione / Certificato","💡 Condividere esperienza","🏆 Successo progetto","🔍 Aperto a opportunità","💬 Opinione professionale"]},req:true},
+      {k:"details",lbl:{de:"Details & Kontext *",en:"Details & context *",fr:"Détails & contexte *",it:"Dettagli & contesto *"},ph:{de:"z.B. Ich trete als Head of Product bei einem Zürcher FinTech an. Davor 4 Jahre bei Swisscom. Freue mich besonders auf das internationale Team und die Mission...",en:"e.g. I'm joining as Head of Product at a Zurich FinTech. Previously 4 years at Swisscom. Especially excited about the international team and the mission...",fr:"ex. Je rejoins en tant que Head of Product dans une FinTech zurichoise. Auparavant 4 ans chez Swisscom...",it:"es. Entro come Head of Product in una FinTech di Zurigo. Prima 4 anni a Swisscom..."},type:"textarea",req:true,tall:true},
+      {k:"ton",  lbl:{de:"Tonalität",en:"Tone",fr:"Tonalité",it:"Tonalità"},type:"select",opts:{de:["Persönlich & authentisch","Professionell & sachlich","Motivierend & inspirierend","Direkt & prägnant"],en:["Personal & authentic","Professional & factual","Motivating & inspiring","Direct & concise"],fr:["Personnel & authentique","Professionnel & factuel","Motivant & inspirant","Direct & concis"],it:["Personale & autentico","Professionale & fattuale","Motivante & ispirante","Diretto & conciso"]},req:false},
+      {k:"laenge",lbl:{de:"Länge",en:"Length",fr:"Longueur",it:"Lunghezza"},type:"select",opts:{de:["Kurz (100–150 Wörter)","Mittel (200–300 Wörter)","Lang (400+ Wörter)"],en:["Short (100–150 words)","Medium (200–300 words)","Long (400+ words)"],fr:["Court (100–150 mots)","Moyen (200–300 mots)","Long (400+ mots)"],it:["Breve (100–150 parole)","Medio (200–300 parole)","Lungo (400+ parole)"]},req:false},
+    ],
+    prompt:(v,l)=>(({
+      de:`Du bist LinkedIn-Experte für den Schweizer Stellenmarkt. Erstelle 3 verschiedene LinkedIn-Posts auf Schweizer Hochdeutsch (kein ß, kein "herzlichen Dank" Klischee, kein "Freue mich riesig").
+Post-Typ: ${v.typ} | Ton: ${v.ton||"Persönlich & authentisch"} | Länge: ${v.laenge||"Mittel"}
+Details: ${v.details}
+Antworte NUR mit JSON-Array (kein Markdown):
+[{"variante":"Variante 1","post":"vollständiger Post-Text mit \\n für Zeilenumbrüche","warum":"Kurze Begründung warum dieser Stil wirkt"},{"variante":"Variante 2","post":"...","warum":"..."},{"variante":"Variante 3","post":"...","warum":"..."}]`,
+      en:`You are a LinkedIn expert for the Swiss job market. Create 3 different LinkedIn posts in English. No corporate clichés.
+Post type: ${v.typ} | Tone: ${v.ton||"Personal & authentic"} | Length: ${v.laenge||"Medium"}
+Details: ${v.details}
+Reply ONLY with JSON array (no markdown):
+[{"variante":"Variant 1","post":"full post text with \\n for line breaks","warum":"Short reason why this style works"},{"variante":"Variant 2","post":"...","warum":"..."},{"variante":"Variant 3","post":"...","warum":"..."}]`,
+      fr:`Tu es expert LinkedIn pour le marché suisse. Crée 3 posts LinkedIn différents en français. Pas de clichés d'entreprise.
+Type: ${v.typ} | Ton: ${v.ton||"Personnel & authentique"} | Longueur: ${v.laenge||"Moyen"}
+Détails: ${v.details}
+Réponds UNIQUEMENT avec un tableau JSON:
+[{"variante":"Variante 1","post":"texte complet avec \\n","warum":"Raison courte"},{"variante":"Variante 2","post":"...","warum":"..."},{"variante":"Variante 3","post":"...","warum":"..."}]`,
+      it:`Sei un esperto LinkedIn per il mercato svizzero. Crea 3 post LinkedIn diversi in italiano. No cliché aziendali.
+Tipo: ${v.typ} | Tono: ${v.ton||"Personale & autentico"} | Lunghezza: ${v.laenge||"Medio"}
+Dettagli: ${v.details}
+Rispondi SOLO con array JSON:
+[{"variante":"Variante 1","post":"testo completo con \\n","warum":"Motivo breve"},{"variante":"Variante 2","post":"...","warum":"..."},{"variante":"Variante 3","post":"...","warum":"..."}]`,
+    })[l]),
   },
 ];
 
@@ -2223,462 +2328,854 @@ function CookieBanner({ lang, onAccept }) {
 // ════════════════════════════════════════
 // 💬 STELLIFY CHAT BOT
 // ════════════════════════════════════════
+// ════════════════════════════════════════
+// 👤 MULTI-PROFIL MANAGER
+const PROFILES_KEY = "stf_profiles";
+const ACTIVE_PROFILE_KEY = "stf_active_profile";
 
-// ── ChatGate: Register & Login ──────────────────────────────────────────────
-function ChatGate({ lang, L, C, onSuccess, onPro }) {
-  const [mode, setMode]     = useState(() => {
-    // If user was registered before, show login
-    try { return localStorage.getItem("stf_pw_hash") ? "login" : "register"; } catch { return "register"; }
-  });
-  const [email, setEmail]   = useState(() => { try { return localStorage.getItem("stf_chat_email")||""; } catch { return ""; }});
-  const [pw, setPw]         = useState("");
-  const [pw2, setPw2]       = useState("");
-  const [err, setErr]       = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const inputStyle = { width:"100%", padding:"11px 14px", border:"1.5px solid rgba(255,255,255,.15)", borderRadius:12, fontSize:13, background:"rgba(255,255,255,.07)", color:"white", outline:"none", boxSizing:"border-box" };
-  const btnStyle   = { width:"100%", padding:12, background:"var(--em)", border:"none", borderRadius:12, color:"white", fontWeight:700, fontSize:14, cursor:"pointer" };
-
-  const doRegister = async () => {
-    if (!email.includes("@")) { setErr(L("Bitte gültige E-Mail eingeben","Please enter a valid email","E-mail invalide","Email non valida")); return; }
-    if (pw.length < 6) { setErr(L("Passwort mind. 6 Zeichen","Password min. 6 chars","Mot de passe min. 6 caractères","Password min. 6 caratteri")); return; }
-    if (pw !== pw2) { setErr(L("Passwörter stimmen nicht überein","Passwords do not match","Les mots de passe ne correspondent pas","Le password non corrispondono")); return; }
-    setLoading(true);
-    const hash = await hashPw(pw);
-    setLoading(false);
-    onSuccess(email.toLowerCase().trim(), hash);
-  };
-
-  const doLogin = async () => {
-    if (!email.includes("@")) { setErr(L("Bitte E-Mail eingeben","Please enter email","Entrez votre e-mail","Inserisci email")); return; }
-    if (!pw) { setErr(L("Bitte Passwort eingeben","Please enter password","Entrez votre mot de passe","Inserisci password")); return; }
-    setLoading(true);
-    const hash = await hashPw(pw);
-    const saved = getPwHash();
-    const savedEmail = (() => { try { return localStorage.getItem("stf_chat_email")||""; } catch { return ""; }})();
-    setLoading(false);
-    if (saved && hash === saved && email.toLowerCase().trim() === savedEmail) {
-      onSuccess(email.toLowerCase().trim(), hash);
-    } else if (!saved) {
-      // First time on this device – register automatically
-      onSuccess(email.toLowerCase().trim(), hash);
-    } else {
-      setErr(L("E-Mail oder Passwort falsch","Email or password incorrect","E-mail ou mot de passe incorrect","Email o password errati"));
-    }
-  };
-
-  return (
-    <div style={{ padding:"24px 20px", display:"flex", flexDirection:"column", gap:12 }}>
-      <div style={{ textAlign:"center", marginBottom:4 }}>
-        <div style={{ fontSize:32 }}>{mode==="register" ? "✦" : "🔑"}</div>
-        <div style={{ fontFamily:"var(--hd)", fontSize:15, fontWeight:800, color:"white", marginTop:6 }}>
-          {mode==="register"
-            ? L("Konto erstellen – kostenlos","Create account – free","Créer un compte – gratuit","Crea account – gratuito")
-            : L("Anmelden","Sign in","Se connecter","Accedi")}
-        </div>
-        <div style={{ fontSize:12, color:"rgba(255,255,255,.4)", marginTop:4 }}>
-          {mode==="register"
-            ? L(`${C.CHAT_FREE_LIMIT} Gratis-Nachrichten · kein Abo nötig`,`${C.CHAT_FREE_LIMIT} free messages · no subscription`,`${C.CHAT_FREE_LIMIT} messages gratuits`,`${C.CHAT_FREE_LIMIT} messaggi gratis`)
-            : L("Willkommen zurück!","Welcome back!","Bon retour!","Bentornato!")}
-        </div>
-      </div>
-
-      <input type="email" placeholder={L("E-Mail-Adresse","Email address","Adresse e-mail","Indirizzo email")}
-        value={email} onChange={e=>{setEmail(e.target.value);setErr("");}}
-        onKeyDown={e=>e.key==="Enter"&&document.getElementById("stf-gate-pw")?.focus()}
-        autoFocus style={inputStyle} />
-
-      <input id="stf-gate-pw" type="password"
-        placeholder={L("Passwort","Password","Mot de passe","Password")}
-        value={pw} onChange={e=>{setPw(e.target.value);setErr("");}}
-        onKeyDown={e=>{ if(e.key==="Enter"){ if(mode==="register") document.getElementById("stf-gate-pw2")?.focus(); else doLogin(); }}}
-        style={inputStyle} />
-
-      {mode==="register" && (
-        <input id="stf-gate-pw2" type="password"
-          placeholder={L("Passwort bestätigen","Confirm password","Confirmer le mot de passe","Conferma password")}
-          value={pw2} onChange={e=>{setPw2(e.target.value);setErr("");}}
-          onKeyDown={e=>e.key==="Enter"&&doRegister()}
-          style={inputStyle} />
-      )}
-
-      {err && <div style={{ color:"#f87171", fontSize:12, textAlign:"center" }}>{err}</div>}
-
-      <button onClick={mode==="register" ? doRegister : doLogin} disabled={loading} style={btnStyle}>
-        {loading ? "⏳ …" : mode==="register"
-          ? L("Konto erstellen →","Create account →","Créer →","Crea account →")
-          : L("Anmelden →","Sign in →","Se connecter →","Accedi →")}
-      </button>
-
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, marginTop:2 }}>
-        <button onClick={()=>{setMode(mode==="register"?"login":"register");setErr("");setPw("");setPw2("");}}
-          style={{ fontSize:12, color:"rgba(255,255,255,.4)", background:"none", border:"none", cursor:"pointer" }}>
-          {mode==="register"
-            ? L("Bereits registriert? Anmelden","Already registered? Sign in","Déjà inscrit? Se connecter","Già registrato? Accedi")
-            : L("Neu hier? Konto erstellen","New here? Create account","Nouveau? Créer un compte","Nuovo? Crea account")}
-        </button>
-      </div>
-
-      <div style={{ borderTop:"1px solid rgba(255,255,255,.08)", paddingTop:10, textAlign:"center" }}>
-        <button onClick={onPro}
-          style={{ fontSize:12, color:"var(--em)", background:"none", border:"none", cursor:"pointer", fontWeight:600 }}>
-          ✦ {L("Bereits Pro? Pro-Code einlösen →","Already Pro? Redeem code →","Déjà Pro? →","Già Pro? →")}
-        </button>
-      </div>
-
-      <div style={{ fontSize:10, color:"rgba(255,255,255,.25)", textAlign:"center" }}>
-        {L("Kein Spam. Jederzeit löschbar.","No spam. Delete anytime.","Aucun spam.","Nessuno spam.")}
-      </div>
-    </div>
-  );
+function loadProfiles() {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+function saveProfiles(profiles) {
+  try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch {}
+}
+function loadActiveProfileId() {
+  try { return localStorage.getItem(ACTIVE_PROFILE_KEY) || null; } catch { return null; }
+}
+function saveActiveProfileId(id) {
+  try { localStorage.setItem(ACTIVE_PROFILE_KEY, id); } catch {}
 }
 
-function ChatBot({ lang, pro, setPw, navTo }) {
+// 💬 CHAT VERLAUF
+const CHATS_KEY = "stf_chats";
+const ACTIVE_CHAT_KEY = "stf_active_chat";
+
+function loadChats() {
+  try {
+    const raw = localStorage.getItem(CHATS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+function saveChats(chats) {
+  try { localStorage.setItem(CHATS_KEY, JSON.stringify(chats)); } catch {}
+}
+function loadActiveChatId() {
+  try { return localStorage.getItem(ACTIVE_CHAT_KEY) || null; } catch { return null; }
+}
+function saveActiveChatId(id) {
+  try { localStorage.setItem(ACTIVE_CHAT_KEY, id); } catch {}
+}
+function makeChatId() { return "c" + Date.now(); }
+function makeChatTitle(msgs) {
+  const first = msgs.find(m => m.r === "u");
+  if (!first) return "Neuer Chat";
+  return first.t.slice(0, 36) + (first.t.length > 36 ? "…" : "");
+}
+
+function ChatBot({ lang, pro, setPw, navTo, authSession, onAuthOpen }) {
   const L = (d,e,f,i) => ({de:d,en:e,fr:f,it:i}[lang]||d);
-
-  // Core state
-  const [open, setOpen]         = useState(false);
-  const [bubble, setBubble]     = useState(false);
+  const [open, setOpen]       = useState(false);
+  const [bubble, setBubble]   = useState(false);
   const [cookieDone, setCookieDone] = useState(false);
-  const [msgs, setMsgs]         = useState([]);
-  const [input, setInput]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [input, setInput]     = useState("");
+  const [loading, setLoading] = useState(false);
   const [chatUsage, setChatUsage] = useState(0);
-
-  // Email gate
-  const [gateEmail, setGateEmail]   = useState("");
-  const [gateErr, setGateErr]       = useState("");
-  const [gateLoading, setGateLoading] = useState(false);
-  const [chatEmail, setChatEmail]   = useState(() => {
-    try { return localStorage.getItem("stf_chat_email") || ""; } catch { return ""; }
-  });
-
-  // File upload
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploadText, setUploadText] = useState("");
-  const fileRef = useRef(null);
+  const [showHistory, setShowHistory] = useState(false);
   const bottomRef = useRef(null);
 
-  // Cookie check
-  useEffect(() => {
-    try { setCookieDone(!!localStorage.getItem("stf_cookie")); } catch {}
-    const iv = setInterval(() => {
-      try { if (localStorage.getItem("stf_cookie")) { setCookieDone(true); clearInterval(iv); } } catch {}
-    }, 500);
-    return () => clearInterval(iv);
-  }, []);
+  // Chat-Verlauf State
+  const [chats, setChats] = useState(() => loadChats());
+  const [activeChatId, setActiveChatId] = useState(() => loadActiveChatId());
 
-  useEffect(() => { setChatUsage(getChatCount()); }, [open]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
+  // Aktiver Chat Messages
+  const msgs = (() => {
+    const chat = chats.find(c => c.id === activeChatId);
+    return chat ? chat.msgs : [];
+  })();
 
-  // Auto-bubble once per session after 8s
-  useEffect(() => {
-    if (sessionStorage.getItem("stf_bubble")) return;
-    const t = setTimeout(() => {
-      setBubble(true);
-      sessionStorage.setItem("stf_bubble", "1");
-    }, 8000);
-    return () => clearTimeout(t);
-  }, []);
+  function setMsgs(updater) {
+    setChats(prev => {
+      const updated = typeof updater === "function" ? updater(msgs) : updater;
+      let newChats;
+      if (!activeChatId) {
+        const id = makeChatId();
+        saveActiveChatId(id);
+        setActiveChatId(id);
+        newChats = [{id, title: makeChatTitle(updated), msgs: updated, ts: Date.now()}, ...prev];
+      } else {
+        newChats = prev.map(c => c.id === activeChatId
+          ? {...c, msgs: updated, title: makeChatTitle(updated), ts: Date.now()}
+          : c
+        );
+        if (!newChats.find(c => c.id === activeChatId)) {
+          newChats = [{id: activeChatId, title: makeChatTitle(updated), msgs: updated, ts: Date.now()}, ...prev];
+        }
+      }
+      saveChats(newChats);
+      return newChats;
+    });
+  }
 
-  const canChat = pro || chatUsage < C.CHAT_FREE_LIMIT;
+  function newChat() {
+    const id = makeChatId();
+    setActiveChatId(id);
+    saveActiveChatId(id);
+    setShowHistory(false);
+    // Grüssung direkt setzen
+    const welcome = {r:"ai", t: L(
+      "Hallo! Ich bin Stella 👋 Deine KI-Karriere-Assistentin von Stellify. Wie kann ich dir helfen?",
+      "Hi! I'm Stella 👋 Your AI career assistant from Stellify. How can I help?",
+      "Bonjour! Je suis Stella 👋 Comment puis-je vous aider?",
+      "Ciao! Sono Stella 👋 Come posso aiutarti?"
+    )};
+    const newChats = [{id, title: "Neuer Chat", msgs: [welcome], ts: Date.now()}, ...chats];
+    setChats(newChats);
+    saveChats(newChats);
+  }
 
-  // Gate submit
-  const submitGate = () => {
-    if (!gateEmail.includes("@") || gateEmail.length < 5) {
-      setGateErr(L("Bitte gültige E-Mail eingeben", "Please enter a valid email", "E-mail invalide", "Email non valida"));
-      return;
+  function deleteChat(id, e) {
+    e.stopPropagation();
+    const updated = chats.filter(c => c.id !== id);
+    setChats(updated);
+    saveChats(updated);
+    if (activeChatId === id) {
+      const next = updated[0];
+      setActiveChatId(next ? next.id : null);
+      saveActiveChatId(next ? next.id : "");
     }
-    setGateLoading(true);
-    setTimeout(() => {
-      try { localStorage.setItem("stf_chat_email", gateEmail); } catch {}
-      setChatEmail(gateEmail);
-      setGateLoading(false);
-      setMsgs([{ r: "ai", t: L(
-        `Hallo ${gateEmail.split("@")[0]} 👋 Ich bin Stella, deine KI-Karriere-Assistentin von Stellify! Ich helfe dir mit Bewerbungen, LinkedIn, Gehaltsverhandlungen und mehr. Du kannst auch Dokumente hochladen (📎). Wie kann ich dir helfen?`,
-        `Hi ${gateEmail.split("@")[0]} 👋 I'm Stella, your AI career assistant from Stellify! I can help with applications, LinkedIn, salary negotiations and more. You can also upload documents (📎). How can I help?`,
-        `Bonjour ${gateEmail.split("@")[0]} 👋 Je suis Stella, votre assistante carrière IA! Comment puis-je vous aider?`,
-        `Ciao ${gateEmail.split("@")[0]} 👋 Sono Stella, la tua assistente di carriera IA! Come posso aiutarti?`
-      ) }]);
-    }, 500);
-  };
+  }
 
-  // File handler
-  const handleFile = async (file) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert(L("Max. 5MB erlaubt", "Max. 5MB allowed", "Max. 5MB autorisé", "Max. 5MB consentiti"));
-      return;
-    }
-    setUploadFile(file);
-    const ext = file.name.split(".").pop().toLowerCase();
-    if (["txt", "md", "csv"].includes(ext)) {
-      const text = await file.text();
-      setUploadText(text.slice(0, 3000));
-    } else {
-      setUploadText(`[Datei: ${file.name} (${(file.size / 1024).toFixed(0)} KB) – bitte analysieren]`);
-    }
-  };
+  function switchChat(id) {
+    setActiveChatId(id);
+    saveActiveChatId(id);
+    setShowHistory(false);
+  }
 
-  // Download last AI answer
-  const downloadAnswer = () => {
-    const last = [...msgs].reverse().find(m => m.r === "ai");
-    if (!last) return;
-    const blob = new Blob([last.t], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "Stellify-Antwort.txt"; a.click();
-    URL.revokeObjectURL(url);
-  };
+  useEffect(()=>{
+    try { setCookieDone(!!localStorage.getItem("stf_cookie")); } catch{}
+    const iv = setInterval(()=>{ try { if(localStorage.getItem("stf_cookie")) { setCookieDone(true); clearInterval(iv); } } catch{} },500);
+    return ()=>clearInterval(iv);
+  },[]);
 
-  const SYSTEM = `Du bist Stella, die KI-Karriere-Assistentin von Stellify. Tiefes Wissen über Schweizer Arbeitsmarkt, Bewerbungen, LinkedIn, Gehälter, Interview-Vorbereitung.
-Wenn Nutzer eine Datei hochlädt, analysiere sie und gib konkrete Verbesserungen.
-Wenn du ein Dokument erstellst, schreib am Ende: 💾 DOKUMENT BEREIT ZUM DOWNLOAD
-Antworte auf Deutsch, präzise und umsetzbar. Max. 3-4 Sätze im Widget.
-Tools: ✍️ Bewerbungen, 💼 LinkedIn, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer`;
+  useEffect(()=>{ setChatUsage(getChatCount()); },[open]);
+  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[msgs]);
+
+  useEffect(()=>{
+    const seen = sessionStorage.getItem("stf_bubble");
+    if(seen) return;
+    const t = setTimeout(()=>{ setBubble(true); sessionStorage.setItem("stf_bubble","1"); }, 8000);
+    return ()=>clearTimeout(t);
+  },[]);
+
+  const isLoggedIn = !!authSession;
+  const canChat = isLoggedIn && (pro || chatUsage < C.CHAT_FREE_LIMIT);
+  const needsLogin = !isLoggedIn;
+
+  const SYSTEM = `Du bist Stella, die KI-Karriere-Assistentin von Stellify. Du hast tiefes Wissen über Karriere, Bewerbungen, den Schweizer Arbeitsmarkt und Produktivität.
+
+Dein Wissen umfasst: Schweizer Bewerbungsunterlagen (Motivationsschreiben, Lebenslauf mit Foto, 1-2 Seiten), ATS-Optimierung, Schweizer Arbeitsrecht (Kündigungsfristen, Sperrfristen, Zeugnis-Code: \"stets zu vollsten Zufriedenheit\"=sehr gut), Gehälter nach Branche/Erfahrung, LinkedIn-Optimierung, Interview-Vorbereitung (STAR-Methode), Gehaltsverhandlungs-Taktiken, Schweizer Bildungssystem (EFZ, FH, Uni, CAS/MAS).
+
+Tools von Stellify:
+✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer, 💰 KI-Gehaltsrechner Schweiz, 📋 Bewerbungs-Tracker, ✍️ LinkedIn-Post Generator
+
+Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib Beispieltexte direkt aus wenn gefragt. Empfehle Tool-Namen exakt wie oben damit Links funktionieren. Sei warm, direkt, wie ein erfahrener Karriere-Coach.`;
 
   const TOOL_MAP = {
-    "bewerbung": ["✍️ Bewerbungen", "app"], "bewerbungen": ["✍️ Bewerbungen", "app"],
-    "linkedin": ["💼 LinkedIn", "linkedin"], "ats-simulation": ["🤖 ATS-Simulation", "ats"],
-    "zeugnis-analyse": ["📜 Zeugnis-Analyse", "zeugnis"], "job-matching": ["🎯 Job-Matching", "jobmatch"],
-    "interview-coach": ["🎤 Interview-Coach", "coach"], "excel-generator": ["📊 Excel-Generator", "excel"],
-    "powerpoint-maker": ["📽️ PowerPoint-Maker", "pptx"], "gehaltsverhandlung": ["💰 Gehaltsverhandlung", "gehalt"],
-    "networking-nachricht": ["🤝 Networking-Nachricht", "networking"], "kündigung schreiben": ["📤 Kündigung schreiben", "kuendigung"],
-    "30-60-90-tage-plan": ["🗓️ 30-60-90-Tage-Plan", "plan306090"], "referenzschreiben": ["🏆 Referenzschreiben", "referenz"],
-    "lernplan": ["📚 Lernplan", "lernplan"], "zusammenfassung": ["📝 Zusammenfassung", "zusammenfassung"],
-    "lehrstelle": ["🎓 Lehrstelle", "lehrstelle"],
+    "bewerbung":["✍️ Bewerbungen","app"], "bewerbungen":["✍️ Bewerbungen","app"],
+    "linkedin":["💼 LinkedIn","linkedin"], "ats":["🤖 ATS-Simulation","ats"],
+    "zeugnis":["📜 Zeugnis-Analyse","zeugnis"], "job-matching":["🎯 Job-Matching","jobmatch"],
+    "interview":["🎤 Interview-Coach","coach"], "excel":["📊 Excel-Generator","excel"],
+    "powerpoint":["📽️ PowerPoint-Maker","pptx"], "gehalt":["💰 Gehaltsverhandlung","gehalt"],
+    "networking":["🤝 Networking","networking"], "kündigung":["📤 Kündigung","kuendigung"],
+    "30-60-90":["🗓️ 30-60-90-Plan","plan306090"], "referenz":["🏆 Referenzschreiben","referenz"],
+    "lernplan":["📚 Lernplan","lernplan"], "zusammenfassung":["📝 Zusammenfassung","zusammenfassung"],
+    "lehrstelle":["🎓 Lehrstelle","lehrstelle"], "e-mail":["✉️ E-Mail","email"],
+    "protokoll":["📋 Protokoll","protokoll"], "übersetzer":["🌍 Übersetzer","uebersetzer"],
+    "gehaltsrechner":["💰 KI-Gehaltsrechner","gehaltsrechner"],
+    "tracker":["📋 Bewerbungs-Tracker","tracker"],
+    "linkedin-post":["✍️ LinkedIn-Post","lipost"],
   };
 
   const renderMsg = (text) => {
-    const hasDoc = text.includes("💾 DOKUMENT BEREIT ZUM DOWNLOAD");
-    let t2 = text.replace("💾 DOKUMENT BEREIT ZUM DOWNLOAD", "");
-    Object.entries(TOOL_MAP).forEach(([key, [label, page]]) => {
-      t2 = t2.replace(new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"),
-        `%%TOOL:${page}:${label}%%`);
+    const parts = [];
+    let remaining = text;
+    Object.entries(TOOL_MAP).forEach(([key,[label,page]])=>{
+      remaining = remaining.replace(new RegExp(`(${label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")})`, "gi"),
+        `<TOOL:${page}:${label}>`);
     });
-    const parts = t2.split(/(%%TOOL:[^%]+%%)/);
-    return (
-      <div>
-        {parts.map((seg, i) => {
-          const m = seg.match(/^%%TOOL:([^:]+):(.+)%%$/);
-          if (m) return (
-            <button key={i} onClick={() => { setOpen(false); navTo(m[1]); }}
-              style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.3)", borderRadius: 8, padding: "2px 9px", fontSize: 12, fontWeight: 700, color: "var(--em)", cursor: "pointer", margin: "1px 2px" }}>
-              {m[2]} →
-            </button>
-          );
-          return <span key={i}>{seg}</span>;
-        })}
-        {hasDoc && (
-          <button onClick={downloadAnswer}
-            style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, background: "rgba(16,185,129,.12)", border: "1.5px solid var(--em)", borderRadius: 10, padding: "8px 14px", fontSize: 12, fontWeight: 700, color: "var(--em)", cursor: "pointer", width: "100%", justifyContent: "center" }}>
-            💾 {L("Dokument herunterladen", "Download document", "Télécharger", "Scarica")}
-          </button>
-        )}
-      </div>
-    );
+    const segments = remaining.split(/(<TOOL:[^>]+>)/);
+    return segments.map((seg,i)=>{
+      const m = seg.match(/^<TOOL:([^:]+):(.+)>$/);
+      if(m) return <button key={i} onClick={()=>{setOpen(false);navTo(m[1]);}}
+        style={{display:"inline-flex",alignItems:"center",gap:4,background:"rgba(16,185,129,.15)",border:"1px solid rgba(16,185,129,.3)",borderRadius:8,padding:"2px 9px",fontSize:12,fontWeight:700,color:"var(--em)",cursor:"pointer",margin:"1px 2px"}}>
+        {m[2]} →</button>;
+      return <span key={i}>{seg}</span>;
+    });
   };
 
   const send = async () => {
-    if (!input.trim() || loading) return;
-    if (!canChat) { setPw(true); return; }
-    const userText = input.trim();
+    if(!input.trim()||loading) return;
+    if(needsLogin){ onAuthOpen && onAuthOpen(); return; }
+    if(!canChat){ setPw(true); return; }
+    const userMsg = input.trim();
     setInput("");
-    let msgForApi = userText;
-    if (uploadText) {
-      msgForApi = userText + "\n\n" + uploadText;
-      setUploadFile(null); setUploadText("");
-    }
-    const newMsgs = [...msgs.filter(m => m.r !== "sys"), { r: "u", t: userText }];
-    setMsgs(prev => [...prev, { r: "u", t: userText }]);
+    const newMsgs = [...msgs, {r:"u", t:userMsg}];
+    setMsgs(newMsgs);
     setLoading(true);
-    if (!pro) { incChat(); setChatUsage(c => c + 1); }
+    if(!pro){ incChat(); setChatUsage(c=>c+1); }
     try {
       const apiMsgs = [];
-      for (const m of newMsgs) {
-        const role = m.r === "u" ? "user" : "assistant";
-        if (apiMsgs.length > 0 && apiMsgs[apiMsgs.length - 1].role === role) continue;
-        apiMsgs.push({ role, content: (m.r === "u" && m === newMsgs[newMsgs.length - 1]) ? msgForApi : m.t });
+      for(const m of newMsgs) {
+        const role = m.r==="u" ? "user" : "assistant";
+        if(apiMsgs.length > 0 && apiMsgs[apiMsgs.length-1].role === role) continue;
+        apiMsgs.push({role, content: m.t});
       }
-      while (apiMsgs.length && apiMsgs[0].role !== "user") apiMsgs.shift();
+      while(apiMsgs.length && apiMsgs[0].role !== "user") apiMsgs.shift();
+      const finalMsgs = apiMsgs.slice(-10);
+      const msgsWithSystem = [{role:"system",content:SYSTEM}, ...finalMsgs];
       const res = await fetch(GROQ_URL, {
         method: "POST",
         headers: groqHeaders(),
-        body: JSON.stringify({
-          model: C.MODEL_FAST,
-          max_tokens: 700,
-          messages: [{ role: "system", content: SYSTEM }, ...apiMsgs.slice(-12)]
-        })
+        body: JSON.stringify({ model: C.MODEL_FAST, max_tokens: 600, messages: msgsWithSystem })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+      if(!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
       const reply = data.choices?.[0]?.message?.content || "Bitte nochmals versuchen.";
-      setMsgs(m => [...m, { r: "ai", t: reply }]);
-    } catch (e) {
-      setMsgs(m => [...m, { r: "ai", t: `⚠️ ${e.message}` }]);
+      setMsgs(m=>[...m, {r:"ai", t:reply}]);
+    } catch(e) {
+      setMsgs(m=>[...m, {r:"ai", t:`⚠️ ${e.message}`}]);
     } finally {
       setLoading(false);
     }
   };
 
-  const openChat = () => { setBubble(false); setOpen(o => !o); };
   const remaining = pro ? "∞" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage);
+  const openChat = () => {
+    setBubble(false);
+    if (!open && msgs.length === 0 && !activeChatId) {
+      newChat();
+    }
+    setOpen(o=>!o);
+  };
 
-  return (
-    <>
-      {/* Bubble */}
-      {cookieDone && bubble && !open && (
-        <div onClick={openChat}
-          style={{ position: "fixed", bottom: 90, right: 20, maxWidth: 220, background: "var(--dk2)", border: "1px solid rgba(16,185,129,.3)", borderRadius: "14px 14px 4px 14px", padding: "11px 14px", zIndex: 1002, boxShadow: "0 8px 32px rgba(0,0,0,.4)", cursor: "pointer", animation: "fadeSlideUp .4s ease" }}>
-          <button onClick={e => { e.stopPropagation(); setBubble(false); }}
-            style={{ position: "absolute", top: 6, right: 8, background: "none", border: "none", color: "rgba(255,255,255,.3)", fontSize: 12, cursor: "pointer" }}>✕</button>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,.85)", lineHeight: 1.5, paddingRight: 12 }}>
-            {L("Hallo 👋 Frag Stella – deine Karriere-KI!", "Hi 👋 Ask Stella – your career AI!", "Bonjour 👋 Demandez à Stella!", "Ciao 👋 Chiedi a Stella!")}
+  const fmtDate = (ts) => {
+    if(!ts) return "";
+    const d = new Date(ts);
+    const now = new Date();
+    const diff = now - d;
+    if(diff < 86400000) return d.toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"});
+    if(diff < 604800000) return d.toLocaleDateString("de-CH",{weekday:"short"});
+    return d.toLocaleDateString("de-CH",{day:"2-digit",month:"2-digit"});
+  };
+
+  return (<>
+    {/* Auto-Bubble */}
+    {cookieDone&&bubble&&!open&&<div style={{position:"fixed",bottom:90,right:20,maxWidth:220,background:"var(--dk2)",border:"1px solid rgba(16,185,129,.3)",borderRadius:"14px 14px 4px 14px",padding:"11px 14px",zIndex:1002,boxShadow:"0 8px 32px rgba(0,0,0,.4)",cursor:"pointer",animation:"fadeSlideUp .4s ease"}}
+      onClick={openChat}>
+      <button onClick={e=>{e.stopPropagation();setBubble(false);}} style={{position:"absolute",top:6,right:8,background:"none",border:"none",color:"rgba(255,255,255,.3)",fontSize:12,cursor:"pointer",lineHeight:1}}>✕</button>
+      <div style={{fontSize:13,color:"rgba(255,255,255,.85)",lineHeight:1.5,paddingRight:12}}>
+        {L("Hallo 👋 Welches Tool passt zu dir? Frag mich!","Hi 👋 Which tool suits you? Ask me!","Bonjour 👋 Quel outil vous convient?","Ciao 👋 Quale tool fa per te?")}
+      </div>
+      <div style={{fontSize:11,color:"var(--em)",fontWeight:600,marginTop:5}}>{L("Mit Stella chatten →","Chat with Stella →","Discuter avec Stella →","Chatta con Stella →")}</div>
+    </div>}
+
+    {/* Floating Button */}
+    {cookieDone&&<button onClick={openChat}
+      style={{position:"fixed",bottom:open?248:24,right:24,width:56,height:56,borderRadius:"50%",background:"var(--em)",border:"none",cursor:"pointer",zIndex:1001,boxShadow:"0 4px 20px rgba(16,185,129,.45)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,transition:"all .3s",transform:open?"rotate(10deg)":"none"}}>
+      {open?"✕":"💬"}
+      {bubble&&!open&&<div style={{position:"absolute",top:0,right:0,width:14,height:14,borderRadius:"50%",background:"#ef4444",border:"2px solid white"}}/>}
+    </button>}
+
+    {/* Chat Window */}
+    {open&&<div style={{position:"fixed",bottom:92,right:24,width:360,maxWidth:"calc(100vw - 32px)",background:"var(--dk2)",border:"1px solid rgba(255,255,255,.1)",borderRadius:20,boxShadow:"0 20px 60px rgba(0,0,0,.5)",zIndex:1000,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+
+      {/* Header */}
+      <div style={{background:"linear-gradient(135deg,rgba(16,185,129,.2),rgba(16,185,129,.08))",borderBottom:"1px solid rgba(255,255,255,.07)",padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:34,height:34,background:"var(--em)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🤖</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:"var(--hd)",fontSize:13,fontWeight:800,color:"white"}}>Stella – Stellify</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.4)"}}>
+            {pro ? L("Pro · Unbegrenzt","Pro · Unlimited","Pro · Illimité","Pro · Illimitato")
+                 : `${remaining}/${C.CHAT_FREE_LIMIT} ${L("Nachrichten","messages","messages","messaggi")}`}
           </div>
-          <div style={{ fontSize: 11, color: "var(--em)", fontWeight: 600, marginTop: 5 }}>
-            {L("Jetzt kostenlos starten →", "Start free now →", "Commencer →", "Inizia →")}
+        </div>
+        {/* Verlauf Button */}
+        <button onClick={()=>setShowHistory(h=>!h)} title={L("Verlauf","History","Historique","Cronologia")}
+          style={{background:showHistory?"rgba(16,185,129,.25)":"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,color:showHistory?"var(--em)":"rgba(255,255,255,.6)",flexShrink:0,transition:"all .2s"}}>
+          🕐
+        </button>
+        {/* Neuer Chat */}
+        <button onClick={newChat} title={L("Neuer Chat","New chat","Nouveau chat","Nuova chat")}
+          style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,color:"rgba(255,255,255,.6)",flexShrink:0,transition:"all .2s"}}
+          onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.15)"}
+          onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.08)"}>
+          ✏️
+        </button>
+        <div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e",flexShrink:0}}/>
+      </div>
+
+      {/* Chat-Verlauf Panel */}
+      {showHistory && (
+        <div style={{background:"rgba(7,7,14,.98)",borderBottom:"1px solid rgba(255,255,255,.07)",maxHeight:260,overflowY:"auto"}}>
+          <div style={{padding:"10px 14px 6px",fontSize:10,fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase",color:"rgba(255,255,255,.25)"}}>{L("Verlauf","History","Historique","Cronologia")}</div>
+          {chats.length === 0 && (
+            <div style={{padding:"14px",fontSize:12,color:"rgba(255,255,255,.3)",textAlign:"center"}}>{L("Noch keine Chats","No chats yet","Pas encore de chats","Nessuna chat")}</div>
+          )}
+          {chats.map(chat => (
+            <div key={chat.id} onClick={()=>switchChat(chat.id)}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",cursor:"pointer",background:chat.id===activeChatId?"rgba(16,185,129,.1)":"transparent",borderLeft:`2px solid ${chat.id===activeChatId?"var(--em)":"transparent"}`,transition:"all .15s"}}
+              onMouseEnter={e=>{if(chat.id!==activeChatId)e.currentTarget.style.background="rgba(255,255,255,.04)";}}
+              onMouseLeave={e=>{if(chat.id!==activeChatId)e.currentTarget.style.background="transparent";}}>
+              <div style={{fontSize:14,flexShrink:0}}>💬</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:600,color:chat.id===activeChatId?"var(--em)":"rgba(255,255,255,.75)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{chat.title||"Chat"}</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,.25)",marginTop:1}}>{fmtDate(chat.ts)} · {chat.msgs.length} {L("Nachrichten","messages","messages","messaggi")}</div>
+              </div>
+              <button onClick={e=>deleteChat(chat.id,e)}
+                style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",cursor:"pointer",fontSize:12,padding:"2px 4px",borderRadius:4,flexShrink:0,transition:"color .15s"}}
+                onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
+                onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,.2)"}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Login Gate */}
+      {!showHistory && needsLogin && (
+        <div style={{padding:"28px 20px",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
+          <div style={{fontSize:36}}>🔐</div>
+          <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:800,color:"white"}}>
+            {lang==="de"?"Einloggen zum Chatten":lang==="fr"?"Connexion pour chatter":"Sign in to chat"}
+          </div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",lineHeight:1.6}}>
+            {lang==="de"?"20 kostenlose Fragen an Stella – registriere dich gratis.":lang==="fr"?"20 questions gratuites – inscrivez-vous.":"20 free questions for Stella – register free."}
+          </div>
+          <button onClick={()=>onAuthOpen&&onAuthOpen()} className="btn b-em b-w" style={{fontSize:13}}>
+            {lang==="de"?"Einloggen / Registrieren →":lang==="fr"?"Connexion / Inscription →":"Sign in / Register →"}
+          </button>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.2)"}}>
+            {lang==="de"?"Kein Abo nötig · Sofort starten":"No subscription needed · Start instantly"}
           </div>
         </div>
       )}
 
-      {/* Float button */}
-      {cookieDone && (
-        <button onClick={openChat}
-          style={{ position: "fixed", bottom: open ? 248 : 24, right: 24, width: 56, height: 56, borderRadius: "50%", background: "var(--em)", border: "none", cursor: "pointer", zIndex: 1001, boxShadow: "0 4px 20px rgba(16,185,129,.45)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, transition: "all .3s", transform: open ? "rotate(10deg)" : "none" }}>
-          {open ? "✕" : "💬"}
-          {bubble && !open && <div style={{ position: "absolute", top: 0, right: 0, width: 14, height: 14, borderRadius: "50%", background: "#ef4444", border: "2px solid white" }} />}
-        </button>
-      )}
-
-      {/* Chat Window */}
-      {open && (
-        <div style={{ position: "fixed", bottom: 92, right: 24, width: 340, maxWidth: "calc(100vw - 32px)", background: "var(--dk2)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 20, boxShadow: "0 20px 60px rgba(0,0,0,.5)", zIndex: 1000, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-
-          {/* Header */}
-          <div style={{ background: "linear-gradient(135deg,rgba(16,185,129,.2),rgba(16,185,129,.08))", borderBottom: "1px solid rgba(255,255,255,.07)", padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 36, height: 36, background: "var(--em)", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>🤖</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: "var(--hd)", fontSize: 14, fontWeight: 800, color: "white" }}>Stella – Stellify</div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,.4)" }}>
-                {!chatEmail
-                  ? L("Kostenlos registrieren", "Register free", "Inscription gratuite", "Registrazione gratuita")
-                  : pro
-                    ? L("Pro · Unbegrenzte Nachrichten", "Pro · Unlimited", "Pro · Illimité", "Pro · Illimitato")
-                    : L(`${remaining} von ${C.CHAT_FREE_LIMIT} Nachrichten`, `${remaining} of ${C.CHAT_FREE_LIMIT}`, `${remaining} sur ${C.CHAT_FREE_LIMIT}`, `${remaining} di ${C.CHAT_FREE_LIMIT}`)}
+      {/* Messages */}
+      {!showHistory && !needsLogin && <>
+        <div style={{flex:1,overflowY:"auto",padding:14,display:"flex",flexDirection:"column",gap:10,maxHeight:320,minHeight:200}}>
+          {msgs.map((m,i)=>(
+            <div key={i} style={{display:"flex",gap:8,flexDirection:m.r==="u"?"row-reverse":"row",alignItems:"flex-start"}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:m.r==="u"?"rgba(16,185,129,.2)":"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{m.r==="u"?"👤":"🤖"}</div>
+              <div style={{maxWidth:"78%",background:m.r==="u"?"rgba(16,185,129,.15)":"rgba(255,255,255,.05)",border:`1px solid ${m.r==="u"?"rgba(16,185,129,.25)":"rgba(255,255,255,.07)"}`,borderRadius:m.r==="u"?"14px 14px 4px 14px":"14px 14px 14px 4px",padding:"9px 12px",fontSize:13,color:"rgba(255,255,255,.85)",lineHeight:1.6}}>
+                {m.r==="ai"?renderMsg(m.t):m.t}
               </div>
             </div>
-            {chatEmail && (
-              <button onClick={() => { setOpen(false); navTo("chat"); }}
-                style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 8, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 14, color: "rgba(255,255,255,.6)", flexShrink: 0 }}>⤢</button>
-            )}
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e", flexShrink: 0 }} />
+          ))}
+          {loading&&<div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+            <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🤖</div>
+            <div style={{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",borderRadius:"14px 14px 14px 4px",padding:"9px 12px"}}>
+              <div style={{display:"flex",gap:4}}>{[0,1,2].map(j=><div key={j} style={{width:6,height:6,borderRadius:"50%",background:"var(--em)",opacity:.7,animation:`pulse 1.2s ease-in-out ${j*0.2}s infinite`}}/>)}</div>
+            </div>
+          </div>}
+          <div ref={bottomRef}/>
+        </div>
+
+        {!canChat&&<div style={{padding:"10px 14px",background:"rgba(245,158,11,.08)",borderTop:"1px solid rgba(245,158,11,.15)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+          <div style={{fontSize:12,color:"rgba(245,158,11,.8)"}}>{L("Gratis-Limit erreicht","Free limit reached","Limite gratuit atteint","Limite raggiunto")}</div>
+          <button onClick={()=>setPw(true)} style={{background:"var(--am)",color:"white",border:"none",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Pro {L("freischalten","unlock","activer","sblocca")} →</button>
+        </div>}
+
+        <div style={{borderTop:"1px solid rgba(255,255,255,.07)",padding:"10px 12px",display:"flex",gap:8,alignItems:"flex-end"}}>
+          <textarea value={input} onChange={e=>setInput(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!loading&&canChat){e.preventDefault();send();}}}
+            placeholder={canChat ? L("Frag mich etwas…","Ask me anything…","Posez-moi une question…","Chiedimi qualcosa…") : L("Pro freischalten…","Unlock Pro…","Activer Pro…","Sblocca Pro…")}
+            disabled={!canChat||loading}
+            style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 11px",fontSize:13,color:"white",resize:"none",minHeight:36,maxHeight:90,outline:"none",lineHeight:1.5}}
+            rows={1}/>
+          <button onClick={send} disabled={!input.trim()||loading||!canChat}
+            style={{width:36,height:36,borderRadius:10,background:input.trim()&&canChat?"var(--em)":"rgba(255,255,255,.08)",border:"none",cursor:input.trim()&&canChat?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,transition:"background .2s"}}>
+            {loading?"⏳":"➤"}
+          </button>
+        </div>
+      </>}
+    </div>}
+
+    <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.3);opacity:1}}@keyframes fadeSlideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
+  </>);
+}
+// ════════════════════════════════════════
+// 📋 BEWERBUNGS-TRACKER
+function BewerbungsTracker({lang, pro, setPw, navTo}) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const STATUS = {
+    beworben:  {de:"Beworben",       en:"Applied",       fr:"Postulé",      it:"Candidato",    col:"#3b82f6", bg:"rgba(59,130,246,.1)"},
+    pruefung:  {de:"In Prüfung",     en:"Under review",  fr:"En cours",     it:"In esame",     col:"#f59e0b", bg:"rgba(245,158,11,.1)"},
+    interview: {de:"Interview",      en:"Interview",     fr:"Entretien",    it:"Colloquio",    col:"#8b5cf6", bg:"rgba(139,92,246,.1)"},
+    angebot:   {de:"Angebot",        en:"Offer",         fr:"Offre",        it:"Offerta",      col:"#10b981", bg:"rgba(16,185,129,.1)"},
+    abgelehnt: {de:"Abgelehnt",      en:"Rejected",      fr:"Refusé",       it:"Rifiutato",    col:"#ef4444", bg:"rgba(239,68,68,.1)"},
+    zurueck:   {de:"Zurückgezogen",  en:"Withdrawn",     fr:"Retiré",       it:"Ritirato",     col:"#6b7280", bg:"rgba(107,114,128,.1)"},
+  };
+  const DEMO = [
+    {id:1, firma:"Migros", stelle:"Product Manager", datum:"2026-02-15", status:"interview", prio:"hoch", notiz:"2. Interview am 20.3."},
+    {id:2, firma:"Swiss Re", stelle:"Risk Analyst", datum:"2026-02-20", status:"pruefung", prio:"mittel", notiz:""},
+    {id:3, firma:"Nestlé", stelle:"Marketing Manager", datum:"2026-03-01", status:"beworben", prio:"tief", notiz:"Über LinkedIn beworben"},
+  ];
+  const [jobs, setJobs] = useState(DEMO);
+  const [filter, setFilter] = useState("alle");
+  const [modal, setModal] = useState(null); // null | {mode:"add"} | {mode:"edit", job}
+  const [form, setForm] = useState({firma:"",stelle:"",datum:"",status:"beworben",prio:"mittel",notiz:""});
+
+  const filtered = filter==="alle" ? jobs : jobs.filter(j=>j.status===filter);
+  const stats = Object.keys(STATUS).map(k=>({key:k, label:STATUS[k][lang]||STATUS[k].de, count:jobs.filter(j=>j.status===k).length, col:STATUS[k].col}));
+
+  function openAdd() { setForm({firma:"",stelle:"",datum:new Date().toISOString().slice(0,10),status:"beworben",prio:"mittel",notiz:""}); setModal({mode:"add"}); }
+  function openEdit(job) { setForm({...job}); setModal({mode:"edit",job}); }
+  function save() {
+    if(!form.firma||!form.stelle) return;
+    if(modal.mode==="add") setJobs(j=>[...j,{...form,id:Date.now()}]);
+    else setJobs(j=>j.map(x=>x.id===modal.job.id?{...form,id:x.id}:x));
+    setModal(null);
+  }
+  function del(id) { setJobs(j=>j.filter(x=>x.id!==id)); }
+  function changeStatus(id,st) { setJobs(j=>j.map(x=>x.id===id?{...x,status:st}:x)); }
+
+  const prioCol = {hoch:"#ef4444",mittel:"#f59e0b",tief:"#6b7280"};
+
+  return (
+    <div style={{minHeight:"80vh",background:"var(--bg)"}}>
+      {/* Header */}
+      <div className="page-hdr dk" style={{paddingBottom:32}}>
+        <div className="con" style={{maxWidth:900}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+            <button onClick={()=>navTo("landing")} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"rgba(255,255,255,.7)",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontFamily:"var(--bd)"}}>← {L("Zurück","Back","Retour","Indietro")}</button>
+            {!pro && <span style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20}}>PRO</span>}
+          </div>
+          <h1>📋 {L("Bewerbungs-Tracker","Application Tracker","Suivi des candidatures","Tracker candidature")}</h1>
+          <p>{L("Alle Bewerbungen im Überblick – Status, Priorität, Notizen.","All applications at a glance – status, priority, notes.","Toutes les candidatures – statut, priorité, notes.","Tutte le candidature – stato, priorità, note.")}</p>
+        </div>
+      </div>
+
+      {!pro ? (
+        <div className="abody" style={{maxWidth:640,textAlign:"center"}}>
+          <div className="ipw">
+            <h3>📋 {L("Bewerbungs-Tracker freischalten","Unlock Application Tracker","Débloquer le tracker","Sblocca il tracker")}</h3>
+            <p>{L("Behalte alle Bewerbungen im Blick. Status, Priorität, Notizen – alles an einem Ort.","Keep all applications in view. Status, priority, notes – all in one place.","Suivez toutes vos candidatures. Statut, priorité, notes – tout en un.","Tieni traccia di tutte le candidature. Stato, priorità, note – tutto in un posto.")}</p>
+            <div className="ipw-pr">CHF {C.priceM}<span>/Mo.</span></div>
+            <div className="ipw-fts">
+              {["📋 Tracker","✍️ Bewerbungen","🤖 ATS","📜 Zeugnis","🎯 Matching"].map(f=><span key={f} className="ipw-ft">✓ {f}</span>)}
+            </div>
+            <button className="btn b-em b-lg b-w" onClick={()=>setPw(true)}>✦ {L("Pro freischalten →","Unlock Pro →","Activer Pro →","Attiva Pro →")}</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{maxWidth:900,margin:"0 auto",padding:"32px 20px 80px"}}>
+          {/* Stats */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10,marginBottom:24}}>
+            <div onClick={()=>setFilter("alle")} style={{cursor:"pointer",padding:"14px 16px",background:filter==="alle"?"var(--ink)":"white",border:"1.5px solid "+(filter==="alle"?"var(--ink)":"var(--bo)"),borderRadius:12,textAlign:"center"}}>
+              <div style={{fontFamily:"var(--hd)",fontSize:26,fontWeight:800,color:filter==="alle"?"white":"var(--ink)"}}>{jobs.length}</div>
+              <div style={{fontSize:11,color:filter==="alle"?"rgba(255,255,255,.6)":"var(--mu)",marginTop:3}}>{L("Alle","All","Toutes","Tutte")}</div>
+            </div>
+            {stats.map(s=>(
+              <div key={s.key} onClick={()=>setFilter(filter===s.key?"alle":s.key)} style={{cursor:"pointer",padding:"14px 16px",background:filter===s.key?s.col:"white",border:"1.5px solid "+(filter===s.key?s.col:"var(--bo)"),borderRadius:12,textAlign:"center",transition:"all .18s"}}>
+                <div style={{fontFamily:"var(--hd)",fontSize:26,fontWeight:800,color:filter===s.key?"white":s.col}}>{s.count}</div>
+                <div style={{fontSize:11,color:filter===s.key?"rgba(255,255,255,.7)":"var(--mu)",marginTop:3}}>{s.label}</div>
+              </div>
+            ))}
           </div>
 
-          {/* GATE: Register / Login */}
-          {!chatEmail ? (
-            <ChatGate lang={lang} L={L} C={C}
-              onSuccess={(email, pwHash) => {
-                try { localStorage.setItem("stf_chat_email", email); if(pwHash) localStorage.setItem("stf_pw_hash", pwHash); } catch {}
-                setChatEmail(email);
-                setMsgs([{ r: "ai", t: L(
-                  `Hallo ${email.split("@")[0]} 👋 Ich bin Stella! Wie kann ich dir helfen? Du kannst auch Dokumente hochladen (📎).`,
-                  `Hi ${email.split("@")[0]} 👋 I'm Stella! How can I help? You can also upload files (📎).`,
-                  `Bonjour ${email.split("@")[0]} 👋 Je suis Stella! Comment puis-je vous aider?`,
-                  `Ciao ${email.split("@")[0]} 👋 Sono Stella! Come posso aiutarti?`
-                ) }]);
-              }}
-              onPro={() => setPw(true)}
-            />
-          ) : (
-            <>
-              {/* Messages */}
-              <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 10, maxHeight: 280, minHeight: 180 }}>
-                {msgs.map((m, i) => (
-                  <div key={i} style={{ display: "flex", gap: 8, flexDirection: m.r === "u" ? "row-reverse" : "row", alignItems: "flex-start" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: m.r === "u" ? "rgba(16,185,129,.2)" : "rgba(255,255,255,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>
-                      {m.r === "u" ? "👤" : "🤖"}
-                    </div>
-                    <div style={{ maxWidth: "78%", background: m.r === "u" ? "rgba(16,185,129,.15)" : "rgba(255,255,255,.05)", border: `1px solid ${m.r === "u" ? "rgba(16,185,129,.25)" : "rgba(255,255,255,.07)"}`, borderRadius: m.r === "u" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", padding: "9px 12px", fontSize: 13, color: "rgba(255,255,255,.85)", lineHeight: 1.6 }}>
-                      {m.r === "ai" ? renderMsg(m.t) : m.t}
-                    </div>
-                  </div>
-                ))}
-                {loading && (
-                  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>🤖</div>
-                    <div style={{ background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.07)", borderRadius: "14px 14px 14px 4px", padding: "9px 12px" }}>
-                      <div style={{ display: "flex", gap: 4 }}>
-                        {[0, 1, 2].map(j => <div key={j} style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--em)", opacity: .7, animation: `pulse 1.2s ease-in-out ${j * 0.2}s infinite` }} />)}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={bottomRef} />
+          {/* Add button */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{fontSize:13,color:"var(--mu)"}}>{filtered.length} {L("Einträge","entries","entrées","voci")}</div>
+            <button className="btn b-em b-sm" onClick={openAdd}>+ {L("Neue Bewerbung","New application","Nouvelle candidature","Nuova candidatura")}</button>
+          </div>
+
+          {/* List */}
+          {filtered.length===0 ? (
+            <div style={{textAlign:"center",padding:"48px 20px",color:"var(--mu)",fontSize:14}}>
+              {L("Keine Bewerbungen in dieser Kategorie.","No applications in this category.","Aucune candidature dans cette catégorie.","Nessuna candidatura in questa categoria.")}
+            </div>
+          ) : filtered.map(job=>(
+            <div key={job.id} style={{background:"white",border:"1.5px solid var(--bo)",borderRadius:14,padding:"16px 20px",marginBottom:10,display:"flex",flexWrap:"wrap",gap:12,alignItems:"flex-start",transition:"box-shadow .18s"}}>
+              <div style={{flex:1,minWidth:200}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700}}>{job.stelle}</div>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:prioCol[job.prio],flexShrink:0}} title={job.prio}/>
+                </div>
+                <div style={{fontSize:13,color:"var(--mu)",marginBottom:job.notiz?6:0}}>{job.firma} · {job.datum}</div>
+                {job.notiz && <div style={{fontSize:12,color:"var(--mu)",background:"var(--bos)",borderRadius:6,padding:"4px 9px",display:"inline-block"}}>{job.notiz}</div>}
               </div>
-
-              {/* Limit banner */}
-              {!canChat && (
-                <div style={{ padding: "10px 14px", background: "rgba(245,158,11,.08)", borderTop: "1px solid rgba(245,158,11,.15)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                  <div style={{ fontSize: 12, color: "rgba(245,158,11,.8)" }}>{L("Gratis-Limit erreicht", "Free limit reached", "Limite atteint", "Limite raggiunto")}</div>
-                  <button onClick={() => setPw(true)} style={{ background: "var(--am)", color: "white", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>Pro →</button>
-                </div>
-              )}
-
-              {/* Upload preview */}
-              {uploadFile && (
-                <div style={{ padding: "6px 14px", background: "rgba(16,185,129,.08)", borderTop: "1px solid rgba(16,185,129,.15)", display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--em)" }}>
-                  <span>📎 {uploadFile.name}</span>
-                  <button onClick={() => { setUploadFile(null); setUploadText(""); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "rgba(255,255,255,.4)", cursor: "pointer", fontSize: 14, lineHeight: 1 }}>✕</button>
-                </div>
-              )}
-
-              {/* Input area */}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,.07)", padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-                  <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md" style={{ display: "none" }}
-                    onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
-                  <button onClick={() => fileRef.current?.click()}
-                    title={L("Datei hochladen", "Upload file", "Télécharger", "Carica")}
-                    style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
-                    📎
-                  </button>
-                  <textarea value={input} onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !loading && canChat) { e.preventDefault(); send(); } }}
-                    placeholder={canChat
-                      ? L("Frag mich etwas… (Enter = Senden)", "Ask anything… (Enter = send)", "Posez une question…", "Chiedimi qualcosa…")
-                      : L("Pro freischalten für mehr…", "Unlock Pro for more…", "Activer Pro…", "Sblocca Pro…")}
-                    disabled={!canChat || loading}
-                    style={{ flex: 1, background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 10, padding: "8px 11px", fontSize: 13, color: "white", resize: "none", minHeight: 36, maxHeight: 90, outline: "none", lineHeight: 1.5 }}
-                    rows={1} />
-                  <button onClick={send} disabled={!input.trim() || loading || !canChat}
-                    style={{ width: 36, height: 36, borderRadius: 10, background: input.trim() && canChat ? "var(--em)" : "rgba(255,255,255,.08)", border: "none", cursor: input.trim() && canChat ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0, transition: "background .2s" }}>
-                    {loading ? "⏳" : "➤"}
-                  </button>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,.2)" }}>
-                    {L("Stella kann Fehler machen.", "Stella can make mistakes.", "Stella peut se tromper.", "Stella può sbagliare.")}
-                  </div>
-                  {msgs.some(m => m.r === "ai") && (
-                    <button onClick={downloadAnswer} style={{ fontSize: 10, color: "var(--em)", background: "none", border: "none", cursor: "pointer", whiteSpace: "nowrap" }}>
-                      💾 {L("Speichern", "Save", "Enregistrer", "Salva")}
-                    </button>
-                  )}
-                </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                <select value={job.status} onChange={e=>changeStatus(job.id,e.target.value)}
+                  style={{padding:"5px 10px",borderRadius:8,border:"1.5px solid",borderColor:STATUS[job.status].col,background:STATUS[job.status].bg,color:STATUS[job.status].col,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--bd)"}}>
+                  {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v[lang]||v.de}</option>)}
+                </select>
+                <button onClick={()=>openEdit(job)} style={{background:"none",border:"1px solid var(--bo)",borderRadius:8,padding:"5px 10px",fontSize:12,cursor:"pointer",fontFamily:"var(--bd)",color:"var(--ink)"}}>✏️</button>
+                <button onClick={()=>del(job.id)} style={{background:"none",border:"1px solid rgba(239,68,68,.2)",borderRadius:8,padding:"5px 10px",fontSize:12,cursor:"pointer",color:"#ef4444",fontFamily:"var(--bd)"}}>✕</button>
               </div>
-            </>
-          )}
+            </div>
+          ))}
         </div>
       )}
 
-      <style>{`
-        @keyframes pulse { 0%,100%{transform:scale(1);opacity:.7} 50%{transform:scale(1.3);opacity:1} }
-        @keyframes fadeSlideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-      `}</style>
-    </>
+      {/* Modal */}
+      {modal && (
+        <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)setModal(null)}}>
+          <div className="mod" style={{maxWidth:520}}>
+            <h2 style={{marginBottom:20}}>{modal.mode==="add"?L("Neue Bewerbung","New application","Nouvelle candidature","Nuova candidatura"):L("Bearbeiten","Edit","Modifier","Modifica")}</h2>
+            <div className="fg2" style={{textAlign:"left"}}>
+              <div className="field"><label>{L("Stelle *","Position *","Poste *","Posizione *")}</label><input value={form.stelle} onChange={e=>setForm(f=>({...f,stelle:e.target.value}))} placeholder={L("z.B. Product Manager","e.g. Product Manager","ex. Chef de produit","es. Product Manager")}/></div>
+              <div className="field"><label>{L("Firma *","Company *","Entreprise *","Azienda *")}</label><input value={form.firma} onChange={e=>setForm(f=>({...f,firma:e.target.value}))} placeholder={L("z.B. Nestlé AG","e.g. Nestlé AG","ex. Nestlé SA","es. Nestlé SA")}/></div>
+              <div className="field"><label>{L("Datum","Date","Date","Data")}</label><input type="date" value={form.datum} onChange={e=>setForm(f=>({...f,datum:e.target.value}))}/></div>
+              <div className="field"><label>Status</label>
+                <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} style={{width:"100%",padding:"10px 13px",border:"1.5px solid var(--bo)",borderRadius:10,fontFamily:"var(--bd)",fontSize:14,background:"#fafafa"}}>
+                  {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v[lang]||v.de}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>{L("Priorität","Priority","Priorité","Priorità")}</label>
+                <select value={form.prio} onChange={e=>setForm(f=>({...f,prio:e.target.value}))} style={{width:"100%",padding:"10px 13px",border:"1.5px solid var(--bo)",borderRadius:10,fontFamily:"var(--bd)",fontSize:14,background:"#fafafa"}}>
+                  <option value="hoch">{L("Hoch","High","Haute","Alta")}</option>
+                  <option value="mittel">{L("Mittel","Medium","Moyenne","Media")}</option>
+                  <option value="tief">{L("Tief","Low","Basse","Bassa")}</option>
+                </select>
+              </div>
+            </div>
+            <div className="field" style={{textAlign:"left",marginTop:12}}>
+              <label>{L("Notiz","Note","Note","Nota")}</label>
+              <textarea value={form.notiz} onChange={e=>setForm(f=>({...f,notiz:e.target.value}))} placeholder={L("z.B. Nächster Schritt, Kontaktperson…","e.g. Next step, contact person…","ex. Prochaine étape, contact…","es. Prossimo passo, contatto…")} style={{width:"100%",padding:"10px 13px",border:"1.5px solid var(--bo)",borderRadius:10,fontFamily:"var(--bd)",fontSize:14,background:"#fafafa",minHeight:64,resize:"none"}}/>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:20}}>
+              <button className="btn b-outd" style={{flex:1}} onClick={()=>setModal(null)}>{L("Abbrechen","Cancel","Annuler","Annulla")}</button>
+              <button className="btn b-em" style={{flex:1}} onClick={save} disabled={!form.firma||!form.stelle}>{L("Speichern","Save","Enregistrer","Salva")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
+
+// ════════════════════════════════════════
+// 🔐 AUTH MODAL (Login / Registrierung / Admin)
+function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const [mode, setMode] = useState(defaultMode); // "login" | "register" | "admin"
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [plan, setPlan] = useState("pro");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+
+  function handleLogin(e) {
+    e.preventDefault(); setErr(""); setLoading(true);
+    setTimeout(()=>{
+      if(authIsAdmin(email,pw)){ onSuccess({email,plan:"admin",isAdmin:true}); return; }
+      const r = authLogin(email, pw);
+      if(r.ok) onSuccess(r.user);
+      else setErr(r.err);
+      setLoading(false);
+    },400);
+  }
+
+  function handleRegister(e) {
+    e.preventDefault(); setErr("");
+    if(!email.includes("@")) return setErr(L("Ungültige E-Mail.","Invalid email.","E-mail invalide.","E-mail non valida."));
+    if(pw.length<6) return setErr(L("Passwort mind. 6 Zeichen.","Password min. 6 chars.","Mot de passe min. 6 caractères.","Password min. 6 caratteri."));
+    if(pw!==pw2) return setErr(L("Passwörter stimmen nicht überein.","Passwords don't match.","Mots de passe différents.","Password non corrispondono."));
+    setLoading(true);
+    setTimeout(()=>{
+      const r = authRegister(email, pw, "free");
+      if(r.ok) onSuccess(r.user);
+      else setErr(r.err);
+      setLoading(false);
+    },400);
+  }
+
+  const inp = {background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",borderRadius:10,padding:"10px 13px",width:"100%",color:"white",fontFamily:"inherit",fontSize:14,outline:"none",boxSizing:"border-box"};
+
+  return (
+    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
+      <div className="mod" style={{maxWidth:420,textAlign:"left"}}>
+        {/* Mode Tabs */}
+        <div style={{display:"flex",gap:4,background:"rgba(255,255,255,.06)",borderRadius:12,padding:4,marginBottom:22}}>
+          {[["login",L("Einloggen","Sign in","Connexion","Accedi")],["register",L("Registrieren","Register","S'inscrire","Registrati")]].map(([m,lbl])=>(
+            <button key={m} onClick={()=>{setMode(m);setErr("");}}
+              style={{flex:1,padding:"8px 0",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"all .2s",
+                background:mode===m?"var(--em)":"transparent",color:mode===m?"white":"rgba(255,255,255,.4)"}}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+
+        {mode==="login" && <>
+          <h2 style={{fontSize:22,marginBottom:4}}>{L("Willkommen zurück 👋","Welcome back 👋","Bon retour 👋","Bentornato 👋")}</h2>
+          <p style={{marginBottom:20,color:"rgba(255,255,255,.4)",fontSize:13}}>{L("Logge dich ein und nutze alle deine Tools.","Sign in and use all your tools.","Connectez-vous et utilisez vos outils.","Accedi e usa tutti i tuoi strumenti.")}</p>
+          <form onSubmit={handleLogin} style={{display:"flex",flexDirection:"column",gap:12}}>
+            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp}/>
+            <div style={{position:"relative"}}>
+              <input type={showPw?"text":"password"} placeholder={L("Passwort","Password","Mot de passe","Password")} value={pw} onChange={e=>setPw(e.target.value)} required style={{...inp,paddingRight:40}}/>
+              <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.3)",fontSize:14}}>{showPw?"🙈":"👁"}</button>
+            </div>
+            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"6px 10px",background:"rgba(239,68,68,.08)",borderRadius:8}}>{err}</div>}
+            <button type="submit" className="btn b-em b-w" disabled={loading} style={{marginTop:4}}>
+              {loading?"⏳ …":L("Einloggen →","Sign in →","Connexion →","Accedi →")}
+            </button>
+          </form>
+          <div style={{textAlign:"center",marginTop:16,fontSize:12,color:"rgba(255,255,255,.25)"}}>
+            {L("Noch kein Account?","No account yet?","Pas encore de compte?","Nessun account?")} <button onClick={()=>setMode("register")} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:600,fontSize:12}}>
+              {L("Jetzt registrieren","Register now","S'inscrire","Registrati")}
+            </button>
+          </div>
+        </>}
+
+        {mode==="register" && <>
+          <h2 style={{fontSize:22,marginBottom:4}}>{L("Konto erstellen ✦","Create account ✦","Créer un compte ✦","Crea account ✦")}</h2>
+          <p style={{marginBottom:20,color:"rgba(255,255,255,.4)",fontSize:13}}>{L("Gratis registrieren – 20 Chat-Fragen inklusive.","Register free – 20 chat questions included.","Inscription gratuite – 20 questions incluses.","Registrazione gratuita – 20 domande incluse.")}</p>
+          <form onSubmit={handleRegister} style={{display:"flex",flexDirection:"column",gap:12}}>
+            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp}/>
+            <div style={{position:"relative"}}>
+              <input type={showPw?"text":"password"} placeholder={L("Passwort (mind. 6 Zeichen)","Password (min. 6 chars)","Mot de passe (min. 6 car.)","Password (min. 6 car.)")} value={pw} onChange={e=>setPw(e.target.value)} required style={{...inp,paddingRight:40}}/>
+              <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.3)",fontSize:14}}>{showPw?"🙈":"👁"}</button>
+            </div>
+            <input type="password" placeholder={L("Passwort wiederholen","Repeat password","Répétez le mot de passe","Ripeti password")} value={pw2} onChange={e=>setPw2(e.target.value)} required style={inp}/>
+            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"6px 10px",background:"rgba(239,68,68,.08)",borderRadius:8}}>{err}</div>}
+            <button type="submit" className="btn b-em b-w" disabled={loading} style={{marginTop:4}}>
+              {loading?"⏳ …":L("Konto erstellen →","Create account →","Créer un compte →","Crea account →")}
+            </button>
+          </form>
+          <div style={{textAlign:"center",marginTop:16,fontSize:12,color:"rgba(255,255,255,.25)"}}>
+            {L("Bereits ein Konto?","Already have an account?","Déjà un compte?","Hai già un account?")} <button onClick={()=>setMode("login")} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:600,fontSize:12}}>
+              {L("Einloggen","Sign in","Connexion","Accedi")}
+            </button>
+          </div>
+        </>}
+
+        <div style={{textAlign:"center",marginTop:18}}>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",cursor:"pointer",fontSize:12}}>
+            {L("Schliessen","Close","Fermer","Chiudi")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════
+// 🛡️ ADMIN DASHBOARD
+function AdminDashboard({ lang, onClose }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const [tab, setTab] = useState("users");
+  const [search, setSearch] = useState("");
+  const users = authGetUsers();
+  const chats = (() => { try { return JSON.parse(localStorage.getItem("stf_chats")||"[]"); } catch { return []; }})();
+
+  const filtered = users.filter(u=>
+    u.email.includes(search.toLowerCase()) || (u.plan||"").includes(search.toLowerCase())
+  );
+
+  const stats = {
+    total: users.length,
+    pro: users.filter(u=>u.plan==="pro").length,
+    family: users.filter(u=>u.plan==="family").length,
+    unlimited: users.filter(u=>u.plan==="unlimited").length,
+    free: users.filter(u=>!u.plan||u.plan==="free").length,
+  };
+
+  const PLAN_COLORS = {pro:"#10b981",family:"#6366f1",unlimited:"#f59e0b",free:"rgba(255,255,255,.2)"};
+
+  return (
+    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
+      <div className="mod" style={{maxWidth:700,textAlign:"left",maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div>
+            <h2 style={{fontSize:22,margin:0}}>🛡️ Admin Dashboard</h2>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>{C.name} · {C.domain}</div>
+          </div>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,padding:"6px 12px",color:"rgba(255,255,255,.5)",cursor:"pointer",fontSize:12}}>✕ Schliessen</button>
+        </div>
+
+        {/* Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
+          {[["👥","Total",stats.total,"rgba(255,255,255,.06)"],["✦","Pro",stats.pro,"rgba(16,185,129,.1)"],["👨‍👩‍👧","Familie",stats.family,"rgba(99,102,241,.1)"],["♾️","Unlim.",stats.unlimited,"rgba(245,158,11,.1)"]].map(([ico,lbl,val,bg])=>(
+            <div key={lbl} style={{background:bg,border:"1px solid rgba(255,255,255,.08)",borderRadius:12,padding:"12px 14px",textAlign:"center"}}>
+              <div style={{fontSize:20}}>{ico}</div>
+              <div style={{fontFamily:"var(--hd)",fontSize:22,fontWeight:800,color:"white",lineHeight:1}}>{val}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.3)",marginTop:2}}>{lbl}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:4,background:"rgba(255,255,255,.04)",borderRadius:10,padding:4,marginBottom:16}}>
+          {[["users",L("Nutzer","Users","Utilisateurs","Utenti")],["chats","Chats"]].map(([t,l])=>(
+            <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 0",borderRadius:7,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,background:tab===t?"rgba(255,255,255,.1)":"transparent",color:tab===t?"white":"rgba(255,255,255,.35)"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {tab==="users" && <>
+          <input placeholder={L("Suchen…","Search…","Rechercher…","Cerca…")} value={search} onChange={e=>setSearch(e.target.value)}
+            style={{width:"100%",padding:"9px 13px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"white",fontFamily:"inherit",fontSize:13,outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
+          {filtered.length===0 && <div style={{textAlign:"center",padding:24,color:"rgba(255,255,255,.25)",fontSize:13}}>Keine Nutzer gefunden</div>}
+          {filtered.map(u=>(
+            <div key={u.email} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
+                {u.plan==="family"?"👨‍👩‍👧":u.plan==="unlimited"?"♾️":u.plan==="pro"?"✦":"👤"}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:"white",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:1}}>
+                  {new Date(u.activatedAt||0).toLocaleDateString("de-CH")} · {(u.members||[]).length}/{u.seats} Seats
+                </div>
+              </div>
+              <div style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:`${PLAN_COLORS[u.plan]||PLAN_COLORS.free}22`,color:PLAN_COLORS[u.plan]||"rgba(255,255,255,.4)",border:`1px solid ${PLAN_COLORS[u.plan]||"rgba(255,255,255,.1)"}44`,flexShrink:0,textTransform:"uppercase"}}>
+                {u.plan||"Free"}
+              </div>
+            </div>
+          ))}
+        </>}
+
+        {tab==="chats" && <>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.3)",marginBottom:12}}>{chats.length} {L("gespeicherte Chats (aktuelle Session)","saved chats (current session)","chats enregistrés","chat salvate")}</div>
+          {chats.slice(0,20).map((c,i)=>(
+            <div key={c.id||i} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",borderRadius:10,padding:"10px 13px",marginBottom:6}}>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.7)"}}>{c.title||"Chat"}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.25)",marginTop:2}}>{c.msgs?.length||0} Nachrichten · {new Date(c.ts||0).toLocaleString("de-CH")}</div>
+            </div>
+          ))}
+        </>}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════
+// 👤 PROFIL-MANAGER MODAL
+function ProfileManager({ lang, onClose, onSelect }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const [profiles, setProfiles] = useState(() => loadProfiles());
+  const [activeId, setActiveId] = useState(() => loadActiveProfileId());
+  const [editing, setEditing] = useState(null); // null | {mode:"new"} | {mode:"edit", id}
+  const EMPTY = {name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:"",emoji:"👤"};
+  const [form, setForm] = useState(EMPTY);
+
+  const EMOJIS = ["👤","👨‍💼","👩‍💼","👨‍💻","👩‍💻","👨‍🔬","👩‍🔬","👨‍🎓","👩‍🎓","🧑‍⚕️","🧑‍🏫","🧑‍🎨","🧑‍🔧"];
+
+  function openNew() { setForm({...EMPTY, id: "p"+Date.now()}); setEditing({mode:"new"}); }
+  function openEdit(p) { setForm({...p}); setEditing({mode:"edit",id:p.id}); }
+
+  function save() {
+    if(!form.name) return;
+    let updated;
+    if(editing.mode==="new") {
+      updated = [...profiles, {...form, id: form.id||("p"+Date.now())}];
+    } else {
+      updated = profiles.map(p => p.id===editing.id ? {...form, id:editing.id} : p);
+    }
+    setProfiles(updated);
+    saveProfiles(updated);
+    setEditing(null);
+  }
+
+  function del(id) {
+    const updated = profiles.filter(p => p.id !== id);
+    setProfiles(updated);
+    saveProfiles(updated);
+    if(activeId === id) {
+      const next = updated[0];
+      setActiveId(next ? next.id : null);
+      saveActiveProfileId(next ? next.id : "");
+      onSelect(next || null);
+    }
+  }
+
+  function activate(profile) {
+    setActiveId(profile.id);
+    saveActiveProfileId(profile.id);
+    onSelect(profile);
+    onClose();
+  }
+
+  if(editing) return (
+    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)setEditing(null)}}>
+      <div className="mod" style={{maxWidth:500,textAlign:"left"}}>
+        <h2 style={{marginBottom:4,fontSize:22}}>{editing.mode==="new"?L("Neues Profil","New profile","Nouveau profil","Nuovo profilo"):L("Profil bearbeiten","Edit profile","Modifier profil","Modifica profilo")}</h2>
+        <p style={{marginBottom:18}}>{L("Angaben werden für alle Tools verwendet.","Used across all tools.","Utilisé pour tous les outils.","Usato per tutti gli strumenti.")}</p>
+
+        {/* Emoji Picker */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase",color:"rgba(255,255,255,.3)",marginBottom:8}}>{L("Avatar","Avatar","Avatar","Avatar")}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {EMOJIS.map(e=><button key={e} onClick={()=>setForm(f=>({...f,emoji:e}))}
+              style={{width:36,height:36,borderRadius:8,border:`2px solid ${form.emoji===e?"var(--em)":"rgba(255,255,255,.1)"}`,background:form.emoji===e?"rgba(16,185,129,.15)":"rgba(255,255,255,.04)",fontSize:18,cursor:"pointer",transition:"all .15s"}}>{e}</button>)}
+          </div>
+        </div>
+
+        <div className="fg2" style={{gap:10}}>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Name *","Name *","Nom *","Nome *")}</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder={L("z.B. Max Muster","e.g. John Doe","ex. Jean Dupont","es. Mario Rossi")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Aktueller Beruf","Current job","Emploi actuel","Lavoro attuale")}</label><input value={form.beruf} onChange={e=>setForm(f=>({...f,beruf:e.target.value}))} placeholder={L("z.B. Product Manager","e.g. Product Manager","ex. Chef de produit","es. Product Manager")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Erfahrung (Jahre)","Experience (years)","Expérience (ans)","Esperienza (anni)")}</label><input value={form.erfahrung} onChange={e=>setForm(f=>({...f,erfahrung:e.target.value}))} placeholder="z.B. 5" type="number" min="0" max="50" style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Sprachen","Languages","Langues","Lingue")}</label><input value={form.sprachen} onChange={e=>setForm(f=>({...f,sprachen:e.target.value}))} placeholder={L("z.B. DE, EN, FR","e.g. EN, DE, FR","ex. FR, DE, EN","es. IT, DE, EN")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+        </div>
+        <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Skills","Skills","Compétences","Skills")}</label><textarea value={form.skills} onChange={e=>setForm(f=>({...f,skills:e.target.value}))} placeholder={L("z.B. Python, Projektmanagement, Teamführung","e.g. Python, project management, team leadership","ex. Python, gestion de projet","es. Python, gestione progetti")} style={{width:"100%",padding:"10px 13px",background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",borderRadius:10,color:"white",fontFamily:"var(--bd)",fontSize:14,minHeight:60,resize:"none"}}/></div>
+        <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Ausbildung","Education","Formation","Formazione")}</label><input value={form.ausbildung} onChange={e=>setForm(f=>({...f,ausbildung:e.target.value}))} placeholder={L("z.B. BSc Wirtschaftsinformatik, Uni Bern","e.g. BSc Business IT, Uni Berne","ex. BSc Informatique, Uni Berne","es. BSc Informatica, Uni Berna")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+
+        <div style={{display:"flex",gap:10,marginTop:20}}>
+          <button className="btn b-outd" style={{flex:1,borderColor:"rgba(255,255,255,.15)",color:"rgba(255,255,255,.6)"}} onClick={()=>setEditing(null)}>{L("Abbrechen","Cancel","Annuler","Annulla")}</button>
+          <button className="btn b-em" style={{flex:1}} onClick={save} disabled={!form.name}>{L("Speichern","Save","Enregistrer","Salva")}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
+      <div className="mod" style={{maxWidth:480,textAlign:"left",maxHeight:"85vh",overflowY:"auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+          <h2 style={{fontSize:22,margin:0}}>{L("Profile","Profiles","Profils","Profili")}</h2>
+          <button onClick={openNew} className="btn b-em b-sm">+ {L("Neu","New","Nouveau","Nuovo")}</button>
+        </div>
+
+        {profiles.length===0 && (
+          <div style={{textAlign:"center",padding:"32px 20px",color:"rgba(255,255,255,.3)",fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:10}}>👤</div>
+            <div>{L("Noch kein Profil. Erstelle dein erstes Profil.","No profile yet. Create your first profile.","Pas encore de profil. Créez votre premier profil.","Nessun profilo. Crea il tuo primo profilo.")}</div>
+          </div>
+        )}
+
+        {profiles.map(p=>(
+          <div key={p.id} style={{background:p.id===activeId?"rgba(16,185,129,.08)":"rgba(255,255,255,.04)",border:`1.5px solid ${p.id===activeId?"rgba(16,185,129,.3)":"rgba(255,255,255,.08)"}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:44,height:44,borderRadius:"50%",background:p.id===activeId?"rgba(16,185,129,.2)":"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0,border:`2px solid ${p.id===activeId?"var(--em)":"rgba(255,255,255,.1)"}`}}>{p.emoji||"👤"}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:700,color:p.id===activeId?"var(--em)":"white",display:"flex",alignItems:"center",gap:8}}>
+                {p.name}
+                {p.id===activeId && <span style={{fontSize:10,background:"rgba(16,185,129,.2)",color:"var(--em)",padding:"1px 7px",borderRadius:20,fontWeight:700}}>AKTIV</span>}
+              </div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>{p.beruf||"–"}{p.erfahrung?` · ${p.erfahrung} J.`:""}{p.sprachen?` · ${p.sprachen}`:""}</div>
+            </div>
+            <div style={{display:"flex",gap:6,flexShrink:0}}>
+              <button onClick={()=>activate(p)}
+                style={{padding:"5px 12px",borderRadius:8,border:"none",background:p.id===activeId?"var(--em)":"rgba(255,255,255,.1)",color:p.id===activeId?"white":"rgba(255,255,255,.6)",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"var(--bd)"}}>
+                {p.id===activeId?"✓":L("Wählen","Select","Choisir","Scegli")}
+              </button>
+              <button onClick={()=>openEdit(p)} style={{padding:"5px 9px",borderRadius:8,border:"1px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.5)",fontSize:12,cursor:"pointer"}}>✏️</button>
+              <button onClick={()=>del(p.id)} style={{padding:"5px 9px",borderRadius:8,border:"1px solid rgba(239,68,68,.15)",background:"rgba(239,68,68,.06)",color:"#ef4444",fontSize:12,cursor:"pointer"}}>✕</button>
+            </div>
+          </div>
+        ))}
+
+        <button className="btn b-outd b-w" style={{marginTop:8,borderColor:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.5)"}} onClick={onClose}>{L("Schliessen","Close","Fermer","Chiudi")}</button>
+      </div>
+    </div>
+  );
+}
 
 // ════════════════════════════════════════
 export default function App() {
@@ -2686,13 +3183,18 @@ export default function App() {
   const [page,setPage]=useState("landing");
   const [pro,setPro]=useState(false); const [usage,setUsage]=useState(0); const [proUsage,setProUsage]=useState(0);
   const [pw,setPw]=useState(false); const [yearly,setYearly]=useState(false);
-  const [showLogin,setShowLogin]=useState(false);
-  const [userEmail,setUserEmail]=useState(()=>{try{return localStorage.getItem("stf_email")||"";}catch{return "";}});
-  const [pwLoginMode,setPwLoginMode]=useState(false);
-  const [pwEmail,setPwEmail]=useState("");
-  const [pwCode,setPwCode]=useState("");
-  const [pwErr,setPwErr]=useState("");
-  const [unlimited,setUnlimited]=useState(()=>isUnlimited());
+  // Auth
+  const [authSession, setAuthSession] = useState(()=>authGetSession());
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [showAdmin, setShowAdmin] = useState(false);
+  // Multi-Profil
+  const [showProfiles, setShowProfiles] = useState(false);
+  const [activeProfile, setActiveProfile] = useState(()=>{
+    const id = loadActiveProfileId();
+    if(!id) return null;
+    return loadProfiles().find(p=>p.id===id) || null;
+  });
   // app state
   const [step,setStep]=useState(0); const [docType,setDocType]=useState("motivation");
   const [tab,setTab]=useState(0); const [streaming,setStreaming]=useState(false);
@@ -2700,7 +3202,12 @@ export default function App() {
   const [copied,setCopied]=useState(false);
   const [results,setResults]=useState({motivation:"",lebenslauf:""});
   const [job,setJob]=useState({title:"",company:"",desc:"",branch:""});
-  const [prof,setProf]=useState({name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:""});
+  const [prof,setProf]=useState(()=>{
+    const id = loadActiveProfileId();
+    if(!id) return {name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:""};
+    const p = loadProfiles().find(x=>x.id===id);
+    return p ? {name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""} : {name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:""};
+  });
   const [appDoc,setAppDoc]=useState(null); // uploaded CV for app page
   const [ck,setCk]=useState({});
   const [eTo,setETo]=useState(""); const [eSub,setESub]=useState(""); const [eMsg,setEMsg]=useState("");
@@ -2753,10 +3260,16 @@ export default function App() {
   useEffect(()=>{
     window.scrollTo(0,0);
     const p=new URLSearchParams(window.location.search);
-    if(p.get("pro")==="activated"){actPro();setPro(true);window.history.replaceState({},"",window.location.pathname);}
-    if(p.get("unlimited")==="activated"){actUnlimited();setPro(true);setUnlimited(true);window.history.replaceState({},"",window.location.pathname);}
-    const em = p.get("email"); if(em){saveEmail(em); setUserEmail(em);}
-    setUsage(getU().count); setProUsage(getProCount()); setPro(isPro());
+    if(p.get("pro")==="activated"){
+      actPro();setPro(true);window.history.replaceState({},"",window.location.pathname);
+      // Upgrade session if logged in
+      const sess = authGetSession();
+      if(sess) { authUpgradePlan(sess.email,"pro"); setAuthSession({...sess,plan:"pro"}); }
+    }
+    setUsage(getU().count); setProUsage(getProCount());
+    const sess = authGetSession();
+    if(sess) { setAuthSession(sess); if(sess.plan==="pro"||sess.plan==="family"||sess.plan==="unlimited") setPro(true); else setPro(isPro()); }
+    else setPro(isPro());
   },[page]);
   useEffect(()=>{if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight;},[icMsgs]);
   useEffect(()=>{if(job.title&&prof.name)setESub(`Bewerbung als ${job.title} – ${prof.name}`);},[job.title,prof.name]);
@@ -2861,20 +3374,46 @@ Antworte NUR mit JSON:
           <button className="nlk" style={{color:lc}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"}),100)}}>{t.nav.prices}</button>
           {pro&&<button className="nlk" style={{color:lc}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("faq")?.scrollIntoView({behavior:"smooth"}),100)}}>FAQ</button>}
           <button className="nlk" style={{color:"var(--em)",fontWeight:700}} onClick={()=>navTo("chat")}>💬 Stella</button>
-          {pro && userEmail ? (
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <div style={{fontSize:12,color:dark?"rgba(255,255,255,.6)":"var(--mu)",fontWeight:500}}>
-                👤 {userEmail.split("@")[0]}
+          {/* Profil-Button */}
+          <button onClick={()=>setShowProfiles(true)}
+            style={{display:"flex",alignItems:"center",gap:6,background:activeProfile?"rgba(16,185,129,.12)":"rgba(11,11,18,.06)",border:"1.5px solid",borderColor:activeProfile?"rgba(16,185,129,.25)":"var(--bo)",borderRadius:20,padding:"5px 12px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:600,color:activeProfile?"var(--em2)":dark?"rgba(255,255,255,.5)":"var(--mu)",transition:"all .2s"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--em)";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor=activeProfile?"rgba(16,185,129,.25)":"var(--bo)";}}>
+            <span style={{fontSize:14}}>{activeProfile?.emoji||"👤"}</span>
+            <span style={{maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeProfile?.name||(lang==="fr"?"Profil":lang==="it"?"Profilo":"Profil")}</span>
+            <span style={{fontSize:10,opacity:.6}}>▾</span>
+          </button>
+          {/* Login/User Button */}
+          {authSession ? (
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              {authSession.isAdmin && <button onClick={()=>setShowAdmin(true)}
+                style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(245,158,11,.3)",background:"rgba(245,158,11,.1)",color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                🛡️ Admin
+              </button>}
+              <div style={{position:"relative"}} className="user-menu-wrap">
+                <button onClick={()=>{
+                  if(window.confirm(lang==="de"?`Abmelden von ${authSession.email}?`:`Sign out from ${authSession.email}?`)){
+                    authClearSession(); setAuthSession(null); if(!isPro()) setPro(false);
+                  }
+                }} style={{display:"flex",alignItems:"center",gap:7,background:"linear-gradient(135deg,rgba(16,185,129,.18),rgba(16,185,129,.06))",border:"1.5px solid rgba(16,185,129,.35)",borderRadius:24,padding:"5px 14px 5px 5px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:700,color:"var(--em2)",transition:"all .2s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--em)";e.currentTarget.style.transform="translateY(-1px)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(16,185,129,.35)";e.currentTarget.style.transform="none";}}>
+                  <div style={{width:24,height:24,borderRadius:"50%",background:"linear-gradient(135deg,var(--em),#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"white",flexShrink:0}}>{authSession.email[0].toUpperCase()}</div>
+                  <span style={{maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{authSession.email.split("@")[0]}</span>
+                  <span style={{fontSize:9,opacity:.4}}>▾</span>
+                </button>
               </div>
-              <button className="nlk" style={{color:"#ef4444",fontSize:11}} onClick={()=>{clearUser();setPro(false);setUserEmail("");}}>
-                Logout
-              </button>
             </div>
-          ) : pro ? (
-            <span style={{fontSize:11,fontWeight:700,color:"var(--em)",background:"rgba(16,185,129,.1)",padding:"3px 10px",borderRadius:20}}>✦ PRO</span>
           ) : (
-            <button className="nc" onClick={()=>setPw(true)}>{lang==="de"?"Pro freischalten":lang==="fr"?"Activer Pro":lang==="it"?"Attiva Pro":"Unlock Pro"} →</button>
+            <button onClick={()=>{setAuthMode("login");setShowAuth(true);}}
+              style={{display:"flex",alignItems:"center",gap:7,background:"linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05))",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:24,padding:"6px 14px 6px 6px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:700,color:"var(--em2)",transition:"all .2s"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--em)";e.currentTarget.style.background="linear-gradient(135deg,rgba(16,185,129,.25),rgba(16,185,129,.1))";e.currentTarget.style.transform="translateY(-1px)";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(16,185,129,.3)";e.currentTarget.style.background="linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05))";e.currentTarget.style.transform="none";}}>
+              <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(16,185,129,.2)",border:"1px solid rgba(16,185,129,.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>👤</div>
+              {lang==="de"?"Einloggen":lang==="fr"?"Connexion":lang==="it"?"Accedi":"Sign in"}
+            </button>
           )}
+          <button className="nc" onClick={()=>navTo("app")}>{lang==="de"?"Kostenlos starten":lang==="fr"?"Commencer":lang==="it"?"Inizia":"Start free"} →</button>
         </div>
         {/* Mobile hamburger */}
         <button className="ham" onClick={()=>setMOpen(v=>!v)} style={{background:"none",border:"none",cursor:"pointer",display:"none",flexDirection:"column",gap:4,padding:4,color:dark?"white":"var(--ink)"}}>
@@ -2903,12 +3442,12 @@ Antworte NUR mit JSON:
   const Footer=()=>(
     <footer>
       {/* Trust bar above footer */}
-      <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",maxWidth:1200,margin:"0 auto",padding:"0 0 36px",marginBottom:0}}>
+      <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:28,marginBottom:36,maxWidth:1200,margin:"0 auto 0",padding:"0 0 24px"}}>
         <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:"10px 32px"}}>
           {[
             {ico:"🔒",txt:lang==="de"?"Keine Datenspeicherung":lang==="fr"?"Aucun stockage de données":lang==="it"?"Nessuna memorizzazione":"No data storage"},
             {ico:"🇨🇭",txt:lang==="de"?"Schweizer Unternehmen, Zug":lang==="fr"?"Société suisse, Zoug":lang==="it"?"Azienda svizzera, Zugo":"Swiss company, Zug"},
-            {ico:"⚡",txt:lang==="de"?"Powered by Groq AI":lang==="fr"?"Propulsé par Groq AI":lang==="it"?"Alimentato da Groq AI":"Powered by Groq AI"},
+            {ico:"⚡",txt:lang==="de"?"Powered by Claude AI":lang==="fr"?"Propulsé par Claude AI":lang==="it"?"Alimentato da Claude AI":"Powered by Claude AI"},
             {ico:"💳",txt:lang==="de"?"Sichere Zahlung via Stripe":lang==="fr"?"Paiement sécurisé via Stripe":lang==="it"?"Pagamento sicuro via Stripe":"Secure payment via Stripe"},
           ].map((tr,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:7,fontSize:12,color:"rgba(255,255,255,.3)",fontWeight:500}}>
@@ -2941,7 +3480,6 @@ Antworte NUR mit JSON:
         </div>
         <div className="fcol">
           <h5>{lang==="de"?"Schule & Produktivität":lang==="fr"?"École & Productivité":lang==="it"?"Scuola & Produttività":"School & Productivity"}</h5>
-          <button onClick={()=>navTo("li2job")} style={{fontWeight:700,color:"rgba(255,255,255,.6)"}}>🔗 {lang==="de"?"LinkedIn → Bewerbung":lang==="fr"?"LinkedIn → Candidature":lang==="it"?"LinkedIn → Candidatura":"LinkedIn → Application"}</button>
           {GENERIC_TOOLS.map(g=><button key={g.id} onClick={()=>navTo(g.id)}>{g.ico} {g.t[lang]}</button>)}
         </div>
         <div className="fcol"><h5>{t.legal.legalL}</h5>
@@ -2963,75 +3501,16 @@ Antworte NUR mit JSON:
     </footer>
   );
 
-  const doLogin=async()=>{
-    if(!pwEmail.includes("@")){setPwErr(lang==="de"?"Bitte gültige E-Mail eingeben":"Please enter a valid email");return;}
-    setPwErr(lang==="de"?"⏳ Wird geprüft...":"⏳ Verifying...");
-    const valid = await verifyCode(pwEmail, pwCode);
-    if(valid){
-      actPro(); saveEmail(pwEmail); setPro(true); setUserEmail(pwEmail); setPw(false); setPwErr(""); setPwLoginMode(false);
-    } else {
-      setPwErr(lang==="de"?"❌ Ungültiger Code. Stelle sicher, dass E-Mail und Code übereinstimmen.":"❌ Invalid code. Make sure email and code match.");
-    }
-  };
   const PW=()=>(
     <div className="mbg" onClick={e=>e.target===e.currentTarget&&setPw(false)}>
       <div className="mod">
-        {!pwLoginMode ? (<>
-          <div style={{fontSize:32,marginBottom:10}}>✦</div>
-          <h2>{t.modal.title}</h2><p>{t.modal.sub}</p>
-          <div style={{display:"flex",gap:8,marginBottom:16,borderBottom:"1px solid var(--bo)",paddingBottom:16}}>
-            <div style={{flex:1,textAlign:"center",padding:"10px",borderRadius:10,background:"rgba(16,185,129,.08)",border:"1.5px solid var(--em)"}}>
-              <div style={{fontWeight:800,fontSize:16}}>CHF {C.priceM}</div>
-              <div style={{fontSize:11,color:"var(--mu)"}}>Monatlich</div>
-            </div>
-            <div style={{flex:1,textAlign:"center",padding:"10px",borderRadius:10,background:"rgba(16,185,129,.08)",border:"1.5px solid var(--em)",position:"relative"}}>
-              <div style={{position:"absolute",top:-8,right:8,background:"var(--em)",color:"white",fontSize:9,fontWeight:700,borderRadius:20,padding:"2px 7px"}}>–25%</div>
-              <div style={{fontWeight:800,fontSize:16}}>CHF {C.priceY}</div>
-              <div style={{fontSize:11,color:"var(--mu)"}}>Jährlich (CHF {(Number(C.priceY)*12).toFixed(2)}/Jahr)</div>
-            </div>
-          </div>
-          <div className="mod-fts">{t.modal.feats.map(([ico,tx])=><div key={tx} className="mod-f"><div className="mod-fi">{ico}</div>{tx}</div>)}</div>
-          <div style={{display:"flex",gap:8,marginTop:8}}>
-            <button className="btn b-em" style={{flex:1,fontSize:13}} onClick={()=>{setYearly(true);window.open(C.stripeYearly,"_blank");}}>
-              Jährlich – CHF {C.priceY}/Mo. 🔥
-            </button>
-            <button className="btn b-out" style={{flex:1,fontSize:13}} onClick={()=>{setYearly(false);window.open(C.stripeMonthly,"_blank");}}>
-              Monatlich – CHF {C.priceM}
-            </button>
-          </div>
-          <div className="mod-note">{t.modal.note}</div>
-          <button className="btn b-out b-sm" style={{marginTop:8,width:"100%",fontSize:11}} onClick={()=>setPwLoginMode(true)}>
-            ✦ Bereits Pro? Jetzt einloggen →
-          </button>
-          <button className="btn b-out b-sm" style={{marginTop:6,width:"100%"}} onClick={()=>setPw(false)}>{t.modal.close}</button>
-        </>) : (<>
-          <div style={{fontSize:28,marginBottom:8}}>🔑</div>
-          <h2 style={{fontSize:18,color:"white",fontFamily:"var(--hd)"}}>Pro-Account aktivieren</h2>
-          <div style={{background:"rgba(16,185,129,.08)",border:"1px solid rgba(16,185,129,.2)",borderRadius:10,padding:"10px 14px",fontSize:12,color:"rgba(255,255,255,.6)",lineHeight:1.6,marginBottom:12}}>
-            Nach dem Kauf erhältst du eine E-Mail von <strong style={{color:"var(--em)"}}>support@stellify.ch</strong> mit deinem persönlichen Aktivierungscode (Format: <span style={{fontFamily:"monospace",color:"var(--em)"}}>STF-XXXX-XXXX</span>).
-          </div>
-          <input
-            type="email" placeholder="Deine E-Mail-Adresse (wie beim Kauf)"
-            value={pwEmail} onChange={e=>{setPwEmail(e.target.value);setPwErr("");}}
-            onKeyDown={e=>e.key==="Enter"&&document.getElementById("stf-code-input")?.focus()}
-            style={{width:"100%",padding:"11px 14px",border:"1.5px solid var(--bo)",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box",background:"rgba(255,255,255,.05)",color:"white",outline:"none"}}
-            autoFocus
-          />
-          <input
-            id="stf-code-input"
-            type="text" placeholder="Aktivierungscode (z.B. STF-A1B2-C3D4)"
-            value={pwCode} onChange={e=>{setPwCode(e.target.value.toUpperCase());setPwErr("");}}
-            onKeyDown={e=>e.key==="Enter"&&doLogin()}
-            style={{width:"100%",padding:"11px 14px",border:"1.5px solid var(--bo)",borderRadius:10,fontSize:13,marginBottom:8,boxSizing:"border-box",background:"rgba(255,255,255,.05)",color:"white",outline:"none",fontFamily:"monospace",letterSpacing:1}}
-          />
-          {pwErr&&<div style={{background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.2)",borderRadius:8,padding:"8px 12px",color:"#f87171",fontSize:12,marginBottom:8}}>{pwErr}</div>}
-          <button className="btn b-em b-w" onClick={doLogin} style={{marginBottom:6}}>Aktivieren ✓</button>
-          <div style={{textAlign:"center",fontSize:11,color:"rgba(255,255,255,.3)",marginBottom:8}}>
-            Kein Code erhalten? <a href="mailto:support@stellify.ch?subject=Aktivierungscode fehlt" style={{color:"var(--em)",textDecoration:"none"}}>support@stellify.ch</a>
-          </div>
-          <button className="btn b-out b-sm" style={{marginTop:4,width:"100%",fontSize:11}} onClick={()=>setPwLoginMode(false)}>← Zurück</button>
-          <button className="btn b-out b-sm" style={{marginTop:6,width:"100%"}} onClick={()=>setPw(false)}>{t.modal.close}</button>
-        </>)}
+        <div style={{fontSize:32,marginBottom:10}}>✦</div>
+        <h2>{t.modal.title}</h2><p>{t.modal.sub}</p>
+        <div className="mod-pr">CHF {C.priceM}<span> / {lang==="en"?"mo":"Mo."}</span></div>
+        <div className="mod-fts">{t.modal.feats.map(([ico,tx])=><div key={tx} className="mod-f"><div className="mod-fi">{ico}</div>{tx}</div>)}</div>
+        <button className="btn b-em b-w" onClick={()=>window.open(stripeLink(),"_blank")}>{t.modal.btn}</button>
+        <div className="mod-note">{t.modal.note}</div>
+        <button className="btn b-out b-sm" style={{marginTop:9,width:"100%"}} onClick={()=>setPw(false)}>{t.modal.close}</button>
       </div>
     </div>
   );
@@ -3835,8 +4314,20 @@ NOTE: Incluse in tutte le diapositive`),
   );};
 
   // ══════════════════ LANDING PAGE ══════════════════
+  const authModals = <>
+    {showAuth&&<AuthModal lang={lang} onClose={()=>setShowAuth(false)} defaultMode={authMode}
+      onSuccess={(user)=>{
+        setAuthSession({email:user.email,plan:user.plan,isAdmin:user.isAdmin});
+        if(user.plan==="pro"||user.plan==="family"||user.plan==="unlimited"||user.isAdmin){actPro();setPro(true);}
+        setShowAuth(false);
+      }}/>}
+    {showAdmin&&<AdminDashboard lang={lang} onClose={()=>setShowAdmin(false)}/>}
+  </>;
+
   if(page==="landing") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    {authModals}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     {cookieBanner&&<CookieBanner lang={lang} onAccept={acceptCookie}/>}
     <div>
       <Nav/>
@@ -3897,16 +4388,16 @@ NOTE: Incluse in tutte le diapositive`),
               ))}
             </div>
             {/* Price strip – schlank */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginTop:16,flexWrap:"wrap"}}>
-              <div style={{display:"inline-flex",alignItems:"center",gap:14,background:"white",border:"1.5px solid rgba(16,185,129,.22)",borderRadius:40,padding:"12px 14px 12px 24px",boxShadow:"0 2px 12px rgba(16,185,129,.07)"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginTop:22,flexWrap:"wrap"}}>
+              <div style={{display:"inline-flex",alignItems:"center",gap:12,background:"white",border:"1.5px solid rgba(16,185,129,.22)",borderRadius:40,padding:"10px 10px 10px 20px",boxShadow:"0 2px 12px rgba(16,185,129,.07)"}}>
                 <div style={{fontSize:13,color:"var(--mu)",fontWeight:500}}>
                   {lang==="de"?"Ab":lang==="fr"?"Dès":lang==="it"?"Da":"From"}{" "}
                   <span style={{fontFamily:"var(--hd)",fontSize:17,fontWeight:800,color:"var(--ink)"}}>CHF {C.priceY}</span>
                   <span style={{fontSize:12,color:"var(--mu)"}}>/Mo.</span>
-                  <span style={{fontSize:11,color:"var(--mu)",marginLeft:3}}>{lang==="de"?"(bei Jahresabo)":lang==="fr"?"(annuel)":lang==="it"?"(annuale)":"(yearly)"}</span>
+                  <span style={{fontSize:10,color:"var(--mu)",fontStyle:"italic",marginLeft:2}}>{lang==="de"?"(jährlich)":lang==="fr"?"(annuel)":lang==="it"?"(annuale)":"(annual)"}</span>
                   <span style={{marginLeft:8,fontSize:11,background:"rgba(16,185,129,.1)",color:"var(--em2)",borderRadius:20,padding:"2px 9px",fontWeight:700}}>🔥 –25%</span>
                 </div>
-                <button onClick={()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"})} style={{background:"var(--em)",color:"white",border:"none",borderRadius:25,padding:"10px 20px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                <button onClick={()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"})} style={{background:"var(--em)",color:"white",border:"none",borderRadius:25,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
                   {lang==="de"?"Jetzt starten →":lang==="fr"?"Commencer →":lang==="it"?"Inizia →":"Get started →"}
                 </button>
               </div>
@@ -3928,39 +4419,133 @@ NOTE: Incluse in tutte le diapositive`),
           </div>
 
           {/* ✦ LI2JOB HERO CARD – Alleinstellungsmerkmal */}
-          <div onClick={()=>navTo("li2job")} style={{cursor:"pointer",background:"linear-gradient(135deg,#0a66c2,#004182)",border:"2px solid rgba(10,102,194,.6)",borderRadius:22,padding:"28px 30px",marginBottom:16,position:"relative",overflow:"hidden",transition:"all .25s"}}
-            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";e.currentTarget.style.boxShadow="0 24px 56px rgba(10,102,194,.35)";}}
-            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
-            <div style={{position:"absolute",top:-30,right:-30,width:160,height:160,background:"radial-gradient(circle,rgba(255,255,255,.07),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
-            <div style={{position:"absolute",bottom:-20,left:"40%",width:120,height:120,background:"radial-gradient(circle,rgba(255,255,255,.04),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-              <div style={{flex:1,minWidth:220}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                  <span style={{fontSize:11,fontWeight:800,background:"#fff",color:"#0a66c2",padding:"3px 11px",borderRadius:20,letterSpacing:"1px",textTransform:"uppercase"}}>✦ {lang==="de"?"NEU & EINZIGARTIG":lang==="en"?"NEW & UNIQUE":lang==="fr"?"NOUVEAU & UNIQUE":"NUOVO & UNICO"}</span>
-                  <span style={{fontSize:11,fontWeight:700,background:"rgba(255,255,255,.15)",color:"rgba(255,255,255,.8)",padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,.2)"}}>PRO</span>
+          <div onClick={()=>navTo("li2job")} style={{cursor:"pointer",background:"linear-gradient(135deg,#0a66c2 0%,#004182 55%,#003068 100%)",border:"none",borderRadius:24,padding:"0",marginBottom:20,position:"relative",overflow:"hidden",transition:"all .28s",boxShadow:"0 8px 40px rgba(10,102,194,.25)"}}
+            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-5px)";e.currentTarget.style.boxShadow="0 28px 64px rgba(10,102,194,.45)";}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 8px 40px rgba(10,102,194,.25)";}}>
+            {/* Background design elements */}
+            <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(rgba(255,255,255,.04) 1px,transparent 1px)",backgroundSize:"22px 22px",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",top:-60,right:-20,width:280,height:280,background:"radial-gradient(circle,rgba(255,255,255,.08),transparent 70%)",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",bottom:-40,left:-20,width:200,height:200,background:"radial-gradient(circle,rgba(10,102,194,.4),transparent 70%)",pointerEvents:"none"}}/>
+            {/* Content */}
+            <div style={{display:"flex",alignItems:"stretch",position:"relative"}}>
+              {/* Left: Main content */}
+              <div style={{flex:1,padding:"28px 30px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                  <span style={{fontSize:10,fontWeight:800,background:"white",color:"#0a66c2",padding:"4px 12px",borderRadius:20,letterSpacing:"1.5px",textTransform:"uppercase"}}>✦ {lang==="de"?"NEU & EINZIGARTIG":lang==="en"?"NEW & UNIQUE":lang==="fr"?"NOUVEAU":"UNICO"}</span>
+                  <span style={{fontSize:10,fontWeight:700,background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.85)",padding:"4px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,.2)",letterSpacing:"1px"}}>PRO</span>
                 </div>
-                <div style={{fontFamily:"var(--hd)",fontSize:24,fontWeight:800,color:"white",letterSpacing:"-.5px",marginBottom:8,lineHeight:1.1}}>
-                  🔗 {lang==="de"?"LinkedIn → Bewerbung":lang==="en"?"LinkedIn → Application":lang==="fr"?"LinkedIn → Candidature":"LinkedIn → Candidatura"}
+                <div style={{fontFamily:"var(--hd)",fontSize:"clamp(20px,2.5vw,28px)",fontWeight:900,color:"white",letterSpacing:"-1px",marginBottom:10,lineHeight:1.05}}>
+                  LinkedIn → {lang==="de"?"Bewerbung":lang==="en"?"Application":lang==="fr"?"Candidature":"Candidatura"}
                 </div>
-                <p style={{fontSize:14,color:"rgba(255,255,255,.65)",lineHeight:1.7,marginBottom:16,maxWidth:560}}>
-                  {lang==="de"?"Kopiere dein LinkedIn-Profil + das Stelleninserat – die KI erstellt automatisch Motivationsschreiben, Lebenslauf-Highlights und deine stärksten Argumente. In 30 Sekunden. Nirgendwo sonst.":
-                   lang==="en"?"Copy your LinkedIn profile + the job posting – AI automatically creates a cover letter, CV highlights and your strongest arguments. In 30 seconds. Nowhere else.":
-                   lang==="fr"?"Copiez votre profil LinkedIn + l'offre d'emploi – l'IA crée automatiquement lettre de motivation, points forts CV et vos meilleurs arguments. En 30 secondes.":
-                   "Copia il tuo profilo LinkedIn + l'offerta di lavoro – l'IA crea automaticamente lettera di motivazione, punti di forza CV e i tuoi argomenti più forti. In 30 secondi."}
+                <p style={{fontSize:13,color:"rgba(255,255,255,.62)",lineHeight:1.75,marginBottom:18,maxWidth:500}}>
+                  {lang==="de"?"Profil + Stelleninserat → KI erstellt Motivationsschreiben, CV-Highlights & Top-Argumente. In 30 Sekunden.":
+                   lang==="en"?"Profile + job posting → AI creates cover letter, CV highlights & top arguments. In 30 seconds.":
+                   lang==="fr"?"Profil + offre → l'IA crée lettre, points forts CV & arguments. En 30 secondes.":
+                   "Profilo + offerta → l'IA crea lettera, punti CV & argomenti. In 30 secondi."}
                 </p>
-                <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:18}}>
-                  {(lang==="de"?["✓ Motivationsschreiben","✓ Lebenslauf-Highlights","✓ 3 Killer-Argumente","✓ Auf Stelle zugeschnitten"]:
-                    lang==="en"?["✓ Cover letter","✓ CV highlights","✓ 3 killer arguments","✓ Tailored to position"]:
-                    lang==="fr"?["✓ Lettre de motivation","✓ Points forts CV","✓ 3 arguments clés","✓ Adapté au poste"]:
-                    ["✓ Lettera di motivazione","✓ Punti di forza CV","✓ 3 argomenti chiave","✓ Su misura"]).map((tag,j)=>(
-                    <span key={j} style={{fontSize:12,fontWeight:600,background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.8)",padding:"4px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,.15)"}}>{tag}</span>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:20}}>
+                  {(lang==="de"?["✓ Motivationsschreiben","✓ CV-Highlights","✓ 3 Killer-Argumente","✓ Auf Stelle zugeschnitten"]:
+                    lang==="en"?["✓ Cover letter","✓ CV highlights","✓ 3 killer arguments","✓ Job-tailored"]:
+                    lang==="fr"?["✓ Lettre de motivation","✓ Points forts CV","✓ 3 arguments","✓ Adapté"]:
+                    ["✓ Lettera","✓ Punti CV","✓ 3 argomenti","✓ Su misura"]).map((tag,j)=>(
+                    <span key={j} style={{fontSize:11,fontWeight:600,background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.78)",padding:"4px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,.12)",backdropFilter:"blur(4px)"}}>{tag}</span>
                   ))}
                 </div>
-                <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"white",color:"#0a66c2",padding:"11px 22px",borderRadius:11,fontSize:13,fontWeight:800}}>
-                  {lang==="de"?"Jetzt ausprobieren →":lang==="en"?"Try it now →":lang==="fr"?"Essayer maintenant →":"Prova ora →"}
+                <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"white",color:"#0a66c2",padding:"11px 24px",borderRadius:12,fontSize:13,fontWeight:800,boxShadow:"0 4px 16px rgba(0,0,0,.2)",letterSpacing:"-.2px"}}>
+                  {lang==="de"?"Jetzt ausprobieren →":lang==="en"?"Try it now →":lang==="fr"?"Essayer →":"Prova ora →"}
                 </div>
               </div>
-              <div style={{fontSize:72,opacity:.15,flexShrink:0,alignSelf:"center",display:"flex"}}>in</div>
+              {/* Right: LinkedIn "in" logo as bold design element */}
+              <div style={{width:140,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",borderLeft:"1px solid rgba(255,255,255,.08)",background:"rgba(0,0,0,.12)",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,transparent,rgba(0,0,0,.15))"}}/>
+                <div style={{fontFamily:"Georgia,serif",fontSize:96,fontWeight:900,color:"white",opacity:.18,lineHeight:1,letterSpacing:"-6px",userSelect:"none",transform:"rotate(-5deg)"}}>in</div>
+                <div style={{position:"absolute",bottom:16,right:16,width:36,height:36,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontFamily:"Georgia,serif",fontWeight:900,color:"white"}}>in</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ✦ LIPOST HERO CARD – LinkedIn-Post Generator */}
+          <div onClick={()=>navTo("lipost")} style={{cursor:"pointer",background:"linear-gradient(135deg,#001f3f 0%,#003d7a 50%,#0a66c2 100%)",border:"none",borderRadius:20,padding:"0",marginBottom:12,position:"relative",overflow:"hidden",transition:"all .25s",boxShadow:"0 4px 24px rgba(10,102,194,.18)"}}
+            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";e.currentTarget.style.boxShadow="0 20px 48px rgba(10,102,194,.35)";}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 4px 24px rgba(10,102,194,.18)";}}>
+            <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(rgba(255,255,255,.03) 1px,transparent 1px)",backgroundSize:"18px 18px",pointerEvents:"none"}}/>
+            <div style={{display:"flex",alignItems:"center",position:"relative"}}>
+              <div style={{flex:1,padding:"22px 26px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <span style={{fontSize:10,fontWeight:800,background:"linear-gradient(90deg,#0a66c2,#005fa3)",color:"white",padding:"3px 11px",borderRadius:20,letterSpacing:"1.5px",textTransform:"uppercase",border:"1px solid rgba(255,255,255,.2)"}}>✍️ {lang==="de"?"LINKEDIN POSTS":lang==="en"?"LINKEDIN POSTS":lang==="fr"?"POSTS LINKEDIN":"POSTS LINKEDIN"}</span>
+                  <span style={{fontSize:10,fontWeight:700,background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.75)",padding:"3px 9px",borderRadius:20,border:"1px solid rgba(255,255,255,.15)"}}>PRO</span>
+                </div>
+                <div style={{fontFamily:"var(--hd)",fontSize:"clamp(16px,2vw,21px)",fontWeight:800,color:"white",letterSpacing:"-.5px",marginBottom:7,lineHeight:1.1}}>
+                  {lang==="de"?"Automatische LinkedIn-Posts – Swiss-Style":lang==="en"?"Auto LinkedIn Posts – Swiss Style":lang==="fr"?"Posts LinkedIn automatiques":"Post LinkedIn automatici"}
+                </div>
+                <p style={{fontSize:12.5,color:"rgba(255,255,255,.55)",lineHeight:1.65,marginBottom:14,maxWidth:480}}>
+                  {lang==="de"?"3 massgeschneiderte Posts in Sekunden – keine Corporate-Floskeln, kein «Freue mich riesig». Sofort kopieren.":
+                   lang==="en"?"3 tailored posts in seconds – no corporate clichés. Copy immediately.":
+                   lang==="fr"?"3 posts sur mesure en secondes – pas de clichés. Copiez immédiatement.":
+                   "3 post su misura in secondi – niente cliché. Copia subito."}
+                </p>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
+                  {(lang==="de"?["✓ 3 Post-Varianten","✓ Neuer Job · Zertifikat · Insight","✓ Schweizer Stil","✓ Sofort kopierbar"]:
+                    lang==="en"?["✓ 3 post variants","✓ New job · Certificate · Insight","✓ Swiss style","✓ Copy instantly"]:
+                    lang==="fr"?["✓ 3 variantes","✓ Nouveau poste · Certificat","✓ Style suisse","✓ Prêt à copier"]:
+                    ["✓ 3 varianti","✓ Nuovo posto · Certificato","✓ Stile svizzero","✓ Copia subito"]).map((tag,j)=>(
+                    <span key={j} style={{fontSize:11,fontWeight:600,background:"rgba(255,255,255,.08)",color:"rgba(255,255,255,.7)",padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,.1)"}}>{tag}</span>
+                  ))}
+                </div>
+                <div style={{display:"inline-flex",alignItems:"center",gap:7,background:"rgba(255,255,255,.12)",color:"white",padding:"9px 20px",borderRadius:10,fontSize:12,fontWeight:700,border:"1px solid rgba(255,255,255,.18)"}}>
+                  {lang==="de"?"Post generieren →":lang==="en"?"Generate post →":lang==="fr"?"Générer post →":"Genera post →"}
+                </div>
+              </div>
+              {/* Right visual */}
+              <div style={{width:120,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,padding:"20px 16px",borderLeft:"1px solid rgba(255,255,255,.06)"}}>
+                {["Post 1","Post 2","Post 3"].map((p,i)=>(
+                  <div key={i} style={{width:"100%",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,padding:"7px 10px",fontSize:10,color:"rgba(255,255,255,.5)",fontFamily:"var(--hd)",fontWeight:600}}>{p} ✨</div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ✦ 2-Column: Gehaltsrechner + Tracker */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+            {/* Gehaltsrechner */}
+            <div onClick={()=>navTo("gehaltsrechner")} style={{cursor:"pointer",background:"linear-gradient(135deg,rgba(5,150,105,.14),rgba(5,150,105,.04))",border:"1.5px solid rgba(5,150,105,.3)",borderRadius:18,padding:"20px 22px",position:"relative",overflow:"hidden",transition:"all .22s"}}
+              onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.borderColor="rgba(5,150,105,.55)";e.currentTarget.style.boxShadow="0 12px 36px rgba(5,150,105,.14)";}}
+              onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.borderColor="rgba(5,150,105,.3)";e.currentTarget.style.boxShadow="none";}}>
+              <div style={{position:"absolute",top:-16,right:-16,width:80,height:80,background:"radial-gradient(circle,rgba(16,185,129,.12),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <div style={{width:36,height:36,background:"rgba(16,185,129,.15)",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>💰</div>
+                <div>
+                  <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:800,color:"white",letterSpacing:"-.3px",lineHeight:1.2}}>{lang==="de"?"KI-Gehaltsrechner Schweiz":lang==="en"?"AI Salary Calculator CH":lang==="fr"?"Calculateur salaire IA CH":"Calcolatore stipendio CH"}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:"var(--em)",letterSpacing:"1px",textTransform:"uppercase",marginTop:2}}>PRO</div>
+                </div>
+              </div>
+              <p style={{fontSize:12,color:"rgba(255,255,255,.45)",lineHeight:1.6,marginBottom:14}}>
+                {lang==="de"?"Branche, Erfahrung, Kanton → KI analysiert Marktlöhne & gibt dir deine Verhandlungsbasis.":
+                 lang==="en"?"Industry, experience, canton → AI analyses market salaries & gives your negotiation base.":
+                 lang==="fr"?"Secteur, expérience, canton → analyse des salaires du marché.":
+                 "Settore, esperienza, cantone → analisi salari di mercato."}
+              </p>
+              <div style={{fontSize:12,color:"var(--em)",fontWeight:700}}>Gehalt berechnen →</div>
+            </div>
+            {/* Bewerbungs-Tracker */}
+            <div onClick={()=>navTo("tracker")} style={{cursor:"pointer",background:"linear-gradient(135deg,rgba(139,92,246,.12),rgba(139,92,246,.04))",border:"1.5px solid rgba(139,92,246,.3)",borderRadius:18,padding:"20px 22px",position:"relative",overflow:"hidden",transition:"all .22s"}}
+              onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.borderColor="rgba(139,92,246,.55)";e.currentTarget.style.boxShadow="0 12px 36px rgba(139,92,246,.14)";}}
+              onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.borderColor="rgba(139,92,246,.3)";e.currentTarget.style.boxShadow="none";}}>
+              <div style={{position:"absolute",top:-16,right:-16,width:80,height:80,background:"radial-gradient(circle,rgba(139,92,246,.14),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <div style={{width:36,height:36,background:"rgba(139,92,246,.15)",border:"1.5px solid rgba(139,92,246,.3)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📋</div>
+                <div>
+                  <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:800,color:"white",letterSpacing:"-.3px",lineHeight:1.2}}>{lang==="de"?"Bewerbungs-Tracker":lang==="en"?"Application Tracker":lang==="fr"?"Suivi candidatures":"Tracker candidature"}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:"#a78bfa",letterSpacing:"1px",textTransform:"uppercase",marginTop:2}}>KOSTENLOS</div>
+                </div>
+              </div>
+              <p style={{fontSize:12,color:"rgba(255,255,255,.45)",lineHeight:1.6,marginBottom:14}}>
+                {lang==="de"?"Status-Board für alle Bewerbungen – Kanban, Prioritäten, Notizen. Immer den Überblick.":
+                 lang==="en"?"Status board for all applications – Kanban, priorities, notes. Always stay on top.":
+                 lang==="fr"?"Tableau de bord pour toutes vos candidatures – Kanban, priorités, notes.":
+                 "Bacheca candidature – Kanban, priorità, note. Sempre aggiornato."}
+              </p>
+              <div style={{fontSize:12,color:"#a78bfa",fontWeight:700}}>Status-Board öffnen →</div>
             </div>
           </div>
 
@@ -4025,6 +4610,7 @@ NOTE: Incluse in tutte le diapositive`),
           <div style={{fontSize:11,fontWeight:700,letterSpacing:"2px",textTransform:"uppercase",color:"rgba(255,255,255,.18)",marginBottom:10}}>
             {lang==="de"?"Weitere Karriere-Tools":lang==="en"?"More career tools":lang==="fr"?"Plus d'outils":"Altri strumenti"}
           </div>
+
           <div className="mini-g">
             {GENERIC_TOOLS.filter(g=>g.cat==="karriere" && g.id!=="li2job").map(g=>(
               <div key={g.id} onClick={()=>navTo(g.id)} style={{cursor:"pointer",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:13,padding:"14px 16px",transition:"all .2s",display:"flex",flexDirection:"column",gap:7}}
@@ -4175,6 +4761,8 @@ NOTE: Incluse in tutte le diapositive`),
                 {tier.price===0&&<><div className="ppr">CHF 0<span> / {lang==="en"?"mo":"Mo."}</span></div><div className="pper">{tier.note}</div></>}
                 {tier.priceM&&<>
                   <div className="ppr">CHF {yearly ? Number(tier.priceY).toFixed(2) : Number(tier.priceM).toFixed(2)}<span> / {lang==="en"?"mo":"Mo."}</span></div>
+                  {yearly && tier.yearNote && <div style={{fontSize:11,color:"#f59e0b",fontWeight:600,marginBottom:4,marginTop:-4}}>{tier.yearNote}</div>}
+                  {!yearly && tier.yearNote && <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginBottom:4,marginTop:-4}}>{lang==="de"?`🔥 Jährlich: CHF ${Number(tier.priceY).toFixed(2)}/Mo. – spare ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:`🔥 Annual: CHF ${Number(tier.priceY).toFixed(2)}/mo`}</div>}
                   <div className="pper">
                     {yearly
                       ? `CHF ${(tier.priceY*12).toFixed(2)} / ${lang==="en"?"year":"Jahr"} · ${lang==="de"?"jährlich abgerechnet":lang==="en"?"billed once yearly":lang==="fr"?"facturé annuellement":"fatturato annualmente"}`
@@ -4192,6 +4780,7 @@ NOTE: Incluse in tutte le diapositive`),
                 </ul>
                 {tier.id==="free"&&<button className="btn b-out b-w" style={{borderColor:"rgba(255,255,255,.18)",color:"white"}} onClick={()=>navTo("app")}>{tier.btn}</button>}
                 {tier.id==="pro"&&<button className={`btn ${tier.btnS} b-w`} onClick={()=>window.open(stripeLink(),"_blank")}>{tier.btn}</button>}
+                {(tier.id==="family"||tier.id==="unlimited")&&<button className={`btn b-out b-w`} style={{borderColor:tier.id==="unlimited"?"rgba(245,158,11,.4)":"rgba(139,92,246,.4)",color:tier.id==="unlimited"?"rgba(245,158,11,.85)":"rgba(167,139,250,.85)"}} onClick={()=>window.open(tier.id==="unlimited"?C.stripeUnlimited:C.stripeFamily,"_blank")}>{tier.btn}</button>}
                 {tier.id==="team"&&<button className={`btn b-out b-w`} style={{borderColor:"rgba(245,158,11,.3)",color:"rgba(245,158,11,.8)"}} onClick={()=>window.open(`mailto:${C.email}`)}>{tier.btn}</button>}
               </div>
             ))}
@@ -4226,7 +4815,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ APPLICATION TOOL ══════════════════
   if(page==="app") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr dk">
       <h1>{t.app.title}</h1><p>{t.app.sub}</p>
@@ -4339,7 +4930,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ ATS CHECK ══════════════════
   if(page==="ats") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr dk"><h1>{t.ats.title}</h1><p>{t.ats.sub}</p></div>
     <div className="abody">
@@ -4411,7 +5004,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ ZEUGNIS ANALYSE ══════════════════
   if(page==="zeugnis") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr am"><h1>{t.zeugnis.title}</h1><p>{t.zeugnis.sub}</p></div>
     <div className="abody">
@@ -4474,7 +5069,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ JOB MATCHING ══════════════════
   if(page==="jobmatch") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr vi"><h1>{t.jobmatch.title}</h1><p>{t.jobmatch.sub}</p></div>
     <div className="abody">
@@ -4526,7 +5123,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ LINKEDIN ══════════════════
   if(page==="linkedin") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr bl"><h1>{t.linkedin.title}</h1><p>{t.linkedin.sub}</p></div>
     <div className="abody">
@@ -4566,6 +5165,8 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ CHECKLIST ══════════════════
   if(page==="checklist") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
     <Nav dark/>
     <div className="page-hdr dk"><h1>{t.checklist.title}</h1><p>{t.checklist.sub}</p></div>
     <div className="abody">
@@ -4594,7 +5195,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ INTERVIEW COACH ══════════════════
   if(page==="coach") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr dk"><h1>{t.coach.title}</h1><p>{t.coach.sub}</p></div>
     <div className="abody">
@@ -4649,7 +5252,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ EXCEL GENERATOR ══════════════════
   if(page==="excel") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr" style={{background:"linear-gradient(135deg,#166534,#15803d)",padding:"48px 28px 0",textAlign:"center"}}>
       <h1 style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>📊 {t.nav.excel}</h1>
@@ -4764,7 +5369,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ POWERPOINT MAKER ══════════════════
   if(page==="pptx") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr" style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",padding:"48px 28px 0",textAlign:"center"}}>
       <h1 style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>📽️ {t.nav.pptx}</h1>
@@ -4884,7 +5491,8 @@ NOTE: Incluse in tutte le diapositive`),
   // ══════════════════ STELLA VOLLBILD-CHAT ══════════════════
   if(page==="chat") {
     const chatUsage2 = getChatCount();
-    const canChat2   = pro || chatUsage2 < C.CHAT_FREE_LIMIT;
+    const isLoggedIn2 = !!authSession;
+    const canChat2   = isLoggedIn2 && (pro || chatUsage2 < C.CHAT_FREE_LIMIT);
     const remaining2 = pro ? "∞" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage2);
     const L2 = (d,e,f,i) => ({de:d,en:e,fr:f,it:i}[lang]||d);
 
@@ -4955,6 +5563,9 @@ VERHALTEN:
       "networking":["networking"],"kündigung":["kuendigung"],"30-60-90":["plan306090"],
       "referenz":["referenz"],"lernplan":["lernplan"],"lehrstelle":["lehrstelle"],
       "e-mail":["email"],"protokoll":["protokoll"],"übersetzer":["uebersetzer"],
+      "gehaltsrechner":["gehaltsrechner"],"lohn":["gehaltsrechner"],"salary":["gehaltsrechner"],
+      "tracker":["tracker"],"tracking":["tracker"],"verfolgen":["tracker"],
+      "lipost":["lipost"],"linkedin post":["lipost"],"post":["lipost"],
     };
 
     function ChatPage() {
@@ -5128,187 +5739,15 @@ VERHALTEN:
     <p>Bei Datenschutzanfragen: <a href={`mailto:${C.email}`}>{C.email}</a></p>
     <h2>Haftungsausschluss</h2><p>Schweizer Recht · Gerichtsstand: Zürich</p>
   </>}/>;
-
-  // ══════════════════ ADMIN ══════════════════
-  if(page==="admin") {
-    const AdminPage = () => {
-      const [adminPw, setAdminPw] = useState("");
-      const [adminAuth, setAdminAuth] = useState(()=>{
-        try{return sessionStorage.getItem("stf_admin")==="1";}catch{return false;}
-      });
-      const [genEmail, setGenEmail] = useState("");
-      const [genCode, setGenCode] = useState("");
-      const [history, setHistory] = useState(()=>{
-        try{return JSON.parse(localStorage.getItem("stf_admin_hist")||"[]");}catch{return [];}
-      });
-
-      const checkPw = () => {
-        if(adminPw === C.ADMIN_SECRET){
-          try{sessionStorage.setItem("stf_admin","1");}catch{}
-          setAdminAuth(true);
-        } else {
-          alert("Falsches Passwort");
-        }
-      };
-
-      const genCodeForEmail = async () => {
-        if(!genEmail.includes("@")) return;
-        const code = await generateCode(genEmail.toLowerCase().trim());
-        setGenCode(code);
-        const entry = {email: genEmail.toLowerCase().trim(), code, date: new Date().toLocaleDateString("de-CH")};
-        const newHist = [entry, ...history.slice(0,49)];
-        setHistory(newHist);
-        try{localStorage.setItem("stf_admin_hist", JSON.stringify(newHist));}catch{}
-      };
-
-      const copyCode = (code) => {
-        navigator.clipboard.writeText(code);
-      };
-
-      const mailtoLink = (email, code) => {
-        const subject = encodeURIComponent("✦ Dein Stellify Pro-Aktivierungscode");
-        const body = encodeURIComponent(
-`Hallo ${email.split("@")[0]},
-
-vielen Dank für dein Stellify Pro-Abonnement! 🎉
-
-Dein persönlicher Aktivierungscode lautet:
-
-🔑 ${code}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SO AKTIVIERST DU PRO (2 Minuten):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. Geh auf https://stellify.ch
-2. Klick auf «Pro freischalten» (goldener Button)
-3. Klick «✦ Bereits Pro? Einloggen»
-4. E-Mail eingeben: ${email}
-5. Code eingeben: ${code}
-6. Klick «Aktivieren ✓»
-
-Das war's – du hast sofort Zugriff auf alle 18+ Pro-Tools!
-
-Dein Code ist persönlich und nur mit deiner E-Mail-Adresse gültig.
-
-Bei Fragen jederzeit: support@stellify.ch
-
-Herzliche Grüsse
-Das Stellify-Team ✦
-https://stellify.ch`
-        );
-        return `mailto:${email}?subject=${subject}&body=${body}`;
-      };
-
-      if(!adminAuth) return (
-        <>{<style>{FONTS+CSS}</style>}
-        <div style={{minHeight:"100vh",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{background:"var(--dk2)",border:"1px solid rgba(255,255,255,.1)",borderRadius:20,padding:40,maxWidth:360,width:"100%",textAlign:"center"}}>
-            <div style={{fontSize:36,marginBottom:12}}>🔐</div>
-            <h2 style={{color:"white",marginBottom:8,fontFamily:"var(--hd)"}}>Admin-Bereich</h2>
-            <p style={{color:"rgba(255,255,255,.4)",fontSize:13,marginBottom:20}}>Nur für Stellify-Betreiber</p>
-            <input type="password" placeholder="Admin-Passwort"
-              value={adminPw} onChange={e=>setAdminPw(e.target.value)}
-              onKeyDown={e=>e.key==="Enter"&&checkPw()}
-              style={{width:"100%",padding:"12px 16px",border:"1.5px solid rgba(255,255,255,.15)",borderRadius:12,fontSize:14,background:"rgba(255,255,255,.07)",color:"white",outline:"none",boxSizing:"border-box",marginBottom:12}}
-            />
-            <button onClick={checkPw} style={{width:"100%",padding:12,background:"var(--em)",border:"none",borderRadius:12,color:"white",fontWeight:700,fontSize:14,cursor:"pointer"}}>
-              Einloggen →
-            </button>
-            <button onClick={()=>navTo("landing")} style={{marginTop:12,background:"none",border:"none",color:"rgba(255,255,255,.3)",fontSize:12,cursor:"pointer"}}>← Zurück zur Website</button>
-          </div>
-        </div>
-        </>
-      );
-
-      return (
-        <>{<style>{FONTS+CSS}</style>}
-        <div style={{minHeight:"100vh",background:"var(--bg)",padding:"40px 20px"}}>
-          <div style={{maxWidth:680,margin:"0 auto"}}>
-
-            {/* Header */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:32}}>
-              <div>
-                <div style={{fontFamily:"var(--hd)",fontSize:24,fontWeight:900,color:"white"}}>✦ Stellify Admin</div>
-                <div style={{fontSize:13,color:"rgba(255,255,255,.4)",marginTop:4}}>Pro-Code Generator · Kundenübersicht</div>
-              </div>
-              <button onClick={()=>navTo("landing")} style={{background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 16px",color:"rgba(255,255,255,.6)",fontSize:13,cursor:"pointer"}}>← Website</button>
-            </div>
-
-            {/* Ablauf Info */}
-            <div style={{background:"rgba(16,185,129,.06)",border:"1px solid rgba(16,185,129,.2)",borderRadius:14,padding:18,marginBottom:20,display:"flex",gap:16,flexWrap:"wrap"}}>
-              {[["1. Kunde kauft","Stripe sendet dir eine Benachrichtigung per E-Mail"],["2. Du kommst hierher","E-Mail eingeben → Code generieren → Senden"],["3. Kunde aktiviert","Gibt E-Mail + Code auf stellify.ch ein → fertig"]].map(([t,d],i)=>(
-                <div key={i} style={{flex:1,minWidth:160}}>
-                  <div style={{fontWeight:700,fontSize:13,color:"var(--em)",marginBottom:3}}>{t}</div>
-                  <div style={{fontSize:12,color:"rgba(255,255,255,.4)",lineHeight:1.5}}>{d}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Code Generator */}
-            <div style={{background:"var(--dk2)",border:"1px solid rgba(16,185,129,.2)",borderRadius:16,padding:24,marginBottom:24}}>
-              <h3 style={{color:"white",marginBottom:4,fontSize:16,fontFamily:"var(--hd)"}}>🎯 Pro-Code generieren & senden</h3>
-              <p style={{color:"rgba(255,255,255,.4)",fontSize:13,marginBottom:16}}>Jeder Code ist einzigartig und <strong style={{color:"rgba(255,255,255,.6)"}}>nur mit der eingegebenen E-Mail gültig</strong>.</p>
-              <div style={{display:"flex",gap:10,marginBottom:12}}>
-                <input type="email" placeholder="Kunden-E-Mail (z.B. max@muster.ch)"
-                  value={genEmail} onChange={e=>setGenEmail(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&genCodeForEmail()}
-                  style={{flex:1,padding:"11px 14px",border:"1.5px solid rgba(255,255,255,.15)",borderRadius:10,fontSize:13,background:"rgba(255,255,255,.07)",color:"white",outline:"none",boxSizing:"border-box"}}
-                />
-                <button onClick={genCodeForEmail} style={{padding:"11px 20px",background:"var(--em)",border:"none",borderRadius:10,color:"white",fontWeight:700,fontSize:13,cursor:"pointer",whiteSpace:"nowrap"}}>
-                  Code generieren
-                </button>
-              </div>
-              {genCode&&(
-                <div style={{background:"rgba(16,185,129,.08)",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:12,padding:16}}>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <div>
-                      <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginBottom:4}}>Code für {genEmail}</div>
-                      <div style={{fontFamily:"monospace",fontSize:22,fontWeight:900,color:"var(--em)",letterSpacing:3}}>{genCode}</div>
-                    </div>
-                    <button onClick={()=>copyCode(genCode)} style={{padding:"8px 16px",background:"rgba(16,185,129,.2)",border:"1px solid var(--em)",borderRadius:8,color:"var(--em)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
-                      📋 Kopieren
-                    </button>
-                  </div>
-                  <a href={mailtoLink(genEmail, genCode)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"10px",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"white",textDecoration:"none",fontSize:13,fontWeight:600}}>
-                    ✉️ Code per E-Mail senden (Mail-App öffnen)
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* History */}
-            {history.length>0&&(
-              <div style={{background:"var(--dk2)",border:"1px solid rgba(255,255,255,.08)",borderRadius:16,padding:24}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-                  <h3 style={{color:"white",fontSize:16,fontFamily:"var(--hd)",margin:0}}>📋 Generierte Codes ({history.length})</h3>
-                  <button onClick={()=>{setHistory([]);try{localStorage.removeItem("stf_admin_hist");}catch{}}} style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.3)",borderRadius:8,padding:"5px 12px",color:"#f87171",fontSize:11,cursor:"pointer"}}>Löschen</button>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                  {history.map((h,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"rgba(255,255,255,.04)",borderRadius:10,border:"1px solid rgba(255,255,255,.06)"}}>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,color:"rgba(255,255,255,.8)",fontWeight:600}}>{h.email}</div>
-                        <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>{h.date}</div>
-                      </div>
-                      <div style={{fontFamily:"monospace",fontSize:14,fontWeight:700,color:"var(--em)",letterSpacing:2}}>{h.code}</div>
-                      <div style={{display:"flex",gap:6}}>
-                        <button onClick={()=>copyCode(h.code)} style={{padding:"5px 10px",background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.2)",borderRadius:7,color:"var(--em)",fontSize:11,cursor:"pointer"}}>📋</button>
-                        <a href={mailtoLink(h.email,h.code)} style={{padding:"5px 10px",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:7,color:"rgba(255,255,255,.6)",fontSize:11,cursor:"pointer",textDecoration:"none",display:"inline-flex",alignItems:"center"}}>✉️</a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-          </div>
-        </div>
-        </>
-      );
-    };
-    return <AdminPage/>;
-  }
+  // ══════════════════ BEWERBUNGS-TRACKER ══════════════════
+  if(page==="tracker") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
+    <Nav dark/>
+    <BewerbungsTracker lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    <Footer/>
+  </>);
 
   // ══════════════════ GENERIC TOOLS ROUTING ══════════════════
   const activeTool = GENERIC_TOOLS.find(g => g.id === page);
