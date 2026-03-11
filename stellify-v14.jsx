@@ -168,7 +168,6 @@ function authIsAdmin(email, pw) {
 // ═══════════════════════════════════════════
 // 🧠 AI BACKEND – Groq API (kostenlos, ultraschnell)
 // ═══════════════════════════════════════════
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const groqHeaders = () => ({
   "Content-Type": "application/json",
   "Authorization": `Bearer ${C.GROQ_KEY}`
