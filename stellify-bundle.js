@@ -1,46 +1,14 @@
 var _Stellify = (() => {
-// React CDN shims
-var __modules = {
-  "react": window.React,
-  "react-dom/client": window.ReactDOM,
-  "react-dom": window.ReactDOM,
-  "react/jsx-runtime": { jsx: window.React.createElement, jsxs: window.React.createElement, Fragment: window.React.Fragment }
-};
-var __originalRequire = typeof __require !== 'undefined' ? __require : null;
-  var __create = Object.create;
-  var __defProp = Object.defineProperty;
-  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-  var __getOwnPropNames = Object.getOwnPropertyNames;
-  var __getProtoOf = Object.getPrototypeOf;
-  var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
     get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
   }) : x)(function(x) {
     if (typeof require !== "undefined") return require.apply(this, arguments);
     throw Error('Dynamic require of "' + x + '" is not supported');
   });
-  var __copyProps = (to, from, except, desc) => {
-    if (from && typeof from === "object" || typeof from === "function") {
-      for (let key of __getOwnPropNames(from))
-        if (!__hasOwnProp.call(to, key) && key !== except)
-          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-    }
-    return to;
-  };
-  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-    // If the importer is in node compatibility mode or this is not an ESM
-    // file that has been converted to a CommonJS file using a Babel-
-    // compatible transform (i.e. "__esModule" has not been set), then set
-    // "default" to the CommonJS "module.exports" for node compatibility.
-    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-    mod
-  ));
 
   // home/claude/stellify-build/src/main.jsx
-  var import_react = { default: window.React };
-  var import_client = { default: window.ReactDOM };
   var import_jsx_runtime = { jsx: window.React.createElement, jsxs: window.React.createElement, Fragment: window.React.Fragment };
-  var { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense } = import_react.default;
+  var { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense } = React;
   var C = {
     name: "Stellify",
     tagline: "AI Career Copilot Schweiz",
@@ -2291,7 +2259,11 @@ Rispondi SOLO con array JSON:
   }
   async function downloadAsExcel(rows, headers, sheetName, page2) {
     try {
-      const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs");
+      const XLSX = window.XLSX;
+      if (!XLSX) {
+        console.error("SheetJS nicht geladen");
+        return;
+      }
       const wsData = [headers, ...rows];
       const ws = XLSX.utils.aoa_to_sheet(wsData);
       ws["!cols"] = headers.map(() => ({ wch: 20 }));
@@ -2350,7 +2322,11 @@ Rispondi SOLO con array JSON:
       setErr("");
       try {
         if (file.name.endsWith(".docx")) {
-          const mammoth = await import("https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js");
+          const mammoth = window.mammoth;
+          if (!mammoth) {
+            console.error("Mammoth nicht geladen");
+            return;
+          }
           const ab = await file.arrayBuffer();
           const res = await mammoth.extractRawText({ arrayBuffer: ab });
           setDocText(res.value);
@@ -3208,7 +3184,11 @@ Next step: Apply for Nestl\xE9 \u2192`,
       setLoading(true);
       try {
         if (f.name.endsWith(".docx") || f.name.endsWith(".doc")) {
-          const mammoth = await import("https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js");
+          const mammoth = window.mammoth;
+          if (!mammoth) {
+            console.error("Mammoth nicht geladen");
+            return;
+          }
           const ab = await f.arrayBuffer();
           const res = await mammoth.extractRawText({ arrayBuffer: ab });
           onText(res.value, f.name);
@@ -4151,13 +4131,13 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 S\xE4tze im Widget). Schreib
   }
   function MemberPanel({ lang, session, onClose }) {
     const L = (d, e, f, i) => ({ de: d, en: e, fr: f, it: i })[lang] || d;
-    const [members, setMembers] = import_react.default.useState([]);
-    const [newEmail, setNewEmail] = import_react.default.useState("");
-    const [err, setErr] = import_react.default.useState("");
-    const [ok, setOk] = import_react.default.useState("");
+    const [members, setMembers] = React.useState([]);
+    const [newEmail, setNewEmail] = React.useState("");
+    const [err, setErr] = React.useState("");
+    const [ok, setOk] = React.useState("");
     const maxSeats = session.plan === "family" ? 4 : 10;
     const planLabel = session.plan === "family" ? L("Familie", "Family", "Famille", "Famiglia") : "Team";
-    import_react.default.useEffect(() => {
+    React.useEffect(() => {
       const users = JSON.parse(localStorage.getItem("stf_auth_users") || "[]");
       const owner = users.find((u) => u.email.toLowerCase() === session.email.toLowerCase());
       setMembers(owner?.members || [session.email]);
@@ -4586,13 +4566,7 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 S\xE4tze im Widget). Schreib
       if (!id) return null;
       return loadProfiles().find((p) => p.id === id) || null;
     });
-    const [showOnboarding, setShowOnboarding] = useState(() => {
-      try {
-        return !localStorage.getItem("stf_onb_done");
-      } catch {
-        return true;
-      }
-    });
+    const [showOnboarding, setShowOnboarding] = useState(false);
     const doneOnboarding = () => {
       try {
         localStorage.setItem("stf_onb_done", "1");
@@ -8019,7 +7993,7 @@ ${(s.content || []).map((c) => `\u2022 ${c}`).join("\n")}
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Footer, {})
     ] });
     if (page2 === "chat") {
-      let ChatPage = function() {
+      let ChatPage2 = function() {
         const [chatMsgs, setChatMsgs] = useState([{ r: "ai", t: L2(
           "Hallo! Ich bin Stella \u{1F44B} Deine KI-Karriere-Assistentin von Stellify. Wie kann ich dir heute helfen?",
           "Hello! I'm Stella \u{1F44B} Your AI career assistant from Stellify. How can I help you today?",
@@ -8168,6 +8142,7 @@ ${(s.content || []).map((c) => `\u2022 ${c}`).join("\n")}
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("style", { children: `@keyframes pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.3);opacity:1}}` })
         ] });
       };
+      var ChatPage = ChatPage2;
       const chatUsage2 = getChatCount();
       const isLoggedIn2 = !!authSession;
       const canChat2 = isLoggedIn2 && (pro || chatUsage2 < C.CHAT_FREE_LIMIT);
@@ -8262,7 +8237,7 @@ VERHALTEN:
         "linkedin post": ["lipost"],
         "post": ["lipost"]
       };
-      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatPage, {});
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatPage2, {});
     }
     const LD = () => (/* @__PURE__ */ new Date()).toLocaleDateString("de-CH", { month: "long", year: "numeric" });
     const LS = ({ ch }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
@@ -8395,6 +8370,6 @@ VERHALTEN:
   }
   var rootEl = document.getElementById("root");
   if (rootEl) {
-    import_client.default.createRoot(rootEl).render(import_react.default.createElement(App));
+    ReactDOM.createRoot(rootEl).render(React.createElement(App));
   }
 })();
