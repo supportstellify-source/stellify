@@ -25,10 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 🔐 API-Key sicher aus GitHub Secret einsetzen
       - name: Inject GROQ API Key
         run: |
-          sed -i "s|GROQ_KEY_PLACEHOLDER|${{ secrets.GROQ_API_KEY }}|g" stellify-v14.jsx
+          sed -i "s|GROQ_KEY_PLACEHOLDER|${{ secrets.GROQ_API_KEY }}|g" stellify-bundle.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
