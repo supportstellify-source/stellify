@@ -26,7 +26,7 @@ const C = {
   ADMIN_EMAIL: "admin@stellify.ch",
   ADMIN_PW: "Stellify2025!",
   // ── GROQ CONFIG ──────────────────────────────
-  GROQ_KEY: "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",
+  GROQ_KEY: "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",
   MODEL_FAST: "llama-3.1-8b-instant",      // Schnell & günstig
   MODEL_FULL: "llama-3.3-70b-versatile",   // Smart, für Bewerbungen etc.
   REFERRAL_DISCOUNT: 20,   // % Rabatt für geworbene Freunde
