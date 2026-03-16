@@ -6,13 +6,12 @@
   <meta name="description" content="Stellify – AI Career Copilot Schweiz"/>
   <meta name="theme-color" content="#10b981"/>
   <title>Stellify – AI Career Copilot Schweiz</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>"/>
-  <link rel="preconnect" href="https://api.groq.com"/>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x2726;</text></svg>"/>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{background:#07070e;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
     #root{min-height:100vh}
-    #sl{position:fixed;inset:0;background:#07070e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:99999;transition:opacity .4s}
+    #sl{position:fixed;inset:0;background:#07070e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:99999;transition:opacity .5s}
     #sl .ic{font-size:50px;animation:lp 2s ease-in-out infinite}
     #sl .nm{color:#fff;font-size:21px;font-weight:700;letter-spacing:-.5px}
     #sl .dt{display:flex;gap:7px}
@@ -26,12 +25,23 @@
 </head>
 <body>
   <div id="sl">
-    <div class="ic">✦</div>
+    <div class="ic">&#x2726;</div>
     <div class="nm">Stellify</div>
     <div class="dt"><span></span><span></span><span></span></div>
     <div class="sb">AI Career Copilot Schweiz</div>
   </div>
   <div id="root"></div>
-  <script src="./stellify-bundle.js" defer></script>
+  <script>
+    function hideSL() {
+      var el = document.getElementById("sl");
+      if (el) { el.style.opacity = "0"; setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 500); }
+    }
+    // Hide after 3 seconds no matter what
+    setTimeout(hideSL, 3000);
+    // Hide on any error too (so user sees the app or error)
+    window.onerror = function() { setTimeout(hideSL, 500); };
+    window.addEventListener("unhandledrejection", function() { setTimeout(hideSL, 500); });
+  </script>
+  <script src="./stellify-bundle.js"></script>
 </body>
 </html>
