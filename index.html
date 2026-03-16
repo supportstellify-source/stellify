@@ -36,11 +36,16 @@
       var el = document.getElementById("sl");
       if (el) { el.style.opacity = "0"; setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 500); }
     }
-    // Hide after 3 seconds no matter what
     setTimeout(hideSL, 3000);
-    // Hide on any error too (so user sees the app or error)
-    window.onerror = function() { setTimeout(hideSL, 500); };
-    window.addEventListener("unhandledrejection", function() { setTimeout(hideSL, 500); });
+    window.onerror = function(msg, src, line, col, err) {
+      var el = document.getElementById("sl");
+      if (el) {
+        el.innerHTML = "<div style=\"color:#ef4444;padding:24px;text-align:center;font-family:system-ui;max-width:500px\"><b style=\"font-size:16px\">Fehler beim Laden</b><br><br><span style=\"font-size:12px;opacity:.7\">" + msg + "</span><br><br><button onclick=\"location.reload()\" style=\"background:#10b981;color:white;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:14px\">Neu laden</button></div>";
+        el.style.opacity = "1";
+      }
+      return false;
+    };
+    window.addEventListener("unhandledrejection", function(e) { window.onerror(String(e.reason)); });
   </script>
   <script src="./stellify-bundle.js"></script>
 </body>
