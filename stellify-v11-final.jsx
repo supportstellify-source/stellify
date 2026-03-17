@@ -963,7 +963,7 @@ const mkT = (lang) => {
       tagline:L(`${C.tagline} – Schweizer Standard.`,`${C.tagline} – Standard suisse.`,`${C.tagline} – Standard svizzero.`,`${C.tagline} – Swiss standard.`),
     },
     motivPrompt:(j,p)=>L(
-      `Erfahrener Karrierecoach: Professionelles Motivationsschreiben Schweizer Hochdeutsch (kein ß).\nStelle: ${j.title} bei ${j.company} | Branche: ${j.branch||"k.A."} | Inserat: ${j.desc||"k.A."}\n${p.name} | ${p.beruf} | ${p.erfahrung} J. | Skills: ${p.skills} | Sprachen: ${p.sprachen} | Ausbildung: ${p.ausbildung}\n~350 Wörter, direkt mit Brief beginnen (Ort/Datum/Anschrift).`,
+      `Du bist ein erfahrener Schweizer HR-Berater. Schreibe ein überzeugendes, individuelles Motivationsschreiben auf Schweizer Hochdeutsch (kein ß). Aufbau: persönliche Anrede → Einstieg mit Bezug zur Stelle → Kompetenzen mit konkreten Erfolgen → Motivation für genau diese Firma → professioneller Abschluss. Max. 1 Seite, kein ß.\nStelle: ${j.title} bei ${j.company} | Branche: ${j.branch||"k.A."} | Inserat: ${j.desc||"k.A."}\n${p.name} | ${p.beruf} | ${p.erfahrung} J. | Skills: ${p.skills} | Sprachen: ${p.sprachen} | Ausbildung: ${p.ausbildung}\n~350 Wörter, direkt mit Brief beginnen (Ort/Datum/Anschrift).`,
       `Coach carrière: Lettre de motivation française pour le marché suisse.\nPoste: ${j.title} chez ${j.company} | ${p.name} | ${p.beruf} | ${p.erfahrung} ans | ${p.skills}\n~350 mots, commencer directement par la lettre.`,
       `Coach carriera: Lettera di motivazione italiana per il mercato svizzero.\nPosto: ${j.title} presso ${j.company} | ${p.name} | ${p.beruf} | ${p.erfahrung} anni | ${p.skills}\n~350 parole, iniziare direttamente con la lettera.`,
       `Career coach: Professional English cover letter for Swiss job market.\nPosition: ${j.title} at ${j.company} | ${p.name} | ${p.beruf} | ${p.erfahrung} years | ${p.skills}\n~350 words, start directly with the letter.`
@@ -1071,7 +1071,7 @@ const GENERIC_TOOLS = [
       {k:"staerken",lbl:{de:"Stärken & Interessen",en:"Strengths & interests",fr:"Points forts & intérêts",it:"Punti di forza & interessi"},ph:{de:"z.B. Mathe gut, fleissig, computererfahren",en:"e.g. Good at maths, hardworking, computer savvy",fr:"ex. Bon en maths, travailleur, à l'aise en informatique",it:"es. Bravo in matematica, laborioso, esperto di computer"},type:"textarea",req:false},
     ],
     prompt:(v,l)=>({
-      de:`Schreibe ein professionelles Motivationsschreiben für eine Lehrstelle auf Schweizer Hochdeutsch (kein ß).\nLehrberuf: ${v.beruf} | Firma: ${v.firma} | Name: ${v.name} | Alter: ${v.alter||"nicht angegeben"} | Stärken: ${v.staerken||"nicht angegeben"}\nTon: jugendlich aber professionell, authentisch, enthusiastisch. Schweizer Lehrstellenformat. ~250 Wörter.`,
+      de:`Du bist ein Berufsberater für Schweizer Jugendliche. Schreibe ein Motivationsschreiben für eine Lehrstelle auf Schweizer Hochdeutsch (kein ß): authentisch jugendlich aber professionell, erkläre WARUM genau dieser Lehrberuf und diese Firma, belege Stärken mit Beispielen aus Schule/Hobby, zeige Enthusiasmus und Lernbereitschaft, max. 250 Wörter.\nLehrberuf: ${v.beruf} | Firma: ${v.firma} | Name: ${v.name} | Alter: ${v.alter||"nicht angegeben"} | Stärken: ${v.staerken||"nicht angegeben"}\nTon: jugendlich aber professionell, authentisch, enthusiastisch. Schweizer Lehrstellenformat. ~250 Wörter.`,
       en:`Write a professional motivation letter for an apprenticeship in English for the Swiss system.\nTrade: ${v.beruf} | Company: ${v.firma} | Name: ${v.name} | Age: ${v.alter||"not provided"} | Strengths: ${v.staerken||"not provided"}\nTone: youthful but professional, authentic, enthusiastic. ~250 words.`,
       fr:`Rédige une lettre de motivation pour un apprentissage en français pour le système suisse.\nMétier: ${v.beruf} | Entreprise: ${v.firma} | Nom: ${v.name} | Âge: ${v.alter||"n/a"} | Points forts: ${v.staerken||"n/a"}\nTon: jeune mais professionnel, authentique. ~250 mots.`,
       it:`Scrivi una lettera di motivazione per un apprendistato in italiano per il sistema svizzero.\nMestiere: ${v.beruf} | Azienda: ${v.firma} | Nome: ${v.name} | Età: ${v.alter||"n/d"} | Punti di forza: ${v.staerken||"n/d"}\nTono: giovanile ma professionale, autentico. ~250 parole.`,
@@ -2803,9 +2803,22 @@ function ChatBot({ lang, pro, setPw, navTo, authSession, onAuthOpen }) {
   const canChat = isLoggedIn && (pro || chatUsage < C.CHAT_FREE_LIMIT);
   const needsLogin = !isLoggedIn;
 
-  const SYSTEM = `Du bist Stella, die KI-Karriere-Assistentin von Stellify. Du hast tiefes Wissen über Karriere, Bewerbungen, den Schweizer Arbeitsmarkt und Produktivität.
+  const SYSTEM = `Du bist Stella, die KI-Karriere-Assistentin von Stellify – dem führenden Schweizer Career Copilot. Du begleitest ALLE Karrierephasen:
 
-Dein Wissen umfasst: Schweizer Bewerbungsunterlagen (Motivationsschreiben, Lebenslauf mit Foto, 1-2 Seiten), ATS-Optimierung, Schweizer Arbeitsrecht (Kündigungsfristen, Sperrfristen, Zeugnis-Code: \"stets zu vollsten Zufriedenheit\"=sehr gut), Gehälter nach Branche/Erfahrung, LinkedIn-Optimierung, Interview-Vorbereitung (STAR-Methode), Gehaltsverhandlungs-Taktiken, Schweizer Bildungssystem (EFZ, FH, Uni, CAS/MAS).
+🎓 JUGENDLICHE (14-18): Lehrstellen-Suche, Bewerbungsmappe, Schnupperlehre anfragen, Stärken entdecken. Sprich sie direkt, einfach und ermutigend an.
+🚀 BERUFSEINSTEIGER (18-25): Erster Job, Lohn verhandeln, LinkedIn aufbauen, EFZ/FH/Uni-Abschluss optimal präsentieren.
+💼 BERUFSTÄTIGE (25-45): Jobwechsel strategisch planen, Lohnerhöhung, Führungsrollen, CAS/MAS, Kündigung professionell gestalten.
+🔄 ERFAHRENE (50+): Wiedereinstieg, Age-Bias überwinden, Erfahrung als Stärke positionieren, Teilzeitmodelle.
+
+Fachwissen:
+- Schweizer Bewerbung: Foto obligatorisch, max. 2 Seiten CV, kein ß
+- ATS-Score: Keywords aus Stelleninserat, 70%+ anstreben
+- Zeugnis-Code: "zu vollster Zufriedenheit"=sehr gut, "zu voller Zufriedenheit"=gut, "zu Zufriedenheit"=genügend
+- Lohnbenchmarks CH 2025: IT 95-150k, Finance 90-140k, Marketing 80-110k, Gesundheit 70-95k
+- Schweizer Arbeitsrecht: Probezeit 1-3 Monate, Kündigungsfristen 1-3 Monate, Sperrfristen bei Krankheit
+- Bildungssystem: EFZ=Lehre, HMS/BMS=Berufsmaturität, FH=Fachhochschule, ETH/Uni=Universität
+
+Verhalten: Erkenne die Karrierephase des Nutzers und passe Sprache und Tiefe an. Antworte konkret, umsetzbar, max. 3-4 Sätze im Chat.
 
 Tools von Stellify:
 ✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer, 💰 KI-Gehaltsrechner Schweiz, 📋 Bewerbungs-Tracker, ✍️ LinkedIn-Post Generator
