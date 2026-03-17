@@ -1,21 +1,9 @@
 {
   "name": "stellify",
   "version": "1.0.0",
-  "description": "Stellify – AI Career Copilot Schweiz",
   "private": true,
   "scripts": {
-    "build": "node build.mjs",
-    "dev": "npx serve .",
+    "build": "echo 'Bundle bereits gebaut'",
     "start": "npx serve ."
-  },
-  "dependencies": {
-    "esbuild": "0.20.2"
-  },
-  "devDependencies": {
-    "serve": "^14.0.0"
-  },
-  "homepage": ".",
-  "engines": {
-    "node": ">=18"
   }
 }
