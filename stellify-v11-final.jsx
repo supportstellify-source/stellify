@@ -10,8 +10,8 @@ const C = {
   email: "support@stellify.ch",
   address: "6300 Zug, Schweiz",
   owner: "JTSP",
-  stripeMonthly: "https://buy.stripe.com/MONTHLY_LINK",
-  stripeYearly:  "https://buy.stripe.com/YEARLY_LINK",
+  stripeMonthly: "https://buy.stripe.com/cNi14m58gbdve0MbaZ2B202",
+  stripeYearly:  "https://buy.stripe.com/8x2cN4asAchzg8U92R2B205",
   priceM: "19.90",
   priceY: "14.90",
   FREE_LIMIT: 1,
@@ -19,7 +19,8 @@ const C = {
   CHAT_FREE_LIMIT: 20,
 
   ULTIMATE_LIMIT: 9999999,  // effektiv unbegrenzt
-  stripeUltimate: "https://buy.stripe.com/ULTIMATE_LINK",
+  stripeUltimate: "https://buy.stripe.com/aFafZg9ow81jbSEgvj2B206",
+  stripeUltimateYearly: "https://buy.stripe.com/14A9ASfMU95nbSEdj72B203",
 
   priceUltimate: "49.90",
 
@@ -704,8 +705,8 @@ const mkT = (lang) => {
       title: L("Ein Preis. 19+ Tools.","One price. 19+ tools.","Un prix. 19+ outils.","Un prezzo. 19+ strumenti."),
       sub:   L("Jederzeit kündbar. Keine versteckten Kosten.","Résiliable à tout moment.","Cancellabile in qualsiasi momento.","Cancel anytime. No hidden costs."),
       monthly:L("Monatlich","Mensuel","Mensile","Monthly"),
-      yearly: L("Jährlich","Annuel","Annuale","Yearly"),
-      save:   L("25% sparen","Économisez 25%","Risparmia 25%","Save 25%"),
+      yearly: L("Jährlich 🎁","Annuel 🎁","Annuale 🎁","Yearly 🎁"),
+      save:   L("2 Monate gratis","2 mois offerts","2 mesi gratis","2 months free"),
       recom:  L("Empfohlen","Recommandé","Consigliato","Recommended"),
       tiers:[
         {id:"free",name:L("Gratis","Gratuit","Gratuito","Free"),price:0,
@@ -725,35 +726,35 @@ const mkT = (lang) => {
          no:L(["LinkedIn","ATS-Check","Zeugnis-Analyse","Job-Matching","Interview-Coach","PDF-Export","20+ weitere Tools"],["LinkedIn","ATS check","Reference analysis","Job matching","Interview coach","PDF export","20+ more tools"],["LinkedIn","ATS","Certificat","Matching","Coach","PDF","20+ outils"],["LinkedIn","ATS","Certificato","Matching","Coach","PDF","20+ strumenti"]),
          btn:L("Kostenlos starten","Commencer gratuitement","Inizia gratis","Start for free"),btnS:"b-out"},
         {id:"pro",name:"Pro",priceM:19.90,priceY:14.90,best:true,
-         note:L("Monatlich kündbar · Refill jeden Montag 07:00","Monthly · Refill every Monday 07:00","Mensuel · Rechargement lundi 07:00","Mensile · Ricarica lunedì 07:00"),
-         yearNote:L("🔥 CHF 14.90/Mo. bei Jahresabo – CHF 178.80/Jahr","🔥 CHF 14.90/mo with annual plan – CHF 178.80/year","🔥 CHF 14.90/mois avec abonnement annuel","🔥 CHF 14.90/mese con abbonamento annuale"),
+         note:L("Monatlich kündbar · Erneuerung jeden Montag 07:00","Monthly · Erneuerung every Monday 07:00","Mensuel · Rechargement lundi 07:00","Mensile · Ricarica lunedì 07:00"),
+         yearNote:L("🎁 Jahresabo – 2 Monate gratis · nur CHF 14.90/Mo.","🎁 Annual plan – 2 months free · CHF 14.90/mo","🎁 Abonnement annuel – 2 mois offerts · CHF 14.90/mois","🎁 Abbonamento annuale – 2 mesi gratis · CHF 14.90/mese"),
          desc:L(
-           "Pro ist limitiert – du hast ein wöchentliches Kontingent, das jeden Montag automatisch aufgefüllt wird.",
-           "Pro is limited – you have a weekly quota that refills automatically every Monday.",
-           "Pro est limité – vous avez un quota hebdomadaire rechargé automatiquement chaque lundi.",
-           "Pro è limitato – hai una quota settimanale che si ricarica automaticamente ogni lunedì."
+           "Pro ist limitiert – du hast ein wöchentliches Nutzungsvolumen, das jeden Montag automatisch aufgefüllt wird.",
+           "Pro is limited – you have a weekly volumen that erneuerungs automatically every Monday.",
+           "Pro est limité – vous avez un volumen hebdomadaire rechargé automatiquement chaque lundi.",
+           "Pro è limitato – hai una volumen settimanale che si ricarica automaticamente ogni lunedì."
          ),
          list:L(
-           ["Alle 20+ Tools sind vollständig freigeschaltet – keine Einschränkungen.","Du siehst im Profil jederzeit wie viel deines Wochenkontingents noch übrig ist.","Jeden Montag um 07:00 Uhr wird dein Kontingent automatisch aufgefüllt.","Die KI optimiert dein LinkedIn-Profil gezielt für Schweizer Recruiter.","Der ATS-Check prüft ob dein CV durch Recruiter-Software kommt und gibt dir einen Score.","Die Zeugnis-Analyse entschlüsselt den versteckten Code in Schweizer Arbeitszeugnissen.","Job-Matching zeigt dir die fünf Stellen die am besten zu deinem Profil passen.","Der Interview-Coach simuliert echte Fragen und bewertet deine Antworten mit 0–100.","Im Bewerbungs-Tracker behältst du alle laufenden Bewerbungen im Überblick.","Der Swiss Bias-Checker prüft deinen Text auf unbewusste Formulierungen.","Die Skill-Gap-Analyse zeigt dir was dir für eine Stelle noch fehlt – und wie du es schliesst."],
-           ["All 20+ tools are fully unlocked – no restrictions.","Your profile always shows how much of your weekly quota is left.","Every Monday at 07:00 your quota is automatically refilled.","The AI optimises your LinkedIn profile specifically for Swiss recruiters.","The ATS check tests if your CV passes recruiter software and gives you a score.","The reference analysis decodes the hidden language in Swiss work references.","Job matching shows the five positions that fit your profile best.","The interview coach simulates real questions and scores your answers 0–100.","The application tracker gives you a clear overview of all ongoing applications.","The Swiss bias checker reviews your text for unconscious phrasing.","The skill gap analysis shows what you need for a role – and how to get there."],
-           ["Tous les 20+ outils entièrement débloqués – sans restrictions.","Votre profil indique toujours combien de votre quota hebdomadaire il vous reste.","Chaque lundi à 07h00, votre quota est automatiquement rechargé.","L'IA optimise votre profil LinkedIn pour les recruteurs suisses.","Le contrôle ATS vérifie si votre CV passe les logiciels RH et vous donne un score.","L'analyse de certificat déchiffre le langage caché des certificats suisses.","Le matching emploi montre les cinq postes qui correspondent le mieux à votre profil.","Le coach entretien simule de vraies questions et note vos réponses de 0 à 100.","Le tracker candidatures vous donne une vue d'ensemble de toutes vos candidatures.","Le vérificateur de biais suisse analyse vos formulations inconscientes.","L'analyse des lacunes montre ce qu'il vous manque pour un poste."],
-           ["Tutti i 20+ strumenti completamente sbloccati – senza restrizioni.","Il tuo profilo mostra sempre quanto del tuo quota settimanale rimane.","Ogni lunedì alle 07:00 il tuo quota viene ricaricato automaticamente.","L'IA ottimizza il tuo profilo LinkedIn per i recruiter svizzeri.","Il controllo ATS verifica se il tuo CV supera i software HR e ti dà un punteggio.","L'analisi del certificato decodifica il linguaggio nascosto dei certificati svizzeri.","Il job matching mostra i cinque posti che si adattano meglio al tuo profilo.","Il coach colloquio simula domande reali e valuta le tue risposte da 0 a 100.","Il tracker candidature ti dà una panoramica di tutte le candidature in corso.","Il controllo bias svizzero esamina le tue formulazioni inconsce.","L'analisi skill gap mostra cosa ti manca per un posto e come colmare il divario."]
+           ["Alle 20+ Tools sind vollständig freigeschaltet – keine Einschränkungen.","Du siehst im Profil jederzeit wie viel deines Wochennutzungsvolumens noch übrig ist.","Jeden Montag um 07:00 Uhr wird dein Nutzungsvolumen automatisch aufgefüllt.","Die KI optimiert dein LinkedIn-Profil gezielt für Schweizer Recruiter.","Der ATS-Check prüft ob dein CV durch Recruiter-Software kommt und gibt dir einen Score.","Die Zeugnis-Analyse entschlüsselt den versteckten Code in Schweizer Arbeitszeugnissen.","Job-Matching zeigt dir die fünf Stellen die am besten zu deinem Profil passen.","Der Interview-Coach simuliert echte Fragen und bewertet deine Antworten mit 0–100.","Im Bewerbungs-Tracker behältst du alle laufenden Bewerbungen im Überblick.","Der Swiss Bias-Checker prüft deinen Text auf unbewusste Formulierungen.","Die Skill-Gap-Analyse zeigt dir was dir für eine Stelle noch fehlt – und wie du es schliesst."],
+           ["All 20+ tools are fully unlocked – no restrictions.","Your profile always shows how much of your weekly volumen is left.","Every Monday at 07:00 your volumen is automatically erneuerunged.","The AI optimises your LinkedIn profile specifically for Swiss recruiters.","The ATS check tests if your CV passes recruiter software and gives you a score.","The reference analysis decodes the hidden language in Swiss work references.","Job matching shows the five positions that fit your profile best.","The interview coach simulates real questions and scores your answers 0–100.","The application tracker gives you a clear overview of all ongoing applications.","The Swiss bias checker reviews your text for unconscious phrasing.","The skill gap analysis shows what you need for a role – and how to get there."],
+           ["Tous les 20+ outils entièrement débloqués – sans restrictions.","Votre profil indique toujours combien de votre volumen hebdomadaire il vous reste.","Chaque lundi à 07h00, votre volumen est automatiquement rechargé.","L'IA optimise votre profil LinkedIn pour les recruteurs suisses.","Le contrôle ATS vérifie si votre CV passe les logiciels RH et vous donne un score.","L'analyse de certificat déchiffre le langage caché des certificats suisses.","Le matching emploi montre les cinq postes qui correspondent le mieux à votre profil.","Le coach entretien simule de vraies questions et note vos réponses de 0 à 100.","Le tracker candidatures vous donne une vue d'ensemble de toutes vos candidatures.","Le vérificateur de biais suisse analyse vos formulations inconscientes.","L'analyse des lacunes montre ce qu'il vous manque pour un poste."],
+           ["Tutti i 20+ strumenti completamente sbloccati – senza restrizioni.","Il tuo profilo mostra sempre quanto del tuo volumen settimanale rimane.","Ogni lunedì alle 07:00 il tuo volumen viene ricaricato automaticamente.","L'IA ottimizza il tuo profilo LinkedIn per i recruiter svizzeri.","Il controllo ATS verifica se il tuo CV supera i software HR e ti dà un punteggio.","L'analisi del certificato decodifica il linguaggio nascosto dei certificati svizzeri.","Il job matching mostra i cinque posti che si adattano meglio al tuo profilo.","Il coach colloquio simula domande reali e valuta le tue risposte da 0 a 100.","Il tracker candidature ti dà una panoramica di tutte le candidature in corso.","Il controllo bias svizzero esamina le tue formulazioni inconsce.","L'analisi skill gap mostra cosa ti manca per un posto e come colmare il divario."]
          ),
          btn:L("Pro werden → CHF 19.90/Mo.","Become Pro → CHF 19.90/mo","Devenir Pro → CHF 19.90/mois","Diventa Pro → CHF 19.90/mese"),btnS:"b-em"},
         {id:"ultimate",name:L("Ultimate ♾️","Ultimate ♾️","Ultimate ♾️","Ultimate ♾️"),priceM:49.90,priceY:39.90,best:false,
          note:L("Absolut keine Limits – für tägliche Intensivnutzung.","Absolutely no limits – for daily intensive use.","Aucune limite – pour une utilisation quotidienne intensive.","Nessun limite – per un uso intensivo quotidiano."),
-         yearNote:L("🔥 CHF 39.90/Mo. bei Jahresabo – CHF 478.80/Jahr","🔥 CHF 39.90/mo with annual plan – CHF 478.80/year","🔥 CHF 39.90/mois avec abonnement annuel","🔥 CHF 39.90/mese con abbonamento annuale"),
+         yearNote:L("🎁 Jahresabo – 2 Monate gratis · nur CHF 39.90/Mo.","🎁 Annual plan – 2 months free · CHF 39.90/mo","🎁 Abonnement annuel – 2 mois offerts · CHF 39.90/mois","🎁 Abbonamento annuale – 2 mesi gratis · CHF 39.90/mese"),
          desc:L(
-           "Ultimate ist unlimitiert – keine Limits, kein Kontingent, kein Warten.",
-           "Ultimate is unlimited – no limits, no quota, no waiting.",
-           "Ultimate est illimité – aucune limite, aucun quota, aucune attente.",
-           "Ultimate è illimitato – nessun limite, nessuna quota, nessuna attesa."
+           "Ultimate ist unlimitiert – keine Limits, kein Nutzungsvolumen, kein Warten.",
+           "Ultimate is unlimited – no limits, no volumen, no waiting.",
+           "Ultimate est illimité – aucune limite, aucun volumen, aucune attente.",
+           "Ultimate è illimitato – nessun limite, nessuna volumen, nessuna attesa."
          ),
          list:L(
-           ["Kein Kontingent, kein Refill, kein Warten – du nutzt Stellify ohne jede Einschränkung.","Alle 20+ Tools in allen vier Sprachen sind jederzeit und unbegrenzt verfügbar.","Der Swiss Bias-Checker prüft deine Texte auf unbewusste Formulierungen.","Die Skill-Gap-Analyse zeigt dir konkret was dir für eine Stelle noch fehlt.","Die KI optimiert dein LinkedIn-Profil gezielt für den Schweizer Markt.","Der ATS-Check gibt dir einen Score und zeigt welche Keywords noch fehlen.","Die Zeugnis-Analyse entschlüsselt den versteckten Code in Schweizer Arbeitszeugnissen.","Job-Matching findet die fünf Stellen die am besten zu deinem Profil passen.","Der Interview-Coach simuliert echte Gespräche und gibt dir eine Bewertung 0–100.","Priority Support – bei Fragen antwortet das Stellify-Team bevorzugt."],
-           ["No quota, no refill, no waiting – use Stellify without any restrictions.","All 20+ tools in all four languages are available at any time without limits.","The Swiss bias checker reviews your texts for unconscious phrasing.","The skill gap analysis shows you exactly what you need for a position.","The AI optimises your LinkedIn profile specifically for the Swiss market.","The ATS check gives you a score and shows which keywords are missing.","The reference analysis decodes the hidden language in Swiss work references.","Job matching finds the five positions that fit your profile best.","The interview coach simulates real conversations and scores you 0–100.","Priority support – the Stellify team responds to your questions first."],
-           ["Aucun quota, aucune recharge, aucune attente – utilisez Stellify sans aucune restriction.","Tous les 20+ outils dans les quatre langues sont disponibles à tout moment.","Le vérificateur de biais suisse analyse vos formulations inconscientes.","L'analyse des lacunes vous montre exactement ce qu'il vous manque pour un poste.","L'IA optimise votre profil LinkedIn pour le marché suisse.","Le contrôle ATS vous donne un score et montre les mots-clés manquants.","L'analyse de certificat déchiffre le langage caché des certificats suisses.","Le matching emploi trouve les cinq postes qui correspondent le mieux à votre profil.","Le coach entretien simule de vraies conversations et vous note de 0 à 100.","Support prioritaire – l'équipe Stellify répond à vos questions en premier."],
-           ["Nessuna quota, nessuna ricarica, nessuna attesa – usa Stellify senza alcuna restrizione.","Tutti i 20+ strumenti in tutte e quattro le lingue sono sempre disponibili.","Il controllo bias svizzero esamina le tue formulazioni inconsce.","L'analisi skill gap mostra esattamente cosa ti manca per un posto.","L'IA ottimizza il tuo profilo LinkedIn per il mercato svizzero.","Il controllo ATS ti dà un punteggio e mostra le keyword mancanti.","L'analisi del certificato decodifica il linguaggio nascosto dei certificati svizzeri.","Il job matching trova i cinque posti che si adattano meglio al tuo profilo.","Il coach colloquio simula conversazioni reali e ti valuta da 0 a 100.","Supporto prioritario – il team Stellify risponde alle tue domande per primo."]
+           ["Kein Nutzungsvolumen, kein Erneuerung, kein Warten – du nutzt Stellify ohne jede Einschränkung.","Alle 20+ Tools in allen vier Sprachen sind jederzeit und unbegrenzt verfügbar.","Der Swiss Bias-Checker prüft deine Texte auf unbewusste Formulierungen.","Die Skill-Gap-Analyse zeigt dir konkret was dir für eine Stelle noch fehlt.","Die KI optimiert dein LinkedIn-Profil gezielt für den Schweizer Markt.","Der ATS-Check gibt dir einen Score und zeigt welche Keywords noch fehlen.","Die Zeugnis-Analyse entschlüsselt den versteckten Code in Schweizer Arbeitszeugnissen.","Job-Matching findet die fünf Stellen die am besten zu deinem Profil passen.","Der Interview-Coach simuliert echte Gespräche und gibt dir eine Bewertung 0–100.","Priority Support – bei Fragen antwortet das Stellify-Team bevorzugt."],
+           ["No volumen, no erneuerung, no waiting – use Stellify without any restrictions.","All 20+ tools in all four languages are available at any time without limits.","The Swiss bias checker reviews your texts for unconscious phrasing.","The skill gap analysis shows you exactly what you need for a position.","The AI optimises your LinkedIn profile specifically for the Swiss market.","The ATS check gives you a score and shows which keywords are missing.","The reference analysis decodes the hidden language in Swiss work references.","Job matching finds the five positions that fit your profile best.","The interview coach simulates real conversations and scores you 0–100.","Priority support – the Stellify team responds to your questions first."],
+           ["Aucun volumen, aucune recharge, aucune attente – utilisez Stellify sans aucune restriction.","Tous les 20+ outils dans les quatre langues sont disponibles à tout moment.","Le vérificateur de biais suisse analyse vos formulations inconscientes.","L'analyse des lacunes vous montre exactement ce qu'il vous manque pour un poste.","L'IA optimise votre profil LinkedIn pour le marché suisse.","Le contrôle ATS vous donne un score et montre les mots-clés manquants.","L'analyse de certificat déchiffre le langage caché des certificats suisses.","Le matching emploi trouve les cinq postes qui correspondent le mieux à votre profil.","Le coach entretien simule de vraies conversations et vous note de 0 à 100.","Support prioritaire – l'équipe Stellify répond à vos questions en premier."],
+           ["Nessuna volumen, nessuna ricarica, nessuna attesa – usa Stellify senza alcuna restrizione.","Tutti i 20+ strumenti in tutte e quattro le lingue sono sempre disponibili.","Il controllo bias svizzero esamina le tue formulazioni inconsce.","L'analisi skill gap mostra esattamente cosa ti manca per un posto.","L'IA ottimizza il tuo profilo LinkedIn per il mercato svizzero.","Il controllo ATS ti dà un punteggio e mostra le keyword mancanti.","L'analisi del certificato decodifica il linguaggio nascosto dei certificati svizzeri.","Il job matching trova i cinque posti che si adattano meglio al tuo profilo.","Il coach colloquio simula conversazioni reali e ti valuta da 0 a 100.","Supporto prioritario – il team Stellify risponde alle tue domande per primo."]
          ),
          btn:L("Ultimate starten → CHF 49.90/Mo.","Start Ultimate → CHF 49.90/mo","Démarrer Ultimate → CHF 49.90/mois","Avvia Ultimate → CHF 49.90/mese"),btnS:"b-out"},
       ],
@@ -768,7 +769,7 @@ const mkT = (lang) => {
     payments:{
       label:L("Bezahle wie du willst","Payez comme vous voulez","Paga come vuoi","Pay your way"),
       sub:L("Sicher via Stripe verarbeitet.","Traitement sécurisé via Stripe.","Elaborazione sicura via Stripe.","Securely processed via Stripe."),
-      methods:["🇨🇭 Twint","💳 Visa","💳 Mastercard","💳 Amex","🅿️ PayPal","🍎 Apple Pay","🤖 Google Pay","🏦 SEPA","🛒 Klarna"],
+      methods:["🇨🇭 Twint","💳 Visa","💳 Mastercard","💳 Amex","🍎 Apple Pay","🤖 Google Pay","🏦 SEPA-Lastschrift","🛒 Klarna","💳 PostFinance"],
     },
     cta:{
       title:L("Deine Karriere verdient","Votre carrière mérite","La tua carriera merita","Your career deserves"),
@@ -1671,7 +1672,7 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
         {limitHit&&(
           <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",borderRadius:12,padding:"16px 20px",marginBottom:16,textAlign:"center"}}>
             <div style={{fontSize:24,marginBottom:6}}>⏳</div>
-            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,marginBottom:4}}>{L("Monatliches Kontingent aufgebraucht","Monthly quota used up","Quota mensuel épuisé","Quota mensile esaurito")}</div>
+            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,marginBottom:4}}>{L("Monatliches Nutzungsvolumen aufgebraucht","Monthly volumen used up","Volumen mensuel épuisé","Volumen mensile esaurito")}</div>
             <div style={{fontSize:13,color:"var(--mu)"}}>{L("Nächster Reset:","Next reset:","Prochaine réinitialisation:","Prossimo reset:")} <strong>{nextReset()}</strong></div>
           </div>
         )}
@@ -2400,14 +2401,14 @@ function FaqSection({lang, email}) {
   const faqs=lang==="de"?[
     {q:"Wie sicher sind meine Daten?",a:"Deine Daten werden nicht gespeichert. Jede Anfrage wird direkt an die Anthropic API gesendet und danach nicht protokolliert. Kein Training auf deinen Daten."},
     {q:"Kann ich jederzeit kündigen?",a:"Ja – du kannst monatlich kündigen, ohne Mindestlaufzeit oder versteckte Gebühren. Über Stripe verwaltest du dein Abo selbst."},
-    {q:"Wie viele Generierungen habe ich?",a:`Gratis: ${C.FREE_LIMIT} Generierung${C.FREE_LIMIT!==1?"en":""} zum Testen. Pro: ${C.PRO_LIMIT} Generierungen/Woche (Refill jeden Montag 07:00). Ultimate: unbegrenzt.`},
+    {q:"Wie viele Generierungen habe ich?",a:`Gratis: ${C.FREE_LIMIT} Generierung${C.FREE_LIMIT!==1?"en":""} zum Testen. Pro: ${C.PRO_LIMIT} Generierungen/Woche (Erneuerung jeden Montag 07:00). Ultimate: unbegrenzt.`},
     {q:"Funktioniert Stellify für alle Branchen?",a:"Ja. Die KI ist auf den Schweizer Jobmarkt trainiert und kennt Gepflogenheiten aus IT, Finanzen, Gesundheit, Bildung, Gastronomie und mehr."},
     {q:"Welche Sprachen werden unterstützt?",a:"Vollständig auf Deutsch, Englisch, Französisch und Italienisch – ideal für Jobs in allen Sprachregionen der Schweiz."},
     {q:"Gibt es einen Studentenrabatt?",a:"Aktuell nicht, aber der Jahrespreis (CHF 18.90/Mo.) macht das Abo für alle erschwinglich. Meld dich bei uns für spezielle Konditionen."},
   ]:lang==="fr"?[
     {q:"Mes données sont-elles sécurisées?",a:"Vos données ne sont pas stockées. Chaque requête est envoyée directement à l'API Anthropic et n'est pas enregistrée."},
     {q:"Puis-je résilier à tout moment?",a:"Oui – résiliation mensuelle possible, sans durée minimale ni frais cachés."},
-    {q:"Combien de générations par plan?",a:"Gratuit: 1 génération. Pro: 60/mois par personne. Famille: 60/mois par personne (3 personnes). Unlimited: 60/mois par personne, membres illimités. Le quota se renouvelle automatiquement le 1er du mois suivant."},
+    {q:"Combien de générations par plan?",a:"Gratuit: 1 génération. Pro: 60/mois par personne. Famille: 60/mois par personne (3 personnes). Unlimited: 60/mois par personne, membres illimités. Le volumen se renouvelle automatiquement le 1er du mois suivant."},
     {q:"Fonctionne pour tous les secteurs?",a:"Oui. L'IA connaît les habitudes du marché suisse dans tous les secteurs."},
     {q:"Quelles langues sont supportées?",a:"Allemand, anglais, français et italien – idéal pour toutes les régions linguistiques."},
     {q:"Y a-t-il une réduction étudiants?",a:"Pas actuellement, mais le prix annuel (CHF 18.90/mois) est accessible à tous."},
@@ -3675,6 +3676,7 @@ export default function App() {
   const uj=(k,v)=>setJob(p=>({...p,[k]:v})); const up=(k,v)=>setProf(p=>({...p,[k]:v}));
   const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]);
   const stripeLink=()=>yearly?C.stripeYearly:C.stripeMonthly;
+  const stripeLinkUltimate=()=>yearly?C.stripeUltimateYearly:C.stripeUltimate;
   const canGen=()=>pro?(proUsage<C.PRO_LIMIT):(usage<C.FREE_LIMIT);
   const canGenPro=()=>authSession?.plan==="ultimate"||proUsage<C.PRO_LIMIT;
   const nextReset=()=>{const d=new Date();d.setMonth(d.getMonth()+1);d.setDate(1);return d.toLocaleDateString(lang==="de"?"de-CH":lang==="fr"?"fr-CH":lang==="it"?"it-CH":"en-CH",{day:"numeric",month:"long",year:"numeric"});};
@@ -3688,12 +3690,48 @@ export default function App() {
     setPage(p);
   };
 
+  // ── GOOGLE LOGIN ──
+  const handleGoogleLogin = () => {
+    const clientId = "370460173343-bnc71e8tib764unofcd6sqf7slesehih.apps.googleusercontent.com";
+    if (clientId === "370460173343-bnc71e8tib764unofcd6sqf7slesehih.apps.googleusercontent.com") {
+      // Fallback: normales Login wenn Google nicht konfiguriert
+      setAuthMode("login"); setShowAuth(true); return;
+    }
+    const redirect = encodeURIComponent(window.location.origin + "/api/auth/google");
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirect}&response_type=code&scope=email%20profile&prompt=select_account`;
+  };
+
   useEffect(()=>{
     // Initialen History-Eintrag setzen
     const hash = window.location.hash.replace("#","") || "landing";
     window.history.replaceState({page:hash},"",window.location.href);
     const onPop = (e) => setPage(e.state?.page || "landing");
     window.addEventListener("popstate", onPop);
+
+    // Google OAuth Session lesen
+    const params = new URLSearchParams(window.location.search);
+    const googleSession = params.get("google_session");
+    const authError = params.get("auth_error");
+    if (googleSession) {
+      try {
+        const sessionData = JSON.parse(atob(decodeURIComponent(googleSession)));
+        // Nutzer registrieren/einloggen
+        const users = authGetUsers();
+        const existing = users.find(u => u.email === sessionData.email);
+        if (!existing) {
+          authRegister(sessionData.email, "google-oauth-" + Date.now(), "free");
+        }
+        const sess = { email: sessionData.email, plan: existing?.plan || "free", name: sessionData.name, picture: sessionData.picture };
+        authSetSession(sess);
+        setAuthSession(sess);
+        if (sess.plan === "pro" || sess.plan === "ultimate") setPro(true);
+      } catch(e) { console.error("Google Session Fehler:", e); }
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+    if (authError) {
+      console.error("Google Auth Fehler:", authError);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     return ()=>window.removeEventListener("popstate", onPop);
   },[]);
 
@@ -3832,11 +3870,20 @@ Antworte NUR mit JSON:
               </button>
             </div>
           ) : (
-            <button onClick={()=>{setAuthMode("login");setShowAuth(true);}}
-              style={{display:"flex",alignItems:"center",gap:7,background:"linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05))",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:24,padding:"6px 14px 6px 6px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:700,color:"var(--em2)"}}>
-              <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(16,185,129,.2)",border:"1px solid rgba(16,185,129,.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>👤</div>
-              {lang==="de"?"Einloggen":lang==="fr"?"Connexion":lang==="it"?"Accedi":"Sign in"}
-            </button>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={handleGoogleLogin}
+                style={{display:"flex",alignItems:"center",gap:6,background:"white",border:"1.5px solid #dadce0",borderRadius:24,padding:"5px 12px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:600,color:"#3c4043",transition:"all .2s",boxShadow:"0 1px 3px rgba(0,0,0,.08)"}}
+                onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,.15)"}
+                onMouseLeave={e=>e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,.08)"}>
+                <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Google
+              </button>
+              <button onClick={()=>{setAuthMode("login");setShowAuth(true);}}
+                style={{display:"flex",alignItems:"center",gap:7,background:"linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05))",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:24,padding:"6px 14px 6px 6px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:700,color:"var(--em2)"}}>
+                <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(16,185,129,.2)",border:"1px solid rgba(16,185,129,.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>👤</div>
+                {lang==="de"?"E-Mail":lang==="fr"?"E-mail":lang==="it"?"E-mail":"Email"}
+              </button>
+            </div>
           )}
           <button className="nc" onClick={()=>navTo("app")}>{lang==="de"?"Kostenlos starten":lang==="fr"?"Commencer":lang==="it"?"Inizia":"Start free"} →</button>
         </div>
@@ -3868,7 +3915,7 @@ Antworte NUR mit JSON:
         <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:"8px 36px",maxWidth:900,margin:"0 auto"}}>
           {[{ico:"🔒",txt:lang==="de"?"Keine Datenspeicherung":"No data storage"},
             {ico:"🇨🇭",txt:lang==="de"?"Schweizer Unternehmen · Zug":"Swiss company · Zug"},
-            {ico:"⚡",txt:"Powered by Groq AI"},
+            
             {ico:"🔐",txt:lang==="de"?"Sichere Zahlung via Stripe":"Secure payment via Stripe"},
           ].map((tr,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"rgba(255,255,255,.32)",fontWeight:500}}>
@@ -3884,7 +3931,7 @@ Antworte NUR mit JSON:
           <div style={{fontSize:12,color:"rgba(255,255,255,.2)",marginBottom:4}}>📍 {C.address}</div>
           <div style={{fontSize:12,color:"rgba(255,255,255,.2)",marginBottom:12}}>✉️ <a href={`mailto:${C.email}`} style={{color:"rgba(255,255,255,.25)",textDecoration:"none"}}>{C.email}</a></div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:14}}>
-            {["Twint","Visa","Mastercard","PayPal","Apple Pay"].map(p=>(
+            {["Twint","Visa","Mastercard","Apple Pay","Google Pay","PostFinance"].map(p=>(
               <div key={p} style={{fontSize:10,fontWeight:700,background:"rgba(255,255,255,.07)",color:"rgba(255,255,255,.35)",padding:"3px 8px",borderRadius:5,border:"1px solid rgba(255,255,255,.08)"}}>{p}</div>
             ))}
           </div>
@@ -3909,15 +3956,18 @@ Antworte NUR mit JSON:
           <button onClick={()=>navTo("agb")}>{t.legal.agb}</button>
           <button onClick={()=>navTo("datenschutz")}>{t.legal.privacy}</button>
           <button onClick={()=>navTo("impressum")}>{t.legal.imprint}</button>
-          <div style={{marginTop:16,fontSize:12,color:"rgba(255,255,255,.18)",lineHeight:1.6}}>
-            {lang==="de"?"Stellify ist kein Rechts- oder Karriereberater. Alle KI-generierten Inhalte sind Entwürfe – keine rechtsverbindlichen Dokumente.":
-             "Stellify is not a legal advisor. All AI-generated content is a draft only."}
-          </div>
+
         </div>
       </div>
       <div className="fbot">
         <div>© {new Date().getFullYear()} {C.name} · {C.owner} · {C.address}</div>
         <div style={{display:"flex",gap:12}}>{[["agb",t.legal.agb],["datenschutz",t.legal.privacy],["impressum",t.legal.imprint]].map(([p,l])=><button key={p} onClick={()=>navTo(p)} style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",fontSize:11,cursor:"pointer",fontFamily:"var(--bd)"}}>{l}</button>)}</div>
+      </div>
+      <div style={{textAlign:"center",fontSize:10,color:"rgba(255,255,255,.12)",paddingTop:12,paddingBottom:8}}>
+        {lang==="de"?"KI-Inhalte sind Entwürfe ohne Rechtsverbindlichkeit · Details in den AGB":
+         lang==="fr"?"Les contenus IA sont des ébauches sans valeur juridique · Voir CGV":
+         lang==="it"?"I contenuti IA sono bozze senza valore legale · Vedi CG":
+         "AI content is non-binding · See Terms"}
       </div>
     </footer>
   );
@@ -3947,7 +3997,7 @@ Antworte NUR mit JSON:
     </div>
   ):proUsage>=C.PRO_LIMIT?(
     <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.25)",borderRadius:10,padding:"10px 16px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-      <span>⏳ {L("Monatliches Kontingent aufgebraucht","Monthly quota used up","Quota mensuel épuisé","Monthly quota used up")} · {L("Reset am","Reset on","Réinitialisation le","Reset on")} <strong>{nextReset()}</strong></span>
+      <span>⏳ {L("Monatliches Nutzungsvolumen aufgebraucht","Monthly volumen used up","Volumen mensuel épuisé","Monthly volumen used up")} · {L("Reset am","Reset on","Réinitialisation le","Reset on")} <strong>{nextReset()}</strong></span>
     </div>
   ):(
     <div className="ubar">
@@ -5219,7 +5269,7 @@ NOTE: Incluse in tutte le diapositive`),
                 </ul>
                 {tier.id==="free"&&<button className="btn b-out b-w" style={{borderColor:"rgba(255,255,255,.18)",color:"white"}} onClick={()=>navTo("app")}>{tier.btn}</button>}
                 {tier.id==="pro"&&<button className={`btn ${tier.btnS} b-w`} onClick={()=>window.open(stripeLink(),"_blank")}>{tier.btn}</button>}
-                {tier.id==="ultimate"&&<button className={`btn b-out b-w`} style={{borderColor:"rgba(245,158,11,.4)",color:"rgba(245,158,11,.85)"}} onClick={()=>window.open(C.stripeUltimate,"_blank")}>{tier.btn}</button>}
+                {tier.id==="ultimate"&&<button className={`btn b-out b-w`} style={{borderColor:"rgba(245,158,11,.4)",color:"rgba(245,158,11,.85)"}} onClick={()=>window.open(stripeLinkUltimate(),"_blank")}>{tier.btn}</button>}
               </div>
             ))}
           </div>
@@ -6156,14 +6206,15 @@ VERHALTEN:
     <h2>2. Leistungen</h2><p>{C.name} ist ein KI-gestützter All-in-One Career & Produktivitäts-Copilot mit 20+ Tools, u.a.: Bewerbungsgenerator, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker, Gehaltsverhandlungs-Coach, Networking-Nachrichten, Kündigung, 30-60-90-Tage-Plan, Referenzschreiben, Lehrstellen-Bewerbung, Lernplan, Zusammenfassung, E-Mail-Assistent, Meeting-Protokoll, Übersetzer. Es wird kein Erfolg garantiert.</p>
     <h2>3. Abonnement & Zahlung</h2><p>Gratis: 1 Bewerbungsgenerierung/Monat. Pro: CHF 19.90/Monat (monatlich kündbar) oder CHF 14.90/Monat (jährlich = CHF 178.80/Jahr). Ultimate: CHF 49.90/Monat oder CHF 39.90/Monat (jährlich = CHF 478.80/Jahr). Pro enthält: Unbegrenzte Bewerbungen, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker. Zahlung via Stripe (Twint, Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay, SEPA, Klarna). Automatische Verlängerung. Kündigung jederzeit per E-Mail.</p>
     <h2>4. Haftung</h2><p>Keine Haftung für Qualität generierter Inhalte, Vollständigkeit der KI-Analysen oder indirekte Schäden.</p>
-    <h2>5. Recht & Gerichtsstand</h2><p>Schweizer Recht. Gerichtsstand: Zürich. Kontakt: <a href={`mailto:${C.email}`}>{C.email}</a></p>
+    <h2>5. Haftungsausschluss KI-Inhalte</h2><p>Stellify ist kein Rechts-, Karriere- oder Finanzberater. Alle KI-generierten Inhalte (Bewerbungsunterlagen, Analysen, Empfehlungen) sind unverbindliche Entwürfe und ersetzen keine professionelle Beratung. Keine Garantie auf Vollständigkeit oder Richtigkeit. Nutzung auf eigene Verantwortung.</p>
+    <h2>6. Recht & Gerichtsstand</h2><p>Schweizer Recht (OR/DSG). Gerichtsstand: Zürich. Kontakt: <a href={`mailto:${C.email}`}>{C.email}</a></p>
   </>}/>;
   if(page==="datenschutz") return <LS ch={<>
     <h1>Datenschutz / Privacy</h1><div className="legal-d">DSG (CH) · DSGVO (EU) · Stand: {LD()}</div>
     <h2>Verantwortlich</h2><p>{C.owner}, {C.address} · <a href={`mailto:${C.email}`}>{C.email}</a></p>
     <h2>Erhobene Daten</h2><ul><li>Eingabedaten (Lebenslauf, Zeugnisse, Profildaten) – werden nicht dauerhaft gespeichert</li><li>Nutzungsstatistiken: IP-Adresse (anonymisiert, 30 Tage)</li><li>Zahlungsdaten: ausschliesslich via Stripe (PCI-DSS-konform)</li></ul>
-    <h2>KI-Verarbeitung</h2><p>Eingaben werden zur Verarbeitung an Anthropic (anthropic.com) übermittelt. Anthropic verarbeitet keine Daten für eigene Zwecke.</p>
-    <h2>Drittanbieter</h2><p>Stripe (stripe.com/privacy) · Anthropic (anthropic.com/privacy)</p>
+    <h2>KI-Verarbeitung</h2><p>Eingaben werden zur KI-Verarbeitung temporär an Groq Inc. (groq.com) übermittelt und nicht dauerhaft gespeichert. Groq verarbeitet keine Daten für eigene Zwecke.</p>
+    <h2>Drittanbieter</h2><p>Stripe (stripe.com/privacy) · Groq (groq.com/privacy)</p>
     <h2>Deine Rechte</h2><p>Auskunft, Berichtigung, Löschung jederzeit: <a href={`mailto:${C.email}`}>{C.email}</a></p>
     <h2>Sicherheit</h2><p>HTTPS/TLS. Keine Marketing-Cookies. Kein Verkauf von Daten.</p>
   </>}/>;
@@ -6202,3 +6253,8 @@ VERHALTEN:
     {/* Render der aktuellen Seite wird oben zurückgegeben – dieser Code ist nie erreichbar */}
   </>);
 }
+
+import { createRoot } from "react-dom/client";
+const root = document.getElementById("root");
+if (root) createRoot(root).render(<App />);
+
