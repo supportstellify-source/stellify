@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Stellify – AI Career Copilot Schweiz"/>
+  <meta name="theme-color" content="#10b981"/>
+  <title>Stellify – AI Career Copilot Schweiz</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x2726;</text></svg>"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#07070e;font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+    #root{min-height:100vh}
+    #sl{position:fixed;inset:0;background:#07070e;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:99999;transition:opacity .5s}
+    #sl .ic{font-size:50px;animation:lp 2s ease-in-out infinite}
+    #sl .nm{color:#fff;font-size:21px;font-weight:700;letter-spacing:-.5px}
+    #sl .dt{display:flex;gap:7px}
+    #sl .dt span{width:7px;height:7px;border-radius:50%;background:#10b981;animation:ld 1.3s ease-in-out infinite}
+    #sl .dt span:nth-child(2){animation-delay:.2s}
+    #sl .dt span:nth-child(3){animation-delay:.4s}
+    #sl .sb{color:rgba(255,255,255,.3);font-size:11px}
+    @keyframes lp{0%,100%{transform:scale(.88);opacity:.5}50%{transform:scale(1.06);opacity:1}}
+    @keyframes ld{0%,80%,100%{transform:scale(.4);opacity:.25}40%{transform:scale(1);opacity:1}}
+  </style>
+</head>
+<body>
+  <div id="sl">
+    <div class="ic">&#x2726;</div>
+    <div class="nm">Stellify</div>
+    <div class="dt"><span></span><span></span><span></span></div>
+    <div class="sb">AI Career Copilot Schweiz</div>
+  </div>
+  <div id="root"></div>
+  <script>
+    function hideSL() {
+      var el = document.getElementById("sl");
+      if (el) { el.style.opacity = "0"; setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 500); }
+    }
+    setTimeout(hideSL, 3000);
+    window.onerror = function(msg, src, line, col, err) {
+      var el = document.getElementById("sl");
+      if (el) {
+        el.innerHTML = "<div style=\"color:#ef4444;padding:24px;text-align:center;font-family:system-ui;max-width:500px\"><b style=\"font-size:16px\">Fehler beim Laden</b><br><br><span style=\"font-size:12px;opacity:.7\">" + msg + "</span><br><br><button onclick=\"location.reload()\" style=\"background:#10b981;color:white;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:14px\">Neu laden</button></div>";
+        el.style.opacity = "1";
+      }
+      return false;
+    };
+    window.addEventListener("unhandledrejection", function(e) { window.onerror(String(e.reason)); });
+  </script>
+  <script src="./stellify-bundle.js"></script>
+</body>
+</html>
