@@ -2829,17 +2829,28 @@ function ChatBot({ lang, pro, setPw, navTo, authSession, onAuthOpen }) {
   },[]);
 
   const isLoggedIn = !!authSession;
-  const canChat = isLoggedIn && (pro || chatUsage < C.CHAT_FREE_LIMIT);
-  const needsLogin = !isLoggedIn;
+  const canChat = !isLoggedIn || pro || chatUsage < C.CHAT_FREE_LIMIT;
+  const needsUpgrade = isLoggedIn && !pro && chatUsage >= C.CHAT_FREE_LIMIT;
 
-  const SYSTEM = `Du bist Stella, die KI-Karriere-Assistentin von Stellify. Du hast tiefes Wissen über Karriere, Bewerbungen, den Schweizer Arbeitsmarkt und Produktivität.
+  // System-Prompt für nicht eingeloggte User: nur Seiten-Infos
+  const SYSTEM_PUBLIC = `Du bist Stella, die freundliche KI-Assistentin von Stellify – dem Schweizer AI Career Copilot. Du beantwortest NUR Fragen zu Stellify, seinen Tools, Funktionen und Abonnements.
 
-Dein Wissen umfasst: Schweizer Bewerbungsunterlagen (Motivationsschreiben, Lebenslauf mit Foto, 1-2 Seiten), ATS-Optimierung, Schweizer Arbeitsrecht (Kündigungsfristen, Sperrfristen, Zeugnis-Code: \"stets zu vollsten Zufriedenheit\"=sehr gut), Gehälter nach Branche/Erfahrung, LinkedIn-Optimierung, Interview-Vorbereitung (STAR-Methode), Gehaltsverhandlungs-Taktiken, Schweizer Bildungssystem (EFZ, FH, Uni, CAS/MAS).
+Stellify-Tools (20+): ✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung, 🗓️ 30-60-90-Plan, 📚 Lernplan, ✉️ E-Mail-Assistent und weitere.
+
+Preise: Gratis (1 Bewerbung, kein Abo), Pro CHF 14.90/Mo. jährlich (CHF 178.80/Jahr), Ultimate CHF 39.90/Mo. jährlich (CHF 478.80/Jahr). Alle Pläne jederzeit kündbar via Stripe. Twint, Kreditkarte, Apple Pay akzeptiert.
+
+WICHTIG: Wenn jemand konkrete Karriere-Fragen stellt (Bewerbung schreiben, Lohnverhandlung, Zeugnis deuten usw.), antworte: "Für persönliche Karriereberatung brauchst du ein Stellify-Konto. Registriere dich jetzt gratis – deine erste vollständige Bewerbung ist kostenlos!" Weise auf den Login-Button hin. Beantworte keine konkreten Karrierefragen ohne Login.`;
+
+  const SYSTEM_FULL = `Du bist Stella, die KI-Karriere-Assistentin von Stellify. Du hast tiefes Wissen über Karriere, Bewerbungen, den Schweizer Arbeitsmarkt und Produktivität.
+
+Dein Wissen umfasst: Schweizer Bewerbungsunterlagen (Motivationsschreiben, Lebenslauf mit Foto, 1-2 Seiten), ATS-Optimierung, Schweizer Arbeitsrecht (Kündigungsfristen, Sperrfristen, Zeugnis-Code: "stets zu vollsten Zufriedenheit"=sehr gut), Gehälter nach Branche/Erfahrung, LinkedIn-Optimierung, Interview-Vorbereitung (STAR-Methode), Gehaltsverhandlungs-Taktiken, Schweizer Bildungssystem (EFZ, FH, Uni, CAS/MAS).
 
 Tools von Stellify:
 ✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer, 💰 KI-Gehaltsrechner Schweiz, 📋 Bewerbungs-Tracker, ✍️ LinkedIn-Post Generator
 
 Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib Beispieltexte direkt aus wenn gefragt. Empfehle Tool-Namen exakt wie oben damit Links funktionieren. Sei warm, direkt, wie ein erfahrener Karriere-Coach.`;
+
+  const SYSTEM = isLoggedIn ? SYSTEM_FULL : SYSTEM_PUBLIC;
 
   const TOOL_MAP = {
     "bewerbung":["✍️ Bewerbungen","app"], "bewerbungen":["✍️ Bewerbungen","app"],
@@ -2876,14 +2887,13 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
 
   const send = async () => {
     if(!input.trim()||loading) return;
-    if(needsLogin){ onAuthOpen && onAuthOpen(); return; }
-    if(!canChat){ setPw(true); return; }
+    if(needsUpgrade){ setPw(true); return; }
     const userMsg = input.trim();
     setInput("");
     const newMsgs = [...msgs, {r:"u", t:userMsg}];
     setMsgs(newMsgs);
     setLoading(true);
-    if(!pro){ incChat(); setChatUsage(c=>c+1); }
+    if(isLoggedIn && !pro){ incChat(); setChatUsage(c=>c+1); }
     try {
       const apiMsgs = [];
       for(const m of newMsgs) {
@@ -3047,20 +3057,31 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
           <div ref={bottomRef}/>
         </div>
 
-        {!canChat&&<div style={{padding:"10px 14px",background:"rgba(245,158,11,.08)",borderTop:"1px solid rgba(245,158,11,.15)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-          <div style={{fontSize:12,color:"rgba(245,158,11,.8)"}}>{L("Gratis-Limit erreicht","Free limit reached","Limite gratuit atteint","Limite raggiunto")}</div>
-          <button onClick={()=>setPw(true)} style={{background:"var(--am)",color:"white",border:"none",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Pro {L("freischalten","unlock","activer","sblocca")} →</button>
+        {needsUpgrade&&<div style={{padding:"10px 14px",background:"rgba(245,158,11,.08)",borderTop:"1px solid rgba(245,158,11,.15)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+          <div>
+            <div style={{fontSize:12,color:"rgba(245,158,11,.9)",fontWeight:700}}>{L("Tageslimit (20) erreicht","Daily limit (20) reached","Limite quotidien atteint","Limite giornaliero raggiunto")}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>{L("Ultimate: unbegrenzt, kein Reset","Ultimate: unlimited, no reset","Ultimate: illimité","Ultimate: illimitato")}</div>
+          </div>
+          <button onClick={()=>setPw(true)} style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",border:"none",borderRadius:8,padding:"6px 14px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",boxShadow:"0 2px 8px rgba(245,158,11,.3)"}}>
+            {L("Upgrade →","Upgrade →","Upgrade →","Upgrade →")}
+          </button>
+        </div>}
+        {!isLoggedIn&&<div style={{padding:"8px 14px",background:"rgba(16,185,129,.06)",borderTop:"1px solid rgba(16,185,129,.12)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.35)"}}>{L("Jetzt registrieren für vollständige Karriere-Beratung","Register now for full career coaching","Inscrivez-vous pour un coaching complet","Registrati per il coaching completo")}</div>
+          <button onClick={()=>onAuthOpen&&onAuthOpen()} style={{background:"var(--em)",color:"white",border:"none",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+            {L("Gratis →","Free →","Gratuit →","Gratis →")}
+          </button>
         </div>}
 
         <div style={{borderTop:"1px solid rgba(255,255,255,.07)",padding:"10px 12px",display:"flex",gap:8,alignItems:"flex-end"}}>
           <textarea value={input} onChange={e=>setInput(e.target.value)}
             onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!loading&&canChat){e.preventDefault();send();}}}
-            placeholder={canChat ? L("Frag mich etwas…","Ask me anything…","Posez-moi une question…","Chiedimi qualcosa…") : L("Pro freischalten…","Unlock Pro…","Activer Pro…","Sblocca Pro…")}
-            disabled={!canChat||loading}
+            placeholder={needsUpgrade ? L("Tageslimit erreicht – Upgrade für mehr","Daily limit reached – upgrade for more","Limite atteint – mettez à niveau","Limite raggiunto – aggiorna") : L("Frag mich etwas…","Ask me anything…","Posez-moi une question…","Chiedimi qualcosa…")}
+            disabled={needsUpgrade||loading}
             style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 11px",fontSize:13,color:"white",resize:"none",minHeight:36,maxHeight:90,outline:"none",lineHeight:1.5}}
             rows={1}/>
-          <button onClick={send} disabled={!input.trim()||loading||!canChat}
-            style={{width:36,height:36,borderRadius:10,background:input.trim()&&canChat?"var(--em)":"rgba(255,255,255,.08)",border:"none",cursor:input.trim()&&canChat?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,transition:"background .2s"}}>
+          <button onClick={send} disabled={!input.trim()||loading||needsUpgrade}
+            style={{width:36,height:36,borderRadius:10,background:input.trim()&&!needsUpgrade?"var(--em)":"rgba(255,255,255,.08)",border:"none",cursor:input.trim()&&!needsUpgrade?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,transition:"background .2s"}}>
             {loading?"⏳":"➤"}
           </button>
         </div>
@@ -5761,53 +5782,131 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
 
       {/* PRICING */}
       <section className="sec sec-dk" id="preise" style={{position:"relative",overflow:"hidden"}}>
-          <div className="orb" style={{width:500,height:500,background:"radial-gradient(circle,rgba(16,185,129,.15),transparent)",top:"-120px",right:"-100px",animationDelay:"-2s",opacity:.4}}/>
-          <div className="orb" style={{width:400,height:400,background:"radial-gradient(circle,rgba(99,102,241,.1),transparent)",bottom:"-80px",left:"-80px",animationDelay:"-6s",opacity:.3}}/>
+        <div className="orb" style={{width:500,height:500,background:"radial-gradient(circle,rgba(16,185,129,.15),transparent)",top:"-120px",right:"-100px",animationDelay:"-2s",opacity:.4}}/>
+        <div className="orb" style={{width:400,height:400,background:"radial-gradient(circle,rgba(99,102,241,.1),transparent)",bottom:"-80px",left:"-80px",animationDelay:"-6s",opacity:.3}}/>
         <div className="con">
-          <div className="sh shc"><div className="seye">{t.price.label}</div><h2 className="st">{t.price.title}</h2><p className="ss">{t.price.sub}</p></div>
-          <div className="btog">
-            <span className={`bto ${!yearly?"on":""}`} onClick={()=>setYearly(false)}>{t.price.monthly}</span>
-            <div className={`btsw ${yearly?"yr":""}`} onClick={()=>setYearly(v=>!v)}><div className="btt"/></div>
-            <span className={`bto ${yearly?"on":""}`} onClick={()=>setYearly(true)}>{t.price.yearly}</span>
-            {yearly&&<span className="save-t">{t.price.save}</span>}
+          <div className="sh shc">
+            <div className="seye">{t.price.label}</div>
+            <h2 className="st">{t.price.title}</h2>
+            <p className="ss">{t.price.sub}</p>
+            {/* Jahres-Hinweis prominent */}
+            <div style={{display:"inline-flex",alignItems:"center",gap:10,background:"rgba(245,158,11,.12)",border:"1px solid rgba(245,158,11,.3)",borderRadius:99,padding:"8px 20px",marginTop:18,fontSize:13,fontWeight:700,color:"#f59e0b"}}>
+              🎁 {lang==="de"?"Jährlich zahlen – 2 Monate geschenkt":lang==="en"?"Pay annually – 2 months free":lang==="fr"?"Paiement annuel – 2 mois offerts":"Pagamento annuale – 2 mesi gratis"}
+            </div>
           </div>
-          <div className="pgrid">
-            {t.price.tiers.map(tier=>(
-              <div key={tier.id} className={`pc ${tier.best?"hl":""} ${tier.id==="ultimate"?"hl2":""}`}>
-                {tier.best&&<div className="bst">{t.price.recom}</div>}
-                <div className={`ppl ${tier.best?"em":tier.id==="ultimate"?"am":""}`}>{tier.name}</div>
-                {tier.price===0&&<><div className="ppr">CHF 0<span> / {lang==="en"?"mo":"Mo."}</span></div><div className="pper">{tier.note}</div></>}
-                {tier.priceM&&<>
-                  <div className="ppr">CHF {yearly ? Number(tier.priceY).toFixed(2) : Number(tier.priceM).toFixed(2)}<span> / {lang==="en"?"mo":"Mo."}</span></div>
-                  <div className="pper">
-                    {yearly
-                      ? (lang==="de"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/Mo. · spare ${Math.round((1-(tier.priceY/tier.priceM))*100)}% · CHF ${(tier.priceY*12).toFixed(2)}/Jahr`:
-                         lang==="en"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/mo · save ${Math.round((1-(tier.priceY/tier.priceM))*100)}% · CHF ${(tier.priceY*12).toFixed(2)}/year`:
-                         lang==="fr"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/mois · économisez ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
-                         `🔥 CHF ${Number(tier.priceY).toFixed(2)}/mese · risparmia ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`)
-                      : (lang==="de"?`Jährlich nur CHF ${Number(tier.priceY).toFixed(2)}/Mo. → ${Math.round((1-(tier.priceY/tier.priceM))*100)}% sparen`:
-                         lang==="en"?`Annual plan: CHF ${Number(tier.priceY).toFixed(2)}/mo → save ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
-                         lang==="fr"?`Annuel: CHF ${Number(tier.priceY).toFixed(2)}/mois → économisez ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
-                         `Annuale: CHF ${Number(tier.priceY).toFixed(2)}/mese → risparmia ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`)
-                    }
+
+          {/* 3-Spalten Pricing Grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,maxWidth:980,margin:"0 auto"}}>
+            {t.price.tiers.filter(t=>t.id!=="free"||true).map(tier=>{
+              const savePct = tier.priceM ? Math.round((1-(tier.priceY/tier.priceM))*100) : 0;
+              const annualTotal = tier.priceY ? (tier.priceY*12).toFixed(0) : null;
+              const savedTotal = tier.priceM ? ((tier.priceM - tier.priceY)*12).toFixed(0) : null;
+              const isFree = tier.id==="free";
+              const isPro = tier.id==="pro";
+              const isUlt = tier.id==="ultimate";
+              return (
+                <div key={tier.id} style={{
+                  borderRadius:20,padding:"28px 24px",position:"relative",
+                  border: isPro ? "2px solid var(--em)" : isUlt ? "2px solid rgba(245,158,11,.4)" : "1.5px solid rgba(255,255,255,.09)",
+                  background: isPro ? "rgba(16,185,129,.07)" : isUlt ? "rgba(245,158,11,.04)" : "var(--dk3)",
+                  boxShadow: isPro ? "0 0 0 1px rgba(16,185,129,.15),0 20px 60px rgba(16,185,129,.1)" : "none",
+                  transition:"transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s"
+                }}
+                  onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.transform="none";}}>
+                  {isPro&&<div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontSize:11,fontWeight:700,padding:"5px 18px",borderRadius:999,whiteSpace:"nowrap",boxShadow:"0 4px 14px rgba(16,185,129,.4)",letterSpacing:.3}}>{t.price.recom}</div>}
+                  {isUlt&&savedTotal&&<div style={{position:"absolute",top:-14,left:"50%",transform:"translateX(-50%)",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontSize:11,fontWeight:700,padding:"5px 18px",borderRadius:999,whiteSpace:"nowrap",boxShadow:"0 4px 14px rgba(245,158,11,.35)"}}>
+                    {lang==="de"?`Spare CHF ${savedTotal}/Jahr`:lang==="en"?`Save CHF ${savedTotal}/year`:lang==="fr"?`Économisez CHF ${savedTotal}/an`:`Risparmia CHF ${savedTotal}/anno`}
+                  </div>}
+
+                  {/* Plan name */}
+                  <div style={{fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:isPro?"var(--em)":isUlt?"#f59e0b":"rgba(255,255,255,.28)",marginBottom:12}}>{tier.name}</div>
+
+                  {/* Price display */}
+                  {isFree&&<>
+                    <div style={{fontFamily:"var(--hd)",fontSize:42,fontWeight:800,color:"white",lineHeight:1,marginBottom:4,letterSpacing:"-2px"}}>CHF 0</div>
+                    <div style={{fontSize:12,color:"rgba(255,255,255,.3)",marginBottom:20}}>{lang==="de"?"Kostenlos starten":lang==="en"?"Start for free":lang==="fr"?"Démarrer gratuitement":"Inizia gratis"}</div>
+                  </>}
+                  {tier.priceY&&<>
+                    <div style={{fontFamily:"var(--hd)",fontSize:42,fontWeight:800,color:"white",lineHeight:1,letterSpacing:"-2px"}}>
+                      CHF {Number(tier.priceY).toFixed(2)}<span style={{fontSize:16,fontWeight:400,color:"rgba(255,255,255,.3)",fontFamily:"var(--bd)",letterSpacing:0}}>/Mo.</span>
+                    </div>
+                    <div style={{fontSize:13,color:"rgba(255,255,255,.3)",margin:"6px 0 4px"}}>
+                      CHF {annualTotal}{lang==="de"?" /Jahr":" /year"} · <span style={{color:isPro?"var(--em)":"#f59e0b",fontWeight:700}}>–{savePct}%</span> {lang==="de"?"vs. monatlich":lang==="en"?"vs. monthly":lang==="fr"?"vs. mensuel":"vs. mensile"}
+                    </div>
+                    {savedTotal&&<div style={{fontSize:11,color:"rgba(255,255,255,.2)",marginBottom:18}}>
+                      {lang==="de"?`statt CHF ${(tier.priceM*12).toFixed(0)}/Jahr – du sparst CHF ${savedTotal}`:
+                       lang==="en"?`instead of CHF ${(tier.priceM*12).toFixed(0)}/year – you save CHF ${savedTotal}`:
+                       lang==="fr"?`au lieu de CHF ${(tier.priceM*12).toFixed(0)}/an – économie CHF ${savedTotal}`:
+                       `invece di CHF ${(tier.priceM*12).toFixed(0)}/anno – risparmio CHF ${savedTotal}`}
+                    </div>}
+                  </>}
+
+                  {/* Description */}
+                  <p style={{fontSize:13,color:"rgba(255,255,255,.5)",lineHeight:1.7,margin:"0 0 18px",borderTop:"1px solid rgba(255,255,255,.07)",paddingTop:14}}>{tier.desc}</p>
+
+                  {/* Pro: Tageslimit-Hinweis */}
+                  {isPro&&<div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:16}}>⚡</span>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>{lang==="de"?"20 Generierungen/Tag":lang==="en"?"20 generations/day":lang==="fr"?"20 générations/jour":"20 generazioni/giorno"}</div>
+                      <div style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>{lang==="de"?"Reset täglich um Mitternacht":lang==="en"?"Resets daily at midnight":lang==="fr"?"Réinitialisation à minuit":"Reset ogni mezzanotte"}</div>
+                    </div>
+                  </div>}
+
+                  {/* Ultimate: Unlimited badge */}
+                  {isUlt&&<div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:16}}>♾️</span>
+                    <div>
+                      <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>{lang==="de"?"Absolut unbegrenzt":lang==="en"?"Absolutely unlimited":lang==="fr"?"Absolument illimité":"Assolutamente illimitato"}</div>
+                      <div style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>{lang==="de"?"Kein Limit, kein Reset, kein Warten":lang==="en"?"No limit, no reset, no waiting":lang==="fr"?"Pas de limite ni de reset":"Nessun limite né reset"}</div>
+                    </div>
+                  </div>}
+
+                  {/* Feature list – flowing, no bullets */}
+                  <div style={{marginBottom:22}}>
+                    {(tier.list||[]).slice(0,6).map((f,i)=>(
+                      <div key={i} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"7px 0",borderBottom:i<5?"1px solid rgba(255,255,255,.05)":"none"}}>
+                        <span style={{color:isPro?"var(--em)":isUlt?"#f59e0b":"rgba(255,255,255,.3)",flexShrink:0,fontSize:12,marginTop:2}}>✓</span>
+                        <span style={{fontSize:13,color:"rgba(255,255,255,.65)",lineHeight:1.5}}>{f}</span>
+                      </div>
+                    ))}
+                    {isFree&&(tier.no||[]).length>0&&<div style={{marginTop:10,padding:"8px 10px",background:"rgba(255,255,255,.03)",borderRadius:8}}>
+                      <div style={{fontSize:11,color:"rgba(255,255,255,.2)",lineHeight:1.6}}>
+                        ✗ {(tier.no||[]).slice(0,4).join(" · ")}
+                      </div>
+                    </div>}
                   </div>
-                </>}
-                {tier.price===null&&<><div className="ppr" style={{fontSize:26,letterSpacing:0}}>{lang==="de"?"Auf Anfrage":lang==="fr"?"Sur demande":lang==="it"?"Su richiesta":"On request"}</div><div className="pper">{tier.note}</div></>}
-                {tier.desc&&<p style={{fontSize:13,color:"rgba(255,255,255,.45)",lineHeight:1.65,margin:"0 0 20px",fontWeight:300,borderTop:"1px solid rgba(255,255,255,.07)",paddingTop:14,fontStyle:"italic"}}>{tier.desc}</p>}
-                <ul className="pfl">
-                  {tier.list.map(f=><li key={f}><span className="pck">✓</span>{f}</li>)}
-                  {(tier.no||[]).map(f=><li key={f} className="off"><span className="pcx">×</span>{f}</li>)}
-                </ul>
-                {tier.id==="free"&&<button className="btn b-out b-w" style={{borderColor:"rgba(255,255,255,.18)",color:"white"}} onClick={()=>navTo("app")}>{tier.btn}</button>}
-                {tier.id==="pro"&&<button className={`btn ${tier.btnS} b-w`} onClick={()=>window.open(stripeLink(),"_blank")}>{tier.btn}</button>}
-                {tier.id==="ultimate"&&<button className={`btn b-out b-w`} style={{borderColor:"rgba(245,158,11,.4)",color:"rgba(245,158,11,.85)"}} onClick={()=>window.open(C.stripeUltimate,"_blank")}>{tier.btn}</button>}
-              </div>
-            ))}
+
+                  {/* CTA Button */}
+                  {isFree&&<button onClick={()=>navTo("app")} style={{width:"100%",padding:"13px",borderRadius:12,border:"1.5px solid rgba(255,255,255,.18)",background:"transparent",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",transition:"all .2s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.5)";e.currentTarget.style.background="rgba(255,255,255,.05)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.18)";e.currentTarget.style.background="transparent";}}>
+                    {tier.btn}
+                  </button>}
+                  {isPro&&<button onClick={()=>window.open(C.stripeYearly,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(16,185,129,.35)",transition:"all .2s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 8px 32px rgba(16,185,129,.5)";e.currentTarget.style.transform="translateY(-1px)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 4px 20px rgba(16,185,129,.35)";e.currentTarget.style.transform="none";}}>
+                    {lang==="de"?`Pro starten → CHF ${C.priceY}/Mo.`:lang==="en"?`Start Pro → CHF ${C.priceY}/mo`:lang==="fr"?`Démarrer Pro → CHF ${C.priceY}/mois`:`Avvia Pro → CHF ${C.priceY}/mese`}
+                  </button>}
+                  {isUlt&&<button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"1.5px solid rgba(245,158,11,.4)",background:"transparent",color:"#f59e0b",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",transition:"all .2s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(245,158,11,.08)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
+                    {lang==="de"?`Ultimate → CHF ${C.priceUltimate}/Mo.`:lang==="en"?`Ultimate → CHF ${C.priceUltimate}/mo`:lang==="fr"?`Ultimate → CHF ${C.priceUltimate}/mois`:`Ultimate → CHF ${C.priceUltimate}/mese`}
+                  </button>}
+                  <div style={{textAlign:"center",fontSize:11,color:"rgba(255,255,255,.18)",marginTop:10}}>{lang==="de"?"Stripe · Twint · Jederzeit kündbar":lang==="en"?"Stripe · Twint · Cancel anytime":lang==="fr"?"Stripe · Twint · Résiliable":"Stripe · Twint · Cancellabile"}</div>
+                </div>
+              );
+            })}
           </div>
-          <div className="vb">
+
+          {/* Value Box */}
+          <div className="vb" style={{marginTop:40}}>
             <h4>{t.price.valTitle}</h4>
             {t.price.valPts.map((p,i)=><div key={i} className="vp"><span style={{color:"var(--em)",flexShrink:0}}>✓</span>{p}</div>)}
           </div>
+
+          {/* Payment methods */}
           <div style={{textAlign:"center",marginTop:40}}>
             <div style={{fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:"rgba(255,255,255,.26)",marginBottom:16}}>{t.payments.label}</div>
             <div className="pay-row">{t.payments.methods.map(m=><div key={m} className="pay-chip">{m}</div>)}</div>
@@ -6732,31 +6831,80 @@ VERHALTEN:
   const LD=()=>new Date().toLocaleDateString("de-CH",{month:"long",year:"numeric"});
   const LS=({ch})=><>{<style>{FONTS+CSS}</style>}<Nav/><div className="legal">{ch}</div><Footer/></>;
   if(page==="agb") return <LS ch={<>
-    <h1>AGB / CGV / CGC / T&C</h1><div className="legal-d">Stand: {LD()} · {C.domain}</div>
-    <h2>1. Geltungsbereich</h2><p>{C.name} ({C.domain}) wird betrieben von {C.owner}, {C.address}. Mit der Nutzung akzeptierst du diese AGB.</p>
-    <h2>2. Leistungen</h2><p>{C.name} ist ein KI-gestützter All-in-One Career & Produktivitäts-Copilot mit 20+ Tools, u.a.: Bewerbungsgenerator, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker, Gehaltsverhandlungs-Coach, Networking-Nachrichten, Kündigung, 30-60-90-Tage-Plan, Referenzschreiben, Lehrstellen-Bewerbung, Lernplan, Zusammenfassung, E-Mail-Assistent, Meeting-Protokoll, Übersetzer. Es wird kein Erfolg garantiert.</p>
-    <h2>3. Abonnement & Zahlung</h2><p>Gratis: 1 Bewerbungsgenerierung/Monat. Pro: CHF 19.90/Monat (monatlich kündbar) oder CHF 14.90/Monat (jährlich = CHF 178.80/Jahr). Ultimate: CHF 49.90/Monat oder CHF 39.90/Monat (jährlich = CHF 478.80/Jahr). Pro enthält: Unbegrenzte Bewerbungen, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker. Zahlung via Stripe (Twint, Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay, SEPA, Klarna). Automatische Verlängerung. Kündigung jederzeit per E-Mail.</p>
-    <h2>4. Haftung</h2><p>Keine Haftung für Qualität generierter Inhalte, Vollständigkeit der KI-Analysen oder indirekte Schäden.</p>
-    <h2>5. Haftung für KI-generierte Inhalte</h2><p>Stellify ist kein Rechts-, Karriere- oder Finanzberater. Alle KI-generierten Inhalte sind unverbindliche Entwürfe ohne Rechtsverbindlichkeit. Nutzung auf eigene Verantwortung.</p><h2>6. Recht & Gerichtsstand</h2><p>Schweizer Recht (OR/DSG). Gerichtsstand: Zürich. Kontakt: <a href={`mailto:${C.email}`}>{C.email}</a></p>
+    <h1>AGB / CGV / CGC / T&amp;C</h1><div className="legal-d">Stand: {LD()} · {C.domain}</div>
+    <h2>1. Geltungsbereich</h2>
+    <p>{C.name} ({C.domain}) wird betrieben von {C.owner}, {C.address}. Mit der Registrierung oder Nutzung des Dienstes akzeptierst du diese Allgemeinen Geschäftsbedingungen.</p>
+    <h2>2. Leistungen</h2>
+    <p>{C.name} ist ein KI-gestützter All-in-One Career &amp; Produktivitäts-Copilot mit 20+ Tools (u. a. Bewerbungsgenerator, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Interview-Coach, Gehaltscoach, Excel-Generator, PowerPoint-Maker, Networking, Lernplan, Übersetzer u. v. m.). Die KI-Ausgaben sind unverbindliche Entwürfe – kein Erfolg wird garantiert.</p>
+    <h2>3. Nutzerkonten</h2>
+    <p>Du bist für die Sicherheit deines Kontos verantwortlich. Falschangaben (Name, E-Mail, Alter) berechtigen uns zur sofortigen Kontosperrung. Mindestalter: 16 Jahre.</p>
+    <h2>4. Abonnement &amp; Zahlung</h2>
+    <p><strong>Gratis:</strong> 1 Generierung/Monat, 20 Chat-Nachrichten/Tag.<br/>
+    <strong>Pro:</strong> CHF 19.90/Monat oder CHF 14.90/Monat (jährlich, = CHF 178.80/Jahr).<br/>
+    <strong>Ultimate:</strong> CHF 49.90/Monat oder CHF 39.90/Monat (jährlich, = CHF 478.80/Jahr).<br/>
+    Zahlung ausschliesslich via Stripe (Twint, Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay, SEPA). Abonnements verlängern sich automatisch. Kündigung jederzeit per E-Mail an <a href={`mailto:${C.email}`}>{C.email}</a> oder über Stripe Customer Portal – wirksam zum Ende der bezahlten Periode.</p>
+    <h2>5. Widerrufsrecht</h2>
+    <p>Da es sich um digitale Inhalte handelt, die sofort nach Vertragsschluss bereitgestellt werden, erlischt das Widerrufsrecht mit Beginn der Nutzung gemäss Art. 40e OR (Schweiz) bzw. EU-Richtlinie 2011/83/EU. Bei technischen Problemen wenden wir uns kulant an: <a href={`mailto:${C.email}`}>{C.email}</a>.</p>
+    <h2>6. Haftung</h2>
+    <p>Die Haftung für KI-generierte Inhalte, Qualität der Ausgaben, Vollständigkeit von Analysen oder indirekte Schäden ist ausgeschlossen. {C.name} ist kein Rechts-, Karriere- oder Finanzberater. Maximale Haftung: bezahlter Betrag der letzten 12 Monate.</p>
+    <h2>7. Verbotene Nutzung</h2>
+    <p>Untersagt sind: automatisierte Massenabfragen (Scraping), Umgehung von Nutzungslimits, Weitergabe von Account-Zugängen, Verwendung für illegale Zwecke oder Erstellung diskriminierender Inhalte.</p>
+    <h2>8. Änderungen</h2>
+    <p>Wir behalten uns vor, diese AGB mit 30 Tagen Voranzeige per E-Mail zu ändern. Bei wesentlichen Änderungen hast du das Recht, das Abonnement zu kündigen.</p>
+    <h2>9. Recht &amp; Gerichtsstand</h2>
+    <p>Schweizer Recht (OR, DSG). Gerichtsstand: Zug. Kontakt: <a href={`mailto:${C.email}`}>{C.email}</a></p>
   </>}/>;
   if(page==="datenschutz") return <LS ch={<>
     <h1>Datenschutz / Privacy</h1><div className="legal-d">DSG (CH) · DSGVO (EU) · Stand: {LD()}</div>
-    <h2>Verantwortlich</h2><p>{C.owner}, {C.address} · <a href={`mailto:${C.email}`}>{C.email}</a></p>
-    <h2>Erhobene Daten</h2><ul><li>Eingabedaten (Lebenslauf, Zeugnisse, Profildaten) – werden nicht dauerhaft gespeichert</li><li>Nutzungsstatistiken: IP-Adresse (anonymisiert, 30 Tage)</li><li>Zahlungsdaten: ausschliesslich via Stripe (PCI-DSS-konform)</li></ul>
-    <h2>KI-Verarbeitung</h2><p>Eingaben werden zur Verarbeitung an Anthropic (anthropic.com) übermittelt. Anthropic verarbeitet keine Daten für eigene Zwecke.</p>
-    <h2>Drittanbieter</h2><p>Stripe (stripe.com/privacy) · Anthropic (anthropic.com/privacy)</p>
-    <h2>Deine Rechte</h2><p>Auskunft, Berichtigung, Löschung jederzeit: <a href={`mailto:${C.email}`}>{C.email}</a></p>
-    <h2>Sicherheit</h2><p>HTTPS/TLS. Keine Marketing-Cookies. Kein Verkauf von Daten.</p>
+    <h2>1. Verantwortlicher</h2>
+    <p>{C.owner}, {C.address}<br/>E-Mail: <a href={`mailto:${C.email}`}>{C.email}</a><br/>Website: {C.domain}</p>
+    <h2>2. Erhobene Daten &amp; Zweck</h2>
+    <ul>
+      <li><strong>Kontodaten</strong> (E-Mail, Name): Vertragserfüllung, Authentifizierung – bis zur Kontolöschung gespeichert.</li>
+      <li><strong>Eingabedaten</strong> (Lebenslauf, Zeugnisse, Profildaten): Verarbeitung durch KI – werden nicht dauerhaft auf unseren Servern gespeichert.</li>
+      <li><strong>Nutzungsstatistiken</strong>: IP-Adresse (anonymisiert, 30 Tage), Sitzungsdaten zur Nutzungslimitierung.</li>
+      <li><strong>Zahlungsdaten</strong>: Ausschliesslich via Stripe (PCI-DSS-konform) – wir speichern keine Kartendaten.</li>
+    </ul>
+    <h2>3. Rechtsgrundlage</h2>
+    <p>Schweizer DSG Art. 6 (Datenbearbeitung zur Vertragserfüllung) sowie EU DSGVO Art. 6 Abs. 1 lit. b (Vertragserfüllung) und lit. f (berechtigtes Interesse) für EU-Nutzerinnen und -Nutzer.</p>
+    <h2>4. KI-Verarbeitung</h2>
+    <p>Eingaben werden zur KI-Verarbeitung an Groq, Inc. (groq.com, USA) übermittelt. Groq verarbeitet Daten ausschliesslich zur unmittelbaren Beantwortung der Anfrage und trainiert keine Modelle auf deinen Inhalten. Rechtsgrundlage für Drittlandtransfer: Standardvertragsklauseln (SCC).</p>
+    <h2>5. Drittanbieter &amp; Auftragsverarbeiter</h2>
+    <ul>
+      <li><strong>Stripe, Inc.</strong> – Zahlungsabwicklung · <a href="https://stripe.com/privacy" target="_blank" rel="noreferrer">stripe.com/privacy</a></li>
+      <li><strong>Groq, Inc.</strong> – KI-Inferenz · <a href="https://groq.com/privacy" target="_blank" rel="noreferrer">groq.com/privacy</a></li>
+      <li><strong>Vercel, Inc.</strong> – Hosting &amp; Serverless Functions · <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noreferrer">vercel.com/legal/privacy-policy</a></li>
+    </ul>
+    <h2>6. Deine Rechte</h2>
+    <p>Du hast jederzeit das Recht auf <strong>Auskunft, Berichtigung, Löschung, Einschränkung, Datenportabilität</strong> und <strong>Widerspruch</strong>. Anfragen an: <a href={`mailto:${C.email}`}>{C.email}</a>. Wir antworten innerhalb von 30 Tagen. Du hast zudem das Recht, Beschwerde bei der zuständigen Aufsichtsbehörde einzureichen (CH: EDÖB – edoeb.admin.ch; EU: zuständige nationale Behörde).</p>
+    <h2>7. Cookies &amp; Tracking</h2>
+    <p>Wir verwenden ausschliesslich technisch notwendige Cookies (Session, Authentifizierung). Keine Marketing-, Tracking- oder Analyse-Cookies. Kein Google Analytics. Kein Facebook Pixel.</p>
+    <h2>8. Sicherheit</h2>
+    <p>HTTPS/TLS für alle Verbindungen. Passwörter werden gehasht gespeichert. Kein Verkauf von Nutzerdaten an Dritte.</p>
+    <h2>9. Kontakt &amp; Beschwerden</h2>
+    <p>Datenschutzanfragen: <a href={`mailto:${C.email}`}>{C.email}</a></p>
   </>}/>;
   if(page==="impressum") return <LS ch={<>
-    <h1>Impressum</h1><div className="legal-d">Art. 12 DSG</div>
-    <h2>Betreiber</h2>
-    <p><strong>JTSP</strong><br/>{C.address}<br/><a href={`mailto:${C.email}`}>{C.email}</a><br/>{C.domain}</p>
-    <h2>Erfinder & Gründer</h2>
-    <p><strong>JTSP</strong> – Erfinder und Gründer von {C.name}. Idee, Konzept und Vision für den ersten vollständigen AI Career & Produktivitäts-Copilot der Schweiz.</p>
+    <h1>Impressum</h1><div className="legal-d">gemäss Art. 12 DSG &amp; § 5 TMG</div>
+    <h2>Betreiber &amp; Verantwortlicher</h2>
+    <p>
+      <strong>{C.owner}</strong><br/>
+      {C.address}<br/>
+      E-Mail: <a href={`mailto:${C.email}`}>{C.email}</a><br/>
+      Website: <a href={`https://${C.domain}`} target="_blank" rel="noreferrer">{C.domain}</a>
+    </p>
+    <h2>Dienst</h2>
+    <p><strong>{C.name}</strong> – KI-gestützter Career &amp; Produktivitäts-Copilot für die Schweiz. Betrieb als digitaler Dienst gemäss Schweizer Recht.</p>
+    <h2>Inhaltlich verantwortlich</h2>
+    <p>{C.owner}, {C.address}</p>
     <h2>Datenschutzbeauftragter</h2>
-    <p>Bei Datenschutzanfragen: <a href={`mailto:${C.email}`}>{C.email}</a></p>
-    <h2>Haftungsausschluss</h2><p>Schweizer Recht · Gerichtsstand: Zürich</p>
+    <p>Da kein formeller DSB erforderlich (KMU), richten Sie Datenschutzanfragen direkt an: <a href={`mailto:${C.email}`}>{C.email}</a></p>
+    <h2>Streitschlichtung</h2>
+    <p>Wir nehmen nicht an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teil. Bei Streitigkeiten gilt Schweizer Recht, Gerichtsstand Zug.</p>
+    <h2>Haftungsausschluss</h2>
+    <p>Trotz sorgfältiger Prüfung übernehmen wir keine Haftung für externe Links. Für den Inhalt verlinkter Seiten sind ausschliesslich deren Betreiber verantwortlich.</p>
+    <h2>Urheberrecht</h2>
+    <p>Alle Inhalte und Grafiken auf {C.domain} unterliegen dem Urheberrecht. Vervielfältigung ohne Genehmigung ist untersagt.</p>
   </>}/>;
   // ══════════════════ BEWERBUNGS-TRACKER ══════════════════
   if(page==="tracker") return(<>{<style>{FONTS+CSS}</style>}{sharedOverlays}{pw&&<PW/>}
