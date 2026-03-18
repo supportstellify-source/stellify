@@ -3736,6 +3736,39 @@ function ProfileManager({ lang, onClose, onSelect }) {
 
   // Footer wird weiter unten in App() definiert
 
+function PromoBanner({ lang, navTo, setPw, onClose }) {
+  const L2=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]);
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:500,background:"linear-gradient(135deg,#10b981,#059669)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,boxShadow:"0 2px 12px rgba(16,185,129,.4)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,flex:1,flexWrap:"wrap"}}>
+        <span style={{fontSize:16}}>🎁</span>
+        <span style={{fontSize:13,fontWeight:600,color:"white"}}>
+          {L2(
+            "1× komplett gratis testen – kein Abo, keine Kreditkarte nötig.",
+            "Try once completely free – no subscription, no credit card needed.",
+            "Essai gratuit 1× – sans abonnement ni carte bancaire.",
+            "Prova 1× gratis – senza abbonamento né carta di credito."
+          )}
+        </span>
+        <button
+          onClick={()=>navTo("app")}
+          style={{background:"white",color:"#059669",border:"none",padding:"5px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0,transition:"all .2s"}}
+          onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 10px rgba(0,0,0,.15)";}}
+          onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
+          {L2("Jetzt starten →","Start now →","Commencer →","Inizia ora →")}
+        </button>
+      </div>
+      <button
+        onClick={onClose}
+        style={{background:"none",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",fontSize:18,flexShrink:0,padding:"0 4px",lineHeight:1,transition:"color .18s"}}
+        onMouseEnter={e=>e.currentTarget.style.color="white"}
+        onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,.7)"}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [lang,setLang]=useState("de");
   const t = React.useMemo(()=>mkT(lang), [lang]);
@@ -3816,6 +3849,34 @@ export default function App() {
   },[]);
 
   // PromoModal Komponente
+  const PromoModal=()=>(
+    <div className="mbg" onClick={e=>e.target===e.currentTarget&&closePromo()}>
+      <div className="mod">
+        <div style={{fontSize:36,marginBottom:10}}>🎁</div>
+        <h2>{L("Stellify gratis testen","Try Stellify for free","Essayez Stellify gratuitement","Prova Stellify gratis")}</h2>
+        <p style={{marginBottom:16}}>{L(
+          "1 vollständige KI-Bewerbung kostenlos – ohne Kreditkarte, ohne Abo.",
+          "1 complete AI application for free – no credit card, no subscription.",
+          "1 candidature IA complète gratuitement – sans carte ni abonnement.",
+          "1 candidatura IA completa gratis – senza carta né abbonamento."
+        )}</p>
+        <div className="mod-fts">
+          {[["✍️",L("Motivationsschreiben","Cover letter","Lettre motivation","Lettera motivazione")],
+            ["📄",L("Lebenslauf","CV","CV","CV")],
+            ["🤖","ATS-Check"],
+            ["📜",L("Zeugnis-Analyse","Reference Analysis","Analyse certificat","Analisi certificato")]
+          ].map(([ico,tx])=><div key={tx} className="mod-f"><div className="mod-fi">{ico}</div>{tx}</div>)}
+        </div>
+        <button className="btn b-em b-w" style={{marginBottom:8}} onClick={()=>{ closePromo(); }}>
+          {L("Jetzt kostenlos starten →","Start for free now →","Commencer gratuitement →","Inizia gratis ora →")}
+        </button>
+        <div className="mod-note">{L("Keine Kreditkarte · Kein Abo · Jederzeit kündbar","No credit card · No subscription · Cancel anytime","Sans carte · Sans abonnement · Résiliable","Senza carta · Senza abbonamento · Cancellabile")}</div>
+        <button className="btn b-out b-sm" style={{marginTop:9,width:"100%"}} onClick={closePromo}>
+          {L("Vielleicht später","Maybe later","Peut-être plus tard","Forse dopo")}
+        </button>
+      </div>
+    </div>
+  );
 
   const uj=(k,v)=>setJob(p=>({...p,[k]:v})); const up=(k,v)=>setProf(p=>({...p,[k]:v}));
   const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]);
