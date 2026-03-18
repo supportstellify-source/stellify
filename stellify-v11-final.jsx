@@ -623,6 +623,28 @@ footer{background:var(--dk);padding:50px 28px 24px}
   .ubar{flex-direction:column;align-items:flex-start;gap:8px}
   .hbtns .btn{width:100%}
 }
+/* ── SCROLL REVEAL ── */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .6s cubic-bezier(.4,0,.2,1),transform .65s cubic-bezier(.34,1.2,.64,1)}
+.reveal.on{opacity:1;transform:none}
+/* ── TESTIMONIALS ── */
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px}
+.testi-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:28px 24px;transition:transform .22s ease,border-color .2s;position:relative}
+.testi-card:hover{transform:translateY(-4px);border-color:rgba(16,185,129,.22)}
+.testi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--em),transparent);border-radius:20px 20px 0 0;opacity:0;transition:opacity .2s}
+.testi-card:hover::before{opacity:1}
+/* ── HOW IT WORKS ── */
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:52px}
+.step-card{background:white;border:1.5px solid var(--bo);border-radius:20px;padding:32px 26px;position:relative;transition:transform .22s ease,box-shadow .22s,border-color .2s}
+.step-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(11,11,18,.09);border-color:rgba(16,185,129,.3)}
+.step-num{font-size:11px;font-weight:800;letter-spacing:3px;color:var(--em);margin-bottom:12px;font-family:var(--bd)}
+.step-arr{position:absolute;top:50%;right:-28px;transform:translateY(-50%);color:rgba(16,185,129,.35);font-size:22px;z-index:1;pointer-events:none}
+/* ── LOGO STRIP ── */
+.logo-strip{display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap;padding:28px 0;margin-top:20px;border-top:1px solid rgba(255,255,255,.07)}
+.logo-chip{font-size:12px;font-weight:700;color:rgba(255,255,255,.2);letter-spacing:.5px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.08);white-space:nowrap}
+@media(max-width:820px){
+  .testi-grid,.steps-grid{grid-template-columns:1fr;gap:14px}
+  .step-arr{display:none}
+}
 `;
 
 // ── ALL TEXT (single language factory) ──
@@ -4042,6 +4064,18 @@ export default function App() {
     return ()=>window.removeEventListener("popstate", onPop);
   },[]);
 
+  // Scroll reveal via IntersectionObserver
+  useEffect(()=>{
+    const timer = setTimeout(()=>{
+      const obs = new IntersectionObserver((entries)=>{
+        entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add("on"); obs.unobserve(e.target); }});
+      },{threshold:0.1,rootMargin:"0px 0px -40px 0px"});
+      document.querySelectorAll(".reveal").forEach(el=>obs.observe(el));
+      return ()=>obs.disconnect();
+    },80);
+    return ()=>clearTimeout(timer);
+  },[page]);
+
   useEffect(()=>{
     window.scrollTo(0,0);
     const p=new URLSearchParams(window.location.search);
@@ -5496,6 +5530,32 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
         </div>
       </section>
 
+      {/* ═══ HOW IT WORKS ═══ */}
+      <section style={{padding:"80px 0 72px",background:"white"}}>
+        <div className="con">
+          <div className="sh shc">
+            <div className="seye">✦ {lang==="de"?"So einfach":"How it works"}</div>
+            <h2 className="st" style={{color:"var(--ink)"}}>{lang==="de"?"In 3 Schritten zur perfekten Bewerbung":lang==="en"?"3 steps to your perfect application":lang==="fr"?"3 étapes pour votre candidature parfaite":"3 passi per la candidatura perfetta"}</h2>
+            <p className="ss" style={{color:"var(--mu)"}}>{lang==="de"?"Kein Aufwand. Sofortige Resultate. Schweizer Qualität.":lang==="en"?"Zero effort. Instant results. Swiss quality.":lang==="fr"?"Zéro effort. Résultats instantanés.":"Zero sforzo. Risultati istantanei."}</p>
+          </div>
+          <div className="steps-grid">
+            {[
+              {n:"01",ico:"📋",title:lang==="de"?"Profil ausfüllen":lang==="en"?"Fill your profile":lang==="fr"?"Remplir le profil":"Compilare il profilo",desc:lang==="de"?"Trage Beruf, Erfahrung und Skills ein – oder lade deinen CV hoch. Stellify liest ihn automatisch.":lang==="en"?"Enter job title, experience and skills – or upload your CV. Stellify reads it automatically.":lang==="fr"?"Entrez votre poste, expérience et compétences – ou importez votre CV.":"Inserisci ruolo, esperienza e competenze – o carica il tuo CV."},
+              {n:"02",ico:"⚡",title:lang==="de"?"KI generiert in Sekunden":lang==="en"?"AI generates in seconds":lang==="fr"?"L'IA génère en secondes":"L'IA genera in secondi",desc:lang==="de"?"Stellify erstellt ein ATS-optimiertes Motivationsschreiben, überarbeiteten Lebenslauf und gibt dir einen ATS-Score.":lang==="en"?"Stellify creates an ATS-optimized cover letter, revised CV and gives you an ATS score.":lang==="fr"?"Stellify crée une lettre de motivation ATS-optimisée, un CV révisé et votre score ATS.":"Stellify crea una lettera di motivazione ATS-ottimizzata, CV rivisto e punteggio ATS."},
+              {n:"03",ico:"🚀",title:lang==="de"?"Bewerben und Job landen":lang==="en"?"Apply and land the job":lang==="fr"?"Postuler et décrocher le poste":"Candidarsi e ottenere il lavoro",desc:lang==="de"?"Kopiere den Text, exportiere als PDF oder schick die Bewerbung direkt ab. Fertig – in unter 3 Minuten.":lang==="en"?"Copy the text, export as PDF or send the application directly. Done – in under 3 minutes.":lang==="fr"?"Copiez le texte, exportez en PDF ou envoyez directement. Terminé en moins de 3 minutes.":"Copia il testo, esporta come PDF o invia direttamente. Fatto in meno di 3 minuti."},
+            ].map((s,i)=>(
+              <div key={i} className="step-card reveal" style={{transitionDelay:`${i*0.12}s`}}>
+                {i<2&&<div className="step-arr">→</div>}
+                <div className="step-num">{s.n}</div>
+                <div style={{fontSize:36,marginBottom:16,lineHeight:1}}>{s.ico}</div>
+                <div style={{fontFamily:"var(--hd)",fontSize:18,fontWeight:700,color:"var(--ink)",marginBottom:10,letterSpacing:"-0.3px",lineHeight:1.3}}>{s.title}</div>
+                <p style={{fontSize:14,color:"var(--mu)",lineHeight:1.75,margin:0}}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ═══ TOOLS HEADER ═══ */}
       <section style={{padding:"72px 0 48px",background:"var(--bg)"}} id="tools">
         <div className="con">
@@ -5882,14 +5942,22 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
             <h2 className="st">{t.price.title}</h2>
             <p className="ss">{t.price.sub}</p>
             {/* Billing Toggle */}
-            <div style={{display:"inline-flex",alignItems:"center",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:99,padding:4,marginTop:20,gap:4}}>
-              <button onClick={()=>setYearly(false)} style={{padding:"7px 20px",borderRadius:99,border:"none",background:!yearly?"white":"transparent",color:!yearly?"var(--ink)":"rgba(255,255,255,.5)",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s",whiteSpace:"nowrap"}}>
-                {lang==="de"?"Monatlich":lang==="en"?"Monthly":lang==="fr"?"Mensuel":"Mensile"}
-              </button>
-              <button onClick={()=>setYearly(true)} style={{padding:"7px 20px",borderRadius:99,border:"none",background:yearly?"linear-gradient(135deg,#10b981,#059669)":"transparent",color:yearly?"white":"rgba(255,255,255,.5)",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s",display:"flex",alignItems:"center",gap:6,whiteSpace:"nowrap"}}>
-                {lang==="de"?"Jährlich":lang==="en"?"Yearly":lang==="fr"?"Annuel":"Annuale"}
-                {yearly&&<span style={{background:"rgba(255,255,255,.25)",borderRadius:99,padding:"1px 7px",fontSize:10}}>–{lang==="de"?"2 Monate gratis":lang==="en"?"2 months free":lang==="fr"?"2 mois offerts":"2 mesi gratis"}</span>}
-              </button>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:8,marginTop:24}}>
+              <div style={{display:"inline-flex",alignItems:"center",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:99,padding:4,gap:4}}>
+                <button onClick={()=>setYearly(false)} style={{padding:"8px 22px",borderRadius:99,border:"none",background:!yearly?"white":"transparent",color:!yearly?"var(--ink)":"rgba(255,255,255,.45)",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .22s",whiteSpace:"nowrap"}}>
+                  {lang==="de"?"Monatlich":lang==="en"?"Monthly":lang==="fr"?"Mensuel":"Mensile"}
+                </button>
+                <button onClick={()=>setYearly(true)} style={{padding:"8px 22px",borderRadius:99,border:"none",background:yearly?"linear-gradient(135deg,#10b981,#059669)":"transparent",color:yearly?"white":"rgba(255,255,255,.45)",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .22s",display:"flex",alignItems:"center",gap:8,whiteSpace:"nowrap"}}>
+                  {lang==="de"?"Jährlich":lang==="en"?"Yearly":lang==="fr"?"Annuel":"Annuale"}
+                  <span style={{background:yearly?"rgba(255,255,255,.2)":"rgba(16,185,129,.25)",color:yearly?"white":"var(--em)",borderRadius:99,padding:"1px 8px",fontSize:11,fontWeight:700,transition:"all .22s"}}>
+                    {lang==="de"?"–17%":lang==="en"?"–17%":lang==="fr"?"–17%":"–17%"}
+                  </span>
+                </button>
+              </div>
+              {!yearly&&<div style={{fontSize:12,color:"rgba(255,255,255,.3)",display:"flex",alignItems:"center",gap:6}}>
+                <span style={{color:"var(--em)"}}>↑</span>
+                {lang==="de"?"Jährlich wählen und 2 Monate gratis sparen!":lang==="en"?"Choose yearly and save 2 months free!":lang==="fr"?"Choisissez l'annuel et économisez 2 mois !":"Scegli l'annuale e risparmia 2 mesi gratis!"}
+              </div>}
             </div>
           </div>
 
@@ -5902,13 +5970,15 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
               const isFree = tier.id==="free";
               const isPro = tier.id==="pro";
               const isUlt = tier.id==="ultimate";
+              const tierIdx = t.price.tiers.indexOf(tier);
               return (
-                <div key={tier.id} style={{
+                <div key={tier.id} className="reveal" style={{
                   borderRadius:20,padding:"28px 24px",position:"relative",
                   border: isPro ? "2px solid var(--em)" : isUlt ? "2px solid rgba(245,158,11,.4)" : "1.5px solid rgba(255,255,255,.09)",
                   background: isPro ? "rgba(16,185,129,.07)" : isUlt ? "rgba(245,158,11,.04)" : "var(--dk3)",
                   boxShadow: isPro ? "0 0 0 1px rgba(16,185,129,.15),0 20px 60px rgba(16,185,129,.1)" : "none",
-                  transition:"transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s"
+                  transition:"transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s,opacity .6s,transform .65s",
+                  transitionDelay:`${tierIdx*0.1}s`
                 }}
                   onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";}}
                   onMouseLeave={e=>{e.currentTarget.style.transform="none";}}>
@@ -6005,6 +6075,51 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
 
       {/* FAQ */}
       <FaqSection lang={lang} email={C.email}/>
+
+      {/* ═══ TESTIMONIALS ═══ */}
+      <section style={{padding:"80px 0",background:"var(--dk)"}}>
+        <div className="con">
+          <div className="sh shc">
+            <div className="seye" style={{color:"#fbbf24",letterSpacing:3}}>★★★★★ {t.testi.label}</div>
+            <h2 className="st">{t.testi.title}</h2>
+          </div>
+          <div className="testi-grid">
+            {t.testi.items.map((item,i)=>(
+              <div key={i} className="testi-card reveal" style={{transitionDelay:`${i*0.13}s`}}>
+                <div style={{display:"flex",gap:3,marginBottom:18}}>
+                  {"★★★★★".split("").map((_,j)=>(
+                    <span key={j} style={{color:"#fbbf24",fontSize:17}}>★</span>
+                  ))}
+                </div>
+                <p style={{fontSize:15,color:"rgba(255,255,255,.7)",lineHeight:1.8,margin:"0 0 24px",fontStyle:"italic",fontFamily:"var(--bd)",fontWeight:300}}>„{item.t}"</p>
+                <div style={{display:"flex",alignItems:"center",gap:12,borderTop:"1px solid rgba(255,255,255,.07)",paddingTop:18}}>
+                  <div style={{width:40,height:40,borderRadius:"50%",background:"linear-gradient(135deg,var(--em),#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:"white",flexShrink:0}}>
+                    {item.a[0]}
+                  </div>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:14,color:"white"}}>{item.a}</div>
+                    <div style={{fontSize:12,color:"rgba(255,255,255,.3)",marginTop:2}}>{item.r}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Trust strip */}
+          <div className="logo-strip">
+            {[
+              {ico:"🔒", txt:lang==="de"?"Keine Datenspeicherung":"No data storage"},
+              {ico:"🇨🇭", txt:lang==="de"?"Schweizer Unternehmen":"Swiss company"},
+              {ico:"⭐", txt:lang==="de"?"4.9/5 Bewertung":"4.9/5 rating"},
+              {ico:"👥", txt:lang==="de"?"2.000+ Nutzer":"2,000+ users"},
+              {ico:"✅", txt:lang==="de"?"ATS-validiert":"ATS-validated"},
+            ].map((item,i)=>(
+              <div key={i} className="logo-chip reveal" style={{transitionDelay:`${i*0.07}s`}}>
+                {item.ico} {item.txt}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="cta-sec">
         <div className="csm">
