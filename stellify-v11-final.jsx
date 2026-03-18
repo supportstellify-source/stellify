@@ -3263,7 +3263,7 @@ function BewerbungsTracker({lang, pro, setPw, navTo}) {
 // 🔐 AUTH MODAL (Login / Registrierung / Admin)
 function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
   const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
-  const [mode, setMode] = useState(defaultMode); // "login"|"register"|"forgot"|"reset"
+  const [mode, setMode] = useState(defaultMode);
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
@@ -3272,14 +3272,43 @@ function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [gLoading, setGLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
-  const inp = {background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",borderRadius:12,padding:"12px 14px",width:"100%",color:"white",fontFamily:"inherit",fontSize:14,outline:"none",boxSizing:"border-box",transition:"border-color .2s"};
-
   const GOOGLE_CLIENT_ID = "370460173343-bnc71e8tib764unofcd6sqf7slesehih.apps.googleusercontent.com";
+
+  // Google OAuth2 popup – no page redirect, stays in SPA
   const handleGoogleLogin = () => {
-    const redirect = encodeURIComponent(window.location.origin + "/api/auth/google");
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirect}&response_type=code&scope=email%20profile&prompt=select_account`;
+    setErr(""); setGLoading(true);
+    const doLogin = () => {
+      try {
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: "email profile",
+          callback: async (resp) => {
+            if (resp.error) { setErr(L("Google-Login fehlgeschlagen.","Google sign-in failed.","Échec Google.","Errore Google.")); setGLoading(false); return; }
+            try {
+              const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${resp.access_token}` } });
+              const u = await r.json();
+              if (!u.email) throw new Error("no email");
+              if (!authGetUser(u.email)) authRegister(u.email, "google-"+Date.now(), "free");
+              const user = authGetUser(u.email);
+              onSuccess(user);
+            } catch { setErr(L("Google-Login fehlgeschlagen.","Google sign-in failed.","Échec Google.","Errore Google.")); }
+            setGLoading(false);
+          }
+        });
+        client.requestAccessToken({ prompt: "select_account" });
+      } catch { setErr(L("Google noch nicht bereit – kurz warten.","Google not ready – please wait.","Google pas prêt – attendez.","Google non pronto – attendere.")); setGLoading(false); }
+    };
+    if (window.google?.accounts?.oauth2) { doLogin(); }
+    else {
+      const s = document.createElement("script");
+      s.src = "https://accounts.google.com/gsi/client";
+      s.onload = doLogin;
+      s.onerror = () => { setErr(L("Google-Script konnte nicht geladen werden.","Failed to load Google script.","Impossible de charger Google.","Impossibile caricare Google.")); setGLoading(false); };
+      document.head.appendChild(s);
+    }
   };
 
   function handleLogin(e) {
@@ -3311,10 +3340,8 @@ function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
     e.preventDefault(); setErr(""); setLoading(true);
     setTimeout(()=>{
       const r = authRequestReset(email);
-      if(r.ok) {
-        setInfo(r.msg);
-        setMode("reset");
-      } else setErr(r.err);
+      if(r.ok) { setInfo(r.msg); setMode("reset"); }
+      else setErr(r.err);
       setLoading(false);
     },400);
   }
@@ -3327,136 +3354,157 @@ function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
     else setErr(r.err);
   }
 
+  // Shared input style
+  const inp = {
+    background:"rgba(255,255,255,.06)",
+    border:"1.5px solid rgba(255,255,255,.1)",
+    borderRadius:12,padding:"14px 16px",width:"100%",
+    color:"white",fontFamily:"inherit",fontSize:14,
+    outline:"none",boxSizing:"border-box",transition:"border-color .2s, background .2s",
+    WebkitTextFillColor:"white"
+  };
+  const inpFocus = (e) => { e.target.style.borderColor="var(--em)"; e.target.style.background="rgba(16,185,129,.06)"; };
+  const inpBlur  = (e) => { e.target.style.borderColor="rgba(255,255,255,.1)"; e.target.style.background="rgba(255,255,255,.06)"; };
+
+  const ErrBox = ({msg}) => msg ? <div style={{color:"#f87171",fontSize:12,padding:"10px 14px",background:"rgba(239,68,68,.08)",borderRadius:10,border:"1px solid rgba(239,68,68,.15)",lineHeight:1.5}}>{msg}</div> : null;
+  const InfoBox = ({msg}) => msg ? <div style={{color:"#34d399",fontSize:12,padding:"10px 14px",background:"rgba(16,185,129,.08)",borderRadius:10,border:"1px solid rgba(16,185,129,.15)",lineHeight:1.5}}>{msg}</div> : null;
+
   return (
-    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
-      <div className="mod" style={{maxWidth:420,textAlign:"left",padding:"32px"}}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",zIndex:9000,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
+
+      <div style={{width:"100%",maxWidth:440,background:"#0f0f1c",border:"1px solid rgba(255,255,255,.08)",borderRadius:24,padding:"40px 36px",position:"relative",boxShadow:"0 40px 100px rgba(0,0,0,.8),0 0 0 1px rgba(16,185,129,.06) inset",animation:"authIn .25s cubic-bezier(.34,1.56,.64,1)"}}>
+
+        {/* Close */}
+        <button onClick={onClose} style={{position:"absolute",top:18,right:18,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"rgba(255,255,255,.4)",fontSize:14,transition:"all .2s"}}
+          onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.12)"}
+          onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.06)"}>✕</button>
 
         {/* Logo */}
-        <div style={{textAlign:"center",marginBottom:24}}>
-          <div style={{fontSize:28,fontFamily:"var(--hd)",fontWeight:800,color:"white",letterSpacing:"-1px"}}>
-            Stellify<span style={{color:"var(--em)"}}>.</span>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:52,height:52,background:"linear-gradient(135deg,#10b981,#059669)",borderRadius:16,fontSize:22,marginBottom:14,boxShadow:"0 8px 24px rgba(16,185,129,.35)"}}>✦</div>
+          <div style={{fontFamily:"var(--hd)",fontSize:22,fontWeight:800,color:"white",letterSpacing:"-0.5px",lineHeight:1.2}}>
+            {mode==="login" ? L("Willkommen zurück","Welcome back","Bon retour","Bentornato") :
+             mode==="register" ? L("Konto erstellen","Create account","Créer un compte","Crea account") :
+             mode==="forgot" ? L("Passwort zurücksetzen","Reset password","Réinitialiser","Reimposta") :
+             L("Neues Passwort","New password","Nouveau mot de passe","Nuova password")}
           </div>
-          <div style={{fontSize:12,color:"rgba(255,255,255,.3)",marginTop:2}}>AI Career Copilot Schweiz</div>
+          {(mode==="login"||mode==="register") && <div style={{fontSize:13,color:"rgba(255,255,255,.3)",marginTop:5}}>
+            {mode==="login"
+              ? L("Melde dich bei Stellify an","Sign in to Stellify","Connectez-vous à Stellify","Accedi a Stellify")
+              : L("Starte gratis – kein Abo nötig","Start free – no subscription needed","Démarrez gratuitement","Inizia gratis")}
+          </div>}
         </div>
 
-        {/* Tabs */}
-        {(mode==="login"||mode==="register") && (
-          <div style={{display:"flex",gap:4,background:"rgba(255,255,255,.06)",borderRadius:12,padding:4,marginBottom:24}}>
-            {[["login",L("Einloggen","Sign in","Connexion","Accedi")],["register",L("Registrieren","Register","S'inscrire","Registrati")]].map(([m,lbl])=>(
-              <button key={m} onClick={()=>{setMode(m);setErr("");setInfo("");}}
-                style={{flex:1,padding:"9px 0",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"all .2s",
-                  background:mode===m?"var(--em)":"transparent",color:mode===m?"white":"rgba(255,255,255,.4)"}}>
-                {lbl}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Google Button */}
-        {(mode==="login"||mode==="register") && (
-          <>
-            <button onClick={handleGoogleLogin}
-              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"white",border:"none",borderRadius:12,padding:"12px",cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:600,color:"#1a1a2e",boxShadow:"0 2px 8px rgba(0,0,0,.15)",transition:"all .2s",marginBottom:16}}
-              onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,.25)"}
-              onMouseLeave={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,.15)"}>
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              {L("Mit Google fortfahren","Continue with Google","Continuer avec Google","Continua con Google")}
-            </button>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-              <div style={{flex:1,height:1,background:"rgba(255,255,255,.1)"}}/>
-              <span style={{fontSize:11,color:"rgba(255,255,255,.3)",fontWeight:500}}>{L("oder mit E-Mail","or with email","ou avec e-mail","o con e-mail")}</span>
-              <div style={{flex:1,height:1,background:"rgba(255,255,255,.1)"}}/>
-            </div>
-          </>
-        )}
+        {(mode==="login"||mode==="register") && <>
+          <button onClick={handleGoogleLogin} disabled={gLoading}
+            style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:gLoading?"rgba(255,255,255,.06)":"rgba(255,255,255,.95)",border:"1px solid rgba(255,255,255,.15)",borderRadius:14,padding:"13px 16px",cursor:gLoading?"default":"pointer",fontFamily:"inherit",fontSize:14,fontWeight:600,color:gLoading?"rgba(255,255,255,.4)":"#1a1a2e",transition:"all .2s",marginBottom:18,boxShadow:gLoading?"none":"0 2px 8px rgba(0,0,0,.2)"}}
+            onMouseEnter={e=>{ if(!gLoading){ e.currentTarget.style.background="white"; e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,.3)"; }}}
+            onMouseLeave={e=>{ if(!gLoading){ e.currentTarget.style.background="rgba(255,255,255,.95)"; e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,.2)"; }}}>
+            {gLoading
+              ? <><div style={{width:18,height:18,borderRadius:"50%",border:"2px solid rgba(255,255,255,.2)",borderTopColor:"var(--em)",animation:"spin .7s linear infinite"}}/><span>{L("Verbinde…","Connecting…","Connexion…","Connessione…")}</span></>
+              : <><svg width="18" height="18" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                {L("Mit Google fortfahren","Continue with Google","Continuer avec Google","Continua con Google")}</>}
+          </button>
+
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+            <div style={{flex:1,height:"1px",background:"rgba(255,255,255,.07)"}}/>
+            <span style={{fontSize:12,color:"rgba(255,255,255,.22)",fontWeight:500,letterSpacing:".3px"}}>{L("oder","or","ou","oppure")}</span>
+            <div style={{flex:1,height:"1px",background:"rgba(255,255,255,.07)"}}/>
+          </div>
+        </>}
 
         {/* Login Form */}
         {mode==="login" && <>
-          <form onSubmit={handleLogin} style={{display:"flex",flexDirection:"column",gap:10}}>
-            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
+          <form onSubmit={handleLogin} style={{display:"flex",flexDirection:"column",gap:12}}>
+            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={inpFocus} onBlur={inpBlur} autoComplete="email"/>
             <div style={{position:"relative"}}>
-              <input type={showPw?"text":"password"} placeholder={L("Passwort","Password","Mot de passe","Password")} value={pw} onChange={e=>setPw(e.target.value)} required style={{...inp,paddingRight:44}} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
-              <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.3)",fontSize:16}}>{showPw?"🙈":"👁"}</button>
+              <input type={showPw?"text":"password"} placeholder={L("Passwort","Password","Mot de passe","Password")} value={pw} onChange={e=>setPw(e.target.value)} required style={{...inp,paddingRight:48}} onFocus={inpFocus} onBlur={inpBlur} autoComplete="current-password"/>
+              <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.25)",fontSize:15,padding:4,lineHeight:1}}>{showPw?"◉":"○"}</button>
             </div>
-            <div style={{textAlign:"right"}}>
-              <button type="button" onClick={()=>{setMode("forgot");setErr("");setInfo("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,.35)",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>
-                {L("Passwort vergessen?","Forgot password?","Mot de passe oublié?","Password dimenticata?")}
-              </button>
-            </div>
-            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:8,border:"1px solid rgba(239,68,68,.2)"}}>{err}</div>}
-            {info&&<div style={{color:"#10b981",fontSize:12,padding:"8px 12px",background:"rgba(16,185,129,.08)",borderRadius:8}}>{info}</div>}
-            <button type="submit" className="btn b-em b-w" disabled={loading} style={{marginTop:4,padding:"13px"}}>
-              {loading?"⏳ …":L("Einloggen →","Sign in →","Connexion →","Accedi →")}
+            <ErrBox msg={err}/><InfoBox msg={info}/>
+            <button type="submit" disabled={loading} style={{marginTop:2,padding:"14px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontFamily:"var(--bd)",fontSize:15,fontWeight:700,cursor:loading?"default":"pointer",boxShadow:"0 4px 16px rgba(16,185,129,.3)",transition:"all .2s",opacity:loading?.7:1}}>
+              {loading ? L("Einloggen…","Signing in…","Connexion…","Accesso…") : L("Einloggen","Sign in","Se connecter","Accedi")}
             </button>
           </form>
-          <div style={{textAlign:"center",marginTop:14,fontSize:12,color:"rgba(255,255,255,.25)"}}>
-            {L("Noch kein Konto?","No account yet?","Pas encore de compte?","Nessun account?")} <button onClick={()=>{setMode("register");setErr("");}} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:700,fontSize:12}}>{L("Gratis registrieren","Register free","S'inscrire","Registrati")}</button>
+          <div style={{textAlign:"center",marginTop:6}}>
+            <button type="button" onClick={()=>{setMode("forgot");setErr("");setInfo("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:12,fontFamily:"inherit",padding:"4px 0"}}>
+              {L("Passwort vergessen?","Forgot password?","Mot de passe oublié?","Password dimenticata?")}
+            </button>
+          </div>
+          <div style={{textAlign:"center",marginTop:20,paddingTop:20,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:13,color:"rgba(255,255,255,.3)"}}>
+            {L("Noch kein Konto?","No account yet?","Pas encore de compte?","Nessun account?")}
+            {" "}<button onClick={()=>{setMode("register");setErr("");}} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>
+              {L("Gratis registrieren","Sign up free","S'inscrire","Registrati")}
+            </button>
           </div>
         </>}
 
         {/* Register Form */}
         {mode==="register" && <>
-          <form onSubmit={handleRegister} style={{display:"flex",flexDirection:"column",gap:10}}>
-            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
+          <form onSubmit={handleRegister} style={{display:"flex",flexDirection:"column",gap:12}}>
+            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={inpFocus} onBlur={inpBlur} autoComplete="email"/>
             <div style={{position:"relative"}}>
-              <input type={showPw?"text":"password"} placeholder={L("Passwort (mind. 6 Zeichen)","Password (min. 6 chars)","Mot de passe (min. 6 car.)","Password (min. 6 car.)")} value={pw} onChange={e=>setPw(e.target.value)} required style={{...inp,paddingRight:44}} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
-              <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.3)",fontSize:16}}>{showPw?"🙈":"👁"}</button>
+              <input type={showPw?"text":"password"} placeholder={L("Passwort (mind. 6 Zeichen)","Password (min. 6 chars)","Mot de passe (min. 6 car.)","Password (min. 6 car.)")} value={pw} onChange={e=>setPw(e.target.value)} required style={{...inp,paddingRight:48}} onFocus={inpFocus} onBlur={inpBlur} autoComplete="new-password"/>
+              <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.25)",fontSize:15,padding:4,lineHeight:1}}>{showPw?"◉":"○"}</button>
             </div>
-            <input type="password" placeholder={L("Passwort wiederholen","Repeat password","Répétez le mot de passe","Ripeti password")} value={pw2} onChange={e=>setPw2(e.target.value)} required style={inp} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
-            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:8,border:"1px solid rgba(239,68,68,.2)"}}>{err}</div>}
-            <button type="submit" className="btn b-em b-w" disabled={loading} style={{marginTop:4,padding:"13px"}}>
-              {loading?"⏳ …":L("Konto erstellen →","Create account →","Créer →","Crea →")}
+            <input type="password" placeholder={L("Passwort wiederholen","Repeat password","Répétez","Ripeti")} value={pw2} onChange={e=>setPw2(e.target.value)} required style={inp} onFocus={inpFocus} onBlur={inpBlur} autoComplete="new-password"/>
+            <ErrBox msg={err}/>
+            <button type="submit" disabled={loading} style={{marginTop:2,padding:"14px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontFamily:"var(--bd)",fontSize:15,fontWeight:700,cursor:loading?"default":"pointer",boxShadow:"0 4px 16px rgba(16,185,129,.3)",transition:"all .2s",opacity:loading?.7:1}}>
+              {loading ? L("Erstelle Konto…","Creating account…","Création…","Creazione…") : L("Konto erstellen","Create account","Créer mon compte","Crea account")}
             </button>
           </form>
-          <div style={{textAlign:"center",marginTop:14,fontSize:11,color:"rgba(255,255,255,.2)",lineHeight:1.6}}>
-            {L("Mit der Registrierung stimmst du den AGB und der Datenschutzerklärung zu.","By registering you agree to our Terms and Privacy Policy.","En vous inscrivant vous acceptez les CGU.","Registrandoti accetti i T&C.")}
+          <div style={{textAlign:"center",marginTop:14,fontSize:11,color:"rgba(255,255,255,.18)",lineHeight:1.7}}>
+            {L("Mit der Registrierung stimmst du den","By signing up you agree to our")}{" "}
+            <span style={{color:"rgba(255,255,255,.35)",textDecoration:"underline",cursor:"pointer"}}>{L("AGB","Terms")}</span> {L("und der","and")}{" "}
+            <span style={{color:"rgba(255,255,255,.35)",textDecoration:"underline",cursor:"pointer"}}>{L("Datenschutzerklärung","Privacy Policy")}</span> {L("zu.","")}
           </div>
-          <div style={{textAlign:"center",marginTop:10,fontSize:12,color:"rgba(255,255,255,.25)"}}>
-            {L("Bereits ein Konto?","Already have an account?","Déjà un compte?","Hai già un account?")} <button onClick={()=>{setMode("login");setErr("");}} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:700,fontSize:12}}>{L("Einloggen","Sign in","Connexion","Accedi")}</button>
+          <div style={{textAlign:"center",marginTop:20,paddingTop:20,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:13,color:"rgba(255,255,255,.3)"}}>
+            {L("Bereits ein Konto?","Already have an account?","Déjà un compte?","Hai già un account?")}
+            {" "}<button onClick={()=>{setMode("login");setErr("");}} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>
+              {L("Einloggen","Sign in","Connexion","Accedi")}
+            </button>
           </div>
         </>}
 
-        {/* Passwort vergessen */}
+        {/* Forgot Password */}
         {mode==="forgot" && <>
-          <h2 style={{fontSize:20,marginBottom:4}}>🔑 {L("Passwort zurücksetzen","Reset password","Réinitialiser","Reimposta")}</h2>
-          <p style={{fontSize:13,color:"rgba(255,255,255,.4)",marginBottom:20}}>{L("Gib deine E-Mail ein. Du erhältst einen Reset-Code.","Enter your email. You'll receive a reset code.","Entrez votre e-mail. Vous recevrez un code.","Inserisci l'email per ricevere il codice.")}</p>
-          <form onSubmit={handleForgot} style={{display:"flex",flexDirection:"column",gap:10}}>
-            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
-            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:8}}>{err}</div>}
-            <button type="submit" className="btn b-em b-w" disabled={loading} style={{padding:"13px"}}>
-              {loading?"⏳ …":L("Code senden →","Send code →","Envoyer →","Invia →")}
+          <p style={{fontSize:13,color:"rgba(255,255,255,.4)",marginBottom:20,lineHeight:1.7}}>
+            {L("Gib deine E-Mail ein. Du erhältst einen Reset-Code.","Enter your email. You'll receive a reset code.","Entrez votre e-mail pour recevoir un code.","Inserisci l'email per ricevere il codice.")}
+          </p>
+          <form onSubmit={handleForgot} style={{display:"flex",flexDirection:"column",gap:12}}>
+            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={inpFocus} onBlur={inpBlur}/>
+            <ErrBox msg={err}/>
+            <button type="submit" disabled={loading} style={{padding:"14px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontFamily:"var(--bd)",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 16px rgba(16,185,129,.3)"}}>
+              {loading ? "…" : L("Reset-Code senden","Send reset code","Envoyer le code","Invia codice")}
             </button>
           </form>
-          <div style={{textAlign:"center",marginTop:14}}>
-            <button onClick={()=>{setMode("login");setErr("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:12}}>← {L("Zurück","Back","Retour","Indietro")}</button>
+          <div style={{textAlign:"center",marginTop:16}}>
+            <button onClick={()=>{setMode("login");setErr("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>← {L("Zurück zum Login","Back to sign in","Retour","Torna al login")}</button>
           </div>
         </>}
 
-        {/* Reset Code eingeben */}
+        {/* Reset Password */}
         {mode==="reset" && <>
-          <h2 style={{fontSize:20,marginBottom:4}}>✅ {L("Neues Passwort","New password","Nouveau mot de passe","Nuova password")}</h2>
-          {info&&<div style={{color:"#10b981",fontSize:12,padding:"8px 12px",background:"rgba(16,185,129,.08)",borderRadius:8,marginBottom:14,lineHeight:1.5}}>{info}</div>}
-          <form onSubmit={handleReset} style={{display:"flex",flexDirection:"column",gap:10}}>
-            <input placeholder={L("Reset-Code eingeben","Enter reset code","Code de réinitialisation","Codice reset")} value={resetToken} onChange={e=>setResetToken(e.target.value)} required style={{...inp,fontFamily:"monospace",letterSpacing:2,textTransform:"uppercase"}}/>
-            <input type="password" placeholder={L("Neues Passwort","New password","Nouveau mot de passe","Nuova password")} value={newPw} onChange={e=>setNewPw(e.target.value)} required style={inp}/>
-            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:8}}>{err}</div>}
-            <button type="submit" className="btn b-em b-w" style={{padding:"13px"}}>
-              {L("Passwort ändern →","Change password →","Changer →","Cambia →")}
+          <InfoBox msg={info}/>
+          <form onSubmit={handleReset} style={{display:"flex",flexDirection:"column",gap:12,marginTop:info?12:0}}>
+            <input placeholder={L("Reset-Code eingeben","Enter reset code","Entrez le code","Inserisci il codice")} value={resetToken} onChange={e=>setResetToken(e.target.value)} required style={{...inp,fontFamily:"monospace",letterSpacing:3,textTransform:"uppercase",textAlign:"center"}} onFocus={inpFocus} onBlur={inpBlur}/>
+            <input type="password" placeholder={L("Neues Passwort","New password","Nouveau mot de passe","Nuova password")} value={newPw} onChange={e=>setNewPw(e.target.value)} required style={inp} onFocus={inpFocus} onBlur={inpBlur}/>
+            <ErrBox msg={err}/>
+            <button type="submit" style={{padding:"14px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontFamily:"var(--bd)",fontSize:15,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 16px rgba(16,185,129,.3)"}}>
+              {L("Passwort ändern","Change password","Changer le mot de passe","Cambia password")}
             </button>
           </form>
         </>}
 
-        <div style={{textAlign:"center",marginTop:20}}>
-          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>
-            {L("Schliessen","Close","Fermer","Chiudi")}
-          </button>
-        </div>
       </div>
+      <style>{`@keyframes authIn{from{opacity:0;transform:scale(.92) translateY(12px)}to{opacity:1;transform:none}}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
@@ -3940,8 +3988,36 @@ export default function App() {
 
   const handleGoogleLogin = () => {
     const clientId = "370460173343-bnc71e8tib764unofcd6sqf7slesehih.apps.googleusercontent.com";
-    const redirect = encodeURIComponent(window.location.origin + "/api/auth/google");
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirect}&response_type=code&scope=email%20profile&prompt=select_account`;
+    const doLogin = () => {
+      try {
+        const client = window.google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: "email profile",
+          callback: async (resp) => {
+            if (resp.error) return;
+            try {
+              const r = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers: { Authorization: `Bearer ${resp.access_token}` } });
+              const u = await r.json();
+              if (!u.email) return;
+              if (!authGetUser(u.email)) authRegister(u.email, "google-"+Date.now(), "free");
+              const user = authGetUser(u.email);
+              const sess = {email:user.email, plan:user.plan||"free", name:u.name||""};
+              authSetSession(sess); setAuthSession(sess);
+              if(sess.plan==="pro"||sess.plan==="ultimate") setPro(true);
+              setShowAuth(false);
+            } catch(e) { console.error(e); }
+          }
+        });
+        client.requestAccessToken({ prompt: "select_account" });
+      } catch(e) { console.error(e); }
+    };
+    if (window.google?.accounts?.oauth2) { doLogin(); }
+    else {
+      const s = document.createElement("script");
+      s.src = "https://accounts.google.com/gsi/client";
+      s.onload = doLogin;
+      document.head.appendChild(s);
+    }
   };
 
   useEffect(()=>{
