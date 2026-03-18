@@ -1,37 +1,64 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 // ═══════════════════════════════════════════
 //  ⚙️  KONFIGURATION
 // ═══════════════════════════════════════════
 const C = {
   name: "Stellify",
-  tagline: "AI Career Copilot Schweiz",
+  tagline: "Dein nächster Job. KI-schnell.",
   domain: "stellify.ch",
   email: "support@stellify.ch",
   address: "6300 Zug, Schweiz",
   owner: "JTSP",
-  stripeMonthly: "https://buy.stripe.com/MONTHLY_LINK",
-  stripeYearly:  "https://buy.stripe.com/YEARLY_LINK",
+  stripeMonthly: "https://buy.stripe.com/cNi14m58gbdve0MbaZ2B202",
+  stripeYearly:  "https://buy.stripe.com/8x2cN4asAchzg8U92R2B205",
   priceM: "19.90",
   priceY: "14.90",
   FREE_LIMIT: 1,
-  PRO_LIMIT: 60,
-  CHAT_FREE_LIMIT: 10,
+  PRO_LIMIT: 20, // 20 Generierungen pro Tag
+  CHAT_FREE_LIMIT: 20,
+
+  ULTIMATE_LIMIT: 9999999,  // effektiv unbegrenzt
+  stripeUltimate: "https://buy.stripe.com/aFafZg9ow81jbSEgvj2B206",
+  stripeUltimateYearly: "https://buy.stripe.com/14A9ASfMU95nbSEdj72B203",
+
+  priceUltimate: "49.90",
+
+  ADMIN_EMAIL: "admin@stellify.ch",
+  ADMIN_PW: "Stellify2025!",
   // ── GROQ CONFIG ──────────────────────────────
-  GROQ_KEY: "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",
+  // GROQ_KEY wird serverseitig in api/ai.js verwaltet
   MODEL_FAST: "llama-3.1-8b-instant",      // Schnell & günstig
   MODEL_FULL: "llama-3.3-70b-versatile",   // Smart, für Bewerbungen etc.
+  REFERRAL_DISCOUNT: 20,   // % Rabatt für geworbene Freunde
+  REFERRAL_REWARD: 1,      // Monate gratis für Werber
   // ─────────────────────────────────────────────
   FREE_MAX_TOKENS: 500,
 };
 
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const groqHeaders = () => ({
-  "Content-Type": "application/json",
-  "Authorization": `Bearer ${C.GROQ_KEY}`
-});
+const GROQ_URL = "/api/ai";
+const groqHeaders = () => ({ "Content-Type": "application/json" });
 
-const getU   = () => { try { const d=JSON.parse(localStorage.getItem("stf_u")||"{}"),m=new Date().toISOString().slice(0,7); return d.month!==m?{month:m,count:0,proCount:0,chatCount:0}:d; } catch { return {month:"",count:0,proCount:0,chatCount:0}; }};
+const getWeekKey = () => {
+  const d = new Date();
+  // Letzter Montag berechnen
+  const day = d.getDay(); // 0=So, 1=Mo...
+  const diff = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(d); monday.setDate(d.getDate() + diff);
+  return monday.toISOString().slice(0,10); // "2026-03-16"
+};
+const getU = () => {
+  try {
+    const d = JSON.parse(localStorage.getItem("stf_u")||"{}");
+    const m = new Date().toISOString().slice(0,7);   // monatlicher Reset für Free
+    const w = getWeekKey();                           // wöchentlicher Reset für Pro
+    const resetMonth = d.month !== m;
+    const resetDay   = d.day   !== new Date().toISOString().slice(0,10);
+    if(resetMonth) return {month:m, week:w, count:0, proCount:0, chatCount:0};
+    if(resetDay)   return {...d, day:new Date().toISOString().slice(0,10), proCount:0}; // Pro-Limit daily reset
+    return d;
+  } catch { return {month:"", week:"", count:0, proCount:0, chatCount:0}; }
+};
 const incU   = () => { const u=getU(); u.count++; localStorage.setItem("stf_u",JSON.stringify(u)); };
 const incPro = () => { const u=getU(); u.proCount=(u.proCount||0)+1; localStorage.setItem("stf_u",JSON.stringify(u)); };
 const incChat= () => { const u=getU(); u.chatCount=(u.chatCount||0)+1; localStorage.setItem("stf_u",JSON.stringify(u)); };
@@ -39,6 +66,116 @@ const getChatCount = () => getU().chatCount||0;
 const getProCount = () => getU().proCount||0;
 const isPro  = () => { try { return localStorage.getItem("stf_pro")==="true"; } catch { return false; }};
 const actPro = () => { try { localStorage.setItem("stf_pro","true"); } catch {}};
+
+// ── REFERRAL ──────────────────────────────────────────────
+const genReferralCode = (email) => {
+  // Einfacher deterministischer Code aus E-Mail
+  let h = 0;
+  for(let i=0; i<email.length; i++) h = ((h<<5)-h)+email.charCodeAt(i);
+  return "STF" + Math.abs(h).toString(36).toUpperCase().slice(0,6);
+};
+const getReferralData = () => { try { return JSON.parse(localStorage.getItem("stf_referral")||"{}"); } catch { return {}; }};
+const applyReferral = (code) => {
+  const data = getReferralData();
+  if(data.applied) return {ok:false, msg:"Bereits verwendet."};
+  localStorage.setItem("stf_referral", JSON.stringify({applied:true, code, discount:C.REFERRAL_DISCOUNT, appliedAt:Date.now()}));
+  return {ok:true};
+};
+
+// ── AUTH SYSTEM ─────────────────────────────────────────────
+const AUTH_KEY = "stf_auth_users"; // [{email,pw,plan,seats,members,activatedAt}]
+const SESSION_KEY = "stf_session"; // {email,plan}
+
+function authGetUsers() {
+  try { return JSON.parse(localStorage.getItem(AUTH_KEY)||"[]"); } catch { return []; }
+}
+function authSaveUsers(users) {
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify(users)); } catch {}
+}
+function authGetSession() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)||"null"); } catch { return null; }
+}
+function authSetSession(session) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch {}
+}
+function authClearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+function authRegister(email, pw, plan) {
+  const users = authGetUsers();
+  if(users.find(u=>u.email.toLowerCase()===email.toLowerCase())) return {ok:false,err:"E-Mail bereits registriert."};
+  const user = {email:email.toLowerCase(), pw, plan:plan||"free", seats:plan==="ultimate"?9999999:1, members:[email.toLowerCase()], activatedAt:Date.now()};
+  users.push(user);
+  authSaveUsers(users);
+  authSetSession({email:user.email, plan:user.plan});
+  return {ok:true, user};
+}
+function authLogin(email, pw) {
+  const users = authGetUsers();
+  const user = users.find(u=>u.email.toLowerCase()===email.toLowerCase() && u.pw===pw);
+  if(!user) return {ok:false,err:"E-Mail oder Passwort falsch."};
+  authSetSession({email:user.email, plan:user.plan});
+  return {ok:true, user};
+}
+function authUpgradePlan(email, plan) {
+  const users = authGetUsers();
+  const idx = users.findIndex(u=>u.email.toLowerCase()===email.toLowerCase());
+  if(idx>=0){
+    users[idx].plan = plan;
+    if(plan==="ultimate") users[idx].seats = 9999999;
+    authSaveUsers(users);
+    authSetSession({email:users[idx].email, plan});
+    return users[idx];
+  }
+  // Neuer User via Stripe
+  const user = {email:email.toLowerCase(), pw:"", plan, seats:plan==="ultimate"?9999999:1, members:[email.toLowerCase()], activatedAt:Date.now()};
+  users.push(user);
+  authSaveUsers(users);
+  authSetSession({email:user.email, plan});
+  return user;
+}
+function authGetUser(email) {
+  return authGetUsers().find(u=>u.email.toLowerCase()===email.toLowerCase())||null;
+}
+function authAddMember(ownerEmail, memberEmail) {
+  const users = authGetUsers();
+  const owner = users.find(u=>u.email.toLowerCase()===ownerEmail.toLowerCase());
+  if(!owner) return {ok:false,err:"Kein Account gefunden."};
+  if((owner.members||[]).length >= owner.seats) return {ok:false,err:`Maximale Anzahl (${owner.seats}) erreicht.`};
+  if((owner.members||[]).includes(memberEmail.toLowerCase())) return {ok:false,err:"Bereits Mitglied."};
+  owner.members = [...(owner.members||[]), memberEmail.toLowerCase()];
+  authSaveUsers(users);
+  return {ok:true};
+}
+function authIsAdmin(email,pw) {
+  return email.toLowerCase()===C.ADMIN_EMAIL.toLowerCase() && pw===C.ADMIN_PW;
+}
+function authRequestReset(email) {
+  const users = authGetUsers();
+  const user = users.find(u=>u.email.toLowerCase()===email.toLowerCase());
+  if(!user) return {ok:false, err:"E-Mail nicht gefunden."};
+  // Reset-Token generieren (vereinfacht – in Produktion via echter E-Mail)
+  const token = Math.random().toString(36).slice(2,10).toUpperCase();
+  const resets = JSON.parse(localStorage.getItem("stf_resets")||"{}");
+  resets[token] = {email:user.email, expires:Date.now()+3600000};
+  localStorage.setItem("stf_resets", JSON.stringify(resets));
+  // In Produktion: E-Mail senden. Hier: Token im Alert anzeigen
+  return {ok:true, token, msg:`Dein Reset-Code: ${token} (gültig 1 Stunde)`};
+}
+function authResetPassword(token, newPw) {
+  const resets = JSON.parse(localStorage.getItem("stf_resets")||"{}");
+  const reset = resets[token];
+  if(!reset) return {ok:false, err:"Ungültiger oder abgelaufener Code."};
+  if(Date.now() > reset.expires) return {ok:false, err:"Code abgelaufen. Bitte neu anfordern."};
+  const users = authGetUsers();
+  const idx = users.findIndex(u=>u.email===reset.email);
+  if(idx<0) return {ok:false, err:"Nutzer nicht gefunden."};
+  users[idx].pw = newPw;
+  authSaveUsers(users);
+  delete resets[token];
+  localStorage.setItem("stf_resets", JSON.stringify(resets));
+  return {ok:true};
+}
 
 // 🧠 MODEL ROUTING
 const HAIKU_TOOLS = ["free","email","protokoll","uebersetzer","networking","kuendigung","lernplan","zusammenfassung","gehalt","plan306090","referenz","lehrstelle"];
@@ -89,7 +226,14 @@ async function streamAI(prompt, onChunk, system, toolId="") {
       })
     });
   } catch(e) { throw new Error("Netzwerkfehler – bitte Internetverbindung prüfen."); }
-  if(!resp.ok) { const e=await resp.json(); throw new Error(e.error?.message||"API Fehler"); }
+  if(!resp.ok) {
+    let msg = "API-Fehler";
+    try { const e=await resp.json(); msg=e.error?.message||msg; } catch{}
+    if(resp.status===429) msg="Zu viele Anfragen – bitte 30 Sekunden warten und nochmals versuchen.";
+    if(resp.status===503||resp.status===529) msg="KI momentan überlastet – bitte in einer Minute nochmals versuchen.";
+    if(resp.status===401) msg="API-Schlüssel ungültig.";
+    throw new Error(msg);
+  }
   const reader = resp.body.getReader(); const dec = new TextDecoder(); let full = "";
   while(true) {
     const {done,value} = await reader.read(); if(done) break;
@@ -120,9 +264,54 @@ const FONTS = `@import url('https://fonts.googleapis.com/css2?family=Bricolage+G
 const CSS = `
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--ink:#0b0b12;--bg:#f2f3f7;--em:#10b981;--em2:#059669;--em3:rgba(16,185,129,.11);--am:#f59e0b;--am2:rgba(245,158,11,.14);--bl:#3b82f6;--bl2:rgba(59,130,246,.12);--mu:rgba(11,11,18,.46);--bo:rgba(11,11,18,.1);--bos:rgba(11,11,18,.06);--dk:#07070e;--dk2:#0f0f1a;--dk3:#161624;--hd:'Bricolage Grotesque',system-ui,sans-serif;--bd:'Figtree',system-ui,sans-serif;--r:12px;--r2:20px}
-html{scroll-behavior:smooth}body{background:var(--bg);color:var(--ink);font-family:var(--bd);font-weight:300;-webkit-font-smoothing:antialiased}
+/* ── APPLE-STYLE ENHANCEMENTS ──────────────────── */
+@supports(backdrop-filter:blur(0)){
+  .glass{background:rgba(255,255,255,.08)!important;backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(255,255,255,.12)!important}
+  .glass-dk{background:rgba(15,15,26,.72)!important;backdrop-filter:blur(24px) saturate(160%);-webkit-backdrop-filter:blur(24px) saturate(160%);border:1px solid rgba(255,255,255,.08)!important}
+}
+/* Smooth spring transitions */
+.btn,.tool-card,.pc,.card{transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s ease,border-color .2s ease,background .2s ease!important}.card:hover{box-shadow:0 8px 24px rgba(0,0,0,.1);border-color:var(--bo)}
+.btn:hover,.tool-card:hover{transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(0,0,0,.15)!important}
+.btn:active,.tool-card:active{transform:translateY(0) scale(.97)!important;transition-duration:.08s!important}
+/* Bubble / pill badges */
+.apple-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:.2px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.apple-pill.green{background:rgba(16,185,129,.18);border:1px solid rgba(16,185,129,.3);color:#10b981}
+.apple-pill.amber{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.28);color:#f59e0b}
+.apple-pill.blue{background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.28);color:#60a5fa}
+.apple-pill.white{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.8)}
+/* Floating card depth */
+.fc,.sc,.card{box-shadow:0 2px 12px rgba(0,0,0,.08),0 0 0 1px var(--bos)}
+.fc:hover,.sc:hover{box-shadow:0 8px 32px rgba(0,0,0,.14),0 0 0 1px var(--bo);transform:translateY(-3px)}
+/* Gradient orbs / background bubbles */
+.orb{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;opacity:.35;animation:orbFloat 8s ease-in-out infinite alternate;will-change:transform}
+@keyframes orbFloat{from{transform:translate3d(0,0,0)}to{transform:translate3d(20px,-30px,0)}}
+/* Frosted hero */
+.hero-glass{background:linear-gradient(135deg,rgba(16,185,129,.06) 0%,rgba(0,0,0,0) 60%)}
+/* Spring scale on interactive */
+.spring{transition:transform .22s cubic-bezier(.34,1.56,.64,1)!important}
+.spring:hover{transform:scale(1.03)!important}
+.spring:active{transform:scale(.96)!important}
+/* Scrollbar Apple-style */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(16,185,129,.3);border-radius:99px}
+::-webkit-scrollbar-thumb:hover{background:rgba(16,185,129,.5)}
+/* SF-style focus ring */
+*:focus-visible{outline:2px solid var(--em);outline-offset:3px;border-radius:6px}
+/* Smooth page transitions */
+.page-enter{animation:pageIn .28s cubic-bezier(.25,.46,.45,.94) both}
+@keyframes pageIn{from{opacity:0;transform:translate3d(0,12px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+html{scroll-behavior:smooth}body{background:var(--bg);color:var(--ink);font-family:var(--bd);font-weight:300;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeSpeed}
+*{box-sizing:border-box}
+section{contain:layout style paint}
+.modal-layer{contain:layout style}
+img,svg{display:block}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+input,textarea,select{-webkit-appearance:none}
+::selection{background:rgba(16,185,129,.25);color:inherit}
+::-moz-selection{background:rgba(16,185,129,.25);color:inherit}
 /* NAV */
-nav{position:sticky;top:0;z-index:200;background:rgba(242,243,247,.94);backdrop-filter:blur(20px);border-bottom:1px solid var(--bo)}
+nav{position:sticky;top:0;z-index:200;background:rgba(242,243,247,.9);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid rgba(11,11,18,.07);box-shadow:0 1px 0 rgba(0,0,0,.05)}
 .ni{max-width:1200px;margin:0 auto;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;gap:10px}
 .logo{font-family:var(--hd);font-size:21px;font-weight:800;cursor:pointer;letter-spacing:-.5px;display:flex;align-items:center;color:var(--ink)}
 .logo-dot{width:8px;height:8px;background:var(--em);border-radius:50%;margin-left:2px;margin-bottom:8px;flex-shrink:0}
@@ -132,24 +321,24 @@ nav{position:sticky;top:0;z-index:200;background:rgba(242,243,247,.94);backdrop-
 .ham{display:none!important}
 @media(max-width:680px){.nl-desk{display:none!important}.ham{display:flex!important}}
 .nlk{font-size:13px;color:var(--mu);cursor:pointer;background:none;border:none;font-family:var(--bd);transition:color .18s;white-space:nowrap;padding:0}.nlk:hover{color:var(--ink)}
-.nc{background:var(--ink);color:white;padding:8px 18px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:var(--bd);transition:all .2s}.nc:hover{background:var(--em)}
+.nc{background:linear-gradient(135deg,#10b981,#059669);color:white;padding:9px 18px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:var(--bd);transition:all .2s;box-shadow:0 2px 10px rgba(16,185,129,.3);transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .18s}.nc:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(16,185,129,.45)}.nc:active{transform:scale(.96)}.nc:hover{background:var(--em)}
 .ls{display:flex;background:rgba(11,11,18,.06);border:1.5px solid rgba(11,11,18,.08);border-radius:12px;padding:4px;gap:3px}
 .lb{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:var(--bd);color:var(--mu);transition:all .18s;letter-spacing:.3px}.lb.on{background:white;color:var(--ink);box-shadow:0 2px 8px rgba(11,11,18,.12);font-weight:700}
 /* HERO */
 .hero{background:var(--dk);overflow:hidden;position:relative;padding:100px 0 88px}
 .hbg{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 70% 80% at 80% 20%,rgba(16,185,129,.14) 0%,transparent 60%),radial-gradient(ellipse 50% 60% at 5% 90%,rgba(59,130,246,.07) 0%,transparent 60%)}
 .hdots{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.04) 1px,transparent 1px);background-size:32px 32px;pointer-events:none}
-.con{max-width:1200px;margin:0 auto;padding:0 28px}.csm{max-width:820px;margin:0 auto;padding:0 28px}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--em);background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);padding:5px 14px;border-radius:20px;margin-bottom:26px}
-h1.hh{font-family:var(--hd);font-size:clamp(48px,7vw,84px);font-weight:800;line-height:.98;letter-spacing:-3px;color:white;margin-bottom:22px;max-width:900px}
+.con{max-width:1200px;margin:0 auto;padding:0 28px}.csm{max-width:820px;margin:0 auto;padding:0 28px}.page-wrap{animation:pageIn .3s cubic-bezier(.25,.46,.45,.94) both}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--em);background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.25);padding:6px 16px;border-radius:999px;margin-bottom:26px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(16,185,129,.15)}
+h1.hh{font-family:var(--hd);font-size:clamp(48px,7vw,88px);font-weight:800;line-height:.96;letter-spacing:-3.5px;color:white;margin-bottom:22px;max-width:960px;background:linear-gradient(135deg,#fff 60%,rgba(255,255,255,.7));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 h1.hh em{font-style:normal;color:var(--em)}
-.hsub{font-size:18px;font-weight:300;color:rgba(255,255,255,.5);max-width:580px;line-height:1.75;margin-bottom:38px}
+.hsub{font-size:18px;font-weight:300;color:rgba(255,255,255,.55);max-width:600px;line-height:1.72;margin-bottom:38px;letter-spacing:-.1px}
 .hctas{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .hstats{margin-top:64px;display:flex;gap:40px;flex-wrap:wrap}
-.stat-n{font-family:var(--hd);font-size:30px;font-weight:800;color:white;letter-spacing:-1px;line-height:1}.stat-l{font-size:12px;color:rgba(255,255,255,.36);margin-top:4px}
+.stat-n{font-family:var(--hd);font-size:30px;font-weight:800;color:white;letter-spacing:-1px;line-height:1}.stat-l{font-size:12px;color:rgba(255,255,255,.36);margin-top:4px}.hstats>div{transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease}.hstats>div:hover{transform:translateY(-4px) scale(1.03);box-shadow:0 16px 40px rgba(0,0,0,.25)}
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;border-radius:10px;font-family:var(--bd);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .2s;white-space:nowrap;text-decoration:none}
-.b-em{background:var(--em);color:white}.b-em:hover{background:var(--em2);transform:translateY(-2px);box-shadow:0 10px 28px rgba(16,185,129,.28)}
+.b-em{background:linear-gradient(135deg,#10b981,#059669);color:white;box-shadow:0 2px 14px rgba(16,185,129,.32)}.b-em:hover{background:linear-gradient(135deg,#0ea572,#047857);box-shadow:0 8px 24px rgba(16,185,129,.48)}
 .b-dk{background:var(--ink);color:white}.b-dk:hover{background:#18182e;transform:translateY(-2px)}
 .b-bl{background:var(--bl);color:white}.b-bl:hover{background:#2563eb;transform:translateY(-2px);box-shadow:0 10px 28px rgba(59,130,246,.28)}
 .b-out{background:transparent;color:white;border:1.5px solid rgba(255,255,255,.2)}.b-out:hover{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.05)}
@@ -159,18 +348,18 @@ h1.hh em{font-style:normal;color:var(--em)}
 /* SECTIONS */
 .sec{padding:88px 0}.sec-dk{background:var(--dk)}.sec-dk2{background:var(--dk2)}.sec-w{background:white}.sec-bg{background:var(--bg)}
 .sh{margin-bottom:50px}.shc{text-align:center}.shc .ss{margin:0 auto}
-.seye{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--em);margin-bottom:12px}
+.seye{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--em);margin-bottom:16px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);padding:5px 14px;border-radius:999px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .st{font-family:var(--hd);font-size:clamp(32px,4vw,50px);font-weight:800;line-height:1.05;letter-spacing:-1.5px;margin-bottom:14px}
 .sec-dk .st,.sec-dk2 .st{color:white}
 .ss{font-size:16px;font-weight:300;line-height:1.75;color:var(--mu);max-width:560px}
 .sec-dk .ss,.sec-dk2 .ss{color:rgba(255,255,255,.42)}
 /* TOOLS GRID */
 .tools-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-.tool-card{padding:28px;border-radius:var(--r2);border:1.5px solid var(--bo);background:white;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;text-align:left}
+.tool-card{padding:28px;border-radius:var(--r2);border:1.5px solid var(--bo);background:white;cursor:pointer;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,border-color .2s ease;position:relative;overflow:hidden;text-align:left;will-change:transform;-webkit-tap-highlight-color:transparent}.tool-card:hover{transform:translateY(-3px) scale(1.01);box-shadow:0 12px 32px rgba(0,0,0,.1);border-color:var(--em)}.tool-card:active{transform:scale(.97);transition-duration:.08s}
 .tool-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .2s;background:linear-gradient(135deg,rgba(16,185,129,.04),transparent)}
 .tool-card:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(11,11,18,.1);border-color:rgba(16,185,129,.35)}.tool-card:hover::before{opacity:1}
 .tool-card.bl:hover{border-color:rgba(59,130,246,.4)}.tool-card.am:hover{border-color:rgba(245,158,11,.4)}
-.tc-ico{font-size:30px;margin-bottom:12px}
+.tc-ico{font-size:30px;margin-bottom:12px;transition:transform .22s cubic-bezier(.34,1.56,.64,1);display:inline-block}.tool-card:hover .tc-ico{transform:scale(1.18) translateY(-3px)}
 .tc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
 .tc-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0;margin-top:2px}
 .tc-em{background:var(--em3);color:var(--em2)}.tc-bl{background:var(--bl2);color:var(--bl)}.tc-am{background:var(--am2);color:#92400e}
@@ -192,7 +381,7 @@ h1.hh em{font-style:normal;color:var(--em)}
 /* Mini-Tools: letzte einsame Karte voll-breit */
 .mini-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
 @media(max-width:680px){.mini-g{grid-template-columns:1fr 1fr}.mini-g>*:last-child:nth-child(odd){grid-column:span 2}}
-.fc{padding:24px;background:white;border:1.5px solid var(--bo);border-radius:var(--r2);position:relative;transition:all .22s}
+.fc{padding:24px;background:white;border:1.5px solid var(--bo);border-radius:var(--r2);position:relative;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,border-color .2s;will-change:transform}.fc:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.08);border-color:var(--em)}.fc:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.08);border-color:var(--em)}
 .fc:hover{border-color:var(--em);box-shadow:0 6px 28px rgba(16,185,129,.08);transform:translateY(-2px)}
 .fc-ico{font-size:24px;margin-bottom:10px}.fc h4{font-family:var(--hd);font-size:15px;font-weight:700;margin-bottom:6px}.fc p{font-size:13px;line-height:1.7;color:var(--mu)}
 .pp{position:absolute;top:13px;right:13px;font-size:10px;font-weight:700;background:linear-gradient(135deg,var(--em),var(--em2));color:white;padding:2px 8px;border-radius:20px}
@@ -200,7 +389,7 @@ h1.hh em{font-style:normal;color:var(--em)}
 /* STEPS */
 .srow{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;position:relative}
 .srow::before{display:none}
-.sc{padding:28px 24px;background:var(--dk3);border:1.5px solid rgba(255,255,255,.07);border-radius:var(--r2)}
+.sc{padding:28px 24px;background:var(--dk3);border:1.5px solid rgba(255,255,255,.07);border-radius:var(--r2);transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,border-color .2s,background .2s;will-change:transform}.sc:hover{transform:translateY(-3px);background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.16);box-shadow:0 12px 32px rgba(0,0,0,.2)}.sc:hover{transform:translateY(-3px);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.15);box-shadow:0 12px 32px rgba(0,0,0,.2)}
 .sn{width:48px;height:48px;background:rgba(16,185,129,.12);border:1.5px solid rgba(16,185,129,.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--hd);font-size:16px;font-weight:800;color:var(--em);margin-bottom:16px}
 .sc h3{font-family:var(--hd);font-size:17px;font-weight:700;color:white;margin-bottom:8px}.sc p{font-size:13px;line-height:1.75;color:rgba(255,255,255,.42)}
 /* TESTI */
@@ -209,18 +398,18 @@ h1.hh em{font-style:normal;color:var(--em)}
 .ts{color:var(--em);font-size:13px;margin-bottom:10px;letter-spacing:3px}.tq{font-size:14px;line-height:1.75;color:rgba(255,255,255,.7);margin-bottom:14px;font-style:italic}
 .tn{font-size:13px;font-weight:600;color:white}.tr{font-size:12px;color:rgba(255,255,255,.3);margin-top:2px}
 /* PRICING */
-.btog{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:40px}
+.btog{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:40px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:99px;padding:4px 8px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);width:fit-content;margin-left:auto;margin-right:auto}
 .bto{font-size:14px;font-weight:500;color:rgba(255,255,255,.4);cursor:pointer;transition:color .18s}.bto.on{color:white}
 .btsw{width:50px;height:27px;background:rgba(255,255,255,.1);border-radius:20px;cursor:pointer;position:relative;border:1.5px solid rgba(255,255,255,.14);transition:background .2s;flex-shrink:0}
 .btsw.yr{background:var(--em)}.btt{position:absolute;top:3px;left:3px;width:17px;height:17px;background:white;border-radius:50%;transition:transform .2s}.btsw.yr .btt{transform:translateX(23px)}
 .save-t{background:rgba(245,158,11,.15);color:var(--am);border:1px solid rgba(245,158,11,.3);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
-.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:980px;margin:0 auto}
-.pc{border-radius:var(--r2);padding:32px;border:1.5px solid rgba(255,255,255,.08);background:var(--dk3);position:relative}
-.pc.hl{border-color:var(--em);background:rgba(16,185,129,.06)}.pc.hl2{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.04)}
-.bst{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--em);color:white;font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;white-space:nowrap}
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:1160px;margin:0 auto}
+.pc{border-radius:var(--r2);padding:26px 22px;border:1.5px solid rgba(255,255,255,.08);background:var(--dk3);position:relative;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,border-color .2s ease}
+.pc.hl{border-color:var(--em);background:rgba(16,185,129,.07);box-shadow:0 0 0 1px rgba(16,185,129,.15),0 16px 48px rgba(16,185,129,.12)}.pc.hl2{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.04)}
+.bst{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#10b981,#059669);color:white;font-size:11px;font-weight:700;padding:5px 16px;border-radius:999px;white-space:nowrap;box-shadow:0 4px 14px rgba(16,185,129,.4);letter-spacing:.3px}
 .ppl{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:10px}
 .ppl.em{color:var(--em)}.ppl.am{color:var(--am)}
-.ppr{font-family:var(--hd);font-size:46px;font-weight:800;color:white;line-height:1;margin-bottom:4px;letter-spacing:-2px}
+.ppr{font-family:var(--hd);font-size:38px;font-weight:800;color:white;line-height:1;margin-bottom:4px;letter-spacing:-2px}
 .ppr span{font-size:16px;font-weight:400;color:rgba(255,255,255,.3);font-family:var(--bd);letter-spacing:0}
 .pper{font-size:12px;color:rgba(255,255,255,.3);margin-bottom:24px}
 .pfl{list-style:none;margin-bottom:24px}
@@ -239,7 +428,7 @@ h1.hh em{font-style:normal;color:var(--em)}
 .page-hdr.dk{background:var(--dk)}.page-hdr.bl{background:linear-gradient(135deg,#0a66c2,#0077b5)}.page-hdr.am{background:linear-gradient(135deg,#92400e,#b45309)}.page-hdr.vi{background:linear-gradient(135deg,#4c1d95,#6d28d9)}
 .page-hdr h1{font-family:var(--hd);font-size:32px;font-weight:800;color:white;margin-bottom:7px;letter-spacing:-1px}.page-hdr p{font-size:14px;color:rgba(255,255,255,.4)}
 .asteps{max-width:640px;margin:28px auto 0;display:flex;border-bottom:2px solid rgba(255,255,255,.07)}
-.as{flex:1;text-align:center;padding:10px 5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.22);transition:all .25s}
+.as{flex:1;text-align:center;padding:10px 5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.22);transition:all .25s;border-radius:10px;-webkit-tap-highlight-color:transparent}.as.on:not(.complete){background:rgba(16,185,129,.08);border-radius:10px}.as:hover{background:rgba(255,255,255,.04);border-radius:10px}
 .as.on{color:var(--em);border-bottom:2px solid var(--em);margin-bottom:-2px}.as.done{color:rgba(255,255,255,.4)}
 .abody{max-width:740px;margin:0 auto;padding:38px 28px 80px}
 /* CARDS */
@@ -247,8 +436,8 @@ h1.hh em{font-style:normal;color:var(--em)}
 .ct{font-family:var(--hd);font-size:22px;font-weight:800;margin-bottom:4px;letter-spacing:-.5px}
 .cs{font-size:13px;color:var(--mu);margin-bottom:20px;line-height:1.6}
 .field{margin-bottom:14px}
-.field label{display:block;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--mu);margin-bottom:5px}
-.field input,.field textarea,.field select{width:100%;padding:10px 13px;border:1.5px solid var(--bo);border-radius:10px;font-family:var(--bd);font-size:14px;font-weight:300;color:var(--ink);background:#fafafa;outline:none;transition:border-color .18s;resize:none}
+.field label{display:block;font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--mu);margin-bottom:6px}
+.field input,.field textarea,.field select{width:100%;padding:11px 14px;border:1.5px solid var(--bo);border-radius:12px;font-family:var(--bd);font-size:14px;font-weight:300;color:var(--ink);background:#fafafa;outline:none;transition:border-color .18s,box-shadow .18s,transform .15s;resize:none}.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--em);box-shadow:0 0 0 3px rgba(16,185,129,.1);transform:translateY(-1px)}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--em);background:white;box-shadow:0 0 0 3px rgba(16,185,129,.07)}
 .field textarea{min-height:84px;line-height:1.65}
 .fg2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -260,11 +449,13 @@ h1.hh em{font-style:normal;color:var(--em)}
 .upz-ico{font-size:30px;margin-bottom:8px}.upz h4{font-family:var(--hd);font-size:14px;font-weight:700;margin-bottom:4px}.upz p{font-size:12px;color:var(--mu)}
 .upz-ok{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:9px 14px;font-size:13px;color:#15803d;margin-bottom:12px;display:flex;align-items:center;gap:7px}
 /* STREAMING */
-.spin{width:32px;height:32px;border:2px solid rgba(16,185,129,.2);border-top-color:var(--em);border-radius:50%;animation:sp .75s linear infinite}
+.spin{width:32px;height:32px;border:2px solid rgba(16,185,129,.2);border-top-color:var(--em);border-radius:50%;animation:sp .75s linear infinite;will-change:transform}
 @keyframes sp{to{transform:rotate(360deg)}}
-.cursor{display:inline-block;width:2px;height:1em;background:var(--em);margin-left:1px;animation:blink .8s step-end infinite;vertical-align:text-bottom}
+.cursor{display:inline-block;width:2px;height:1em;background:var(--em);margin-left:1px;animation:blink .8s step-end infinite;vertical-align:text-bottom;will-change:opacity}
+.progress-bar{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--em),#059669);transition:width .6s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 8px rgba(16,185,129,.4)}
+.progress-track{height:6px;border-radius:99px;background:rgba(16,185,129,.12);overflow:hidden}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
-.r-doc{background:#fafafa;border:1.5px solid var(--bo);border-radius:12px;padding:22px;font-size:14px;line-height:1.9;color:var(--ink);white-space:pre-wrap;max-height:460px;overflow-y:auto;font-family:var(--bd)}
+.r-doc{background:#f8f9fc;border:1.5px solid var(--bo);border-radius:14px;padding:24px;font-size:14px;line-height:1.9;color:var(--ink);white-space:pre-wrap;max-height:460px;overflow-y:auto;font-family:var(--bd);min-height:80px;box-shadow:0 2px 8px rgba(0,0,0,.04) inset}
 .r-doc::-webkit-scrollbar{width:4px}.r-doc::-webkit-scrollbar-thumb{background:rgba(16,185,129,.3);border-radius:4px}
 .r-edit{background:white;border:1.5px solid var(--em);border-radius:12px;padding:22px;font-size:14px;line-height:1.9;color:var(--ink);width:100%;min-height:340px;outline:none;font-family:var(--bd);resize:vertical;box-shadow:0 0 0 3px rgba(16,185,129,.07)}
 .r-bar{display:flex;gap:7px;justify-content:flex-end;margin-bottom:10px;flex-wrap:wrap}
@@ -280,8 +471,8 @@ h1.hh em{font-style:normal;color:var(--em)}
 .free-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(16,185,129,.12);border:1.5px solid rgba(16,185,129,.3);borderRadius:30px;padding:8px 18px;font-size:13px;font-weight:700;color:var(--em);cursor:pointer;transition:all .2s}
 .free-pill:hover{background:rgba(16,185,129,.2);transform:translateY(-1px)}
 /* MODAL PAYWALL */
-.mbg{position:fixed;inset:0;background:rgba(7,7,14,.82);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)}
-.mod{background:var(--dk2);border:1.5px solid rgba(255,255,255,.08);border-radius:24px;padding:44px;max-width:480px;width:100%;color:white;text-align:center}
+.mbg{position:fixed;inset:0;background:rgba(7,7,14,.88);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px}
+.mod{background:rgba(18,18,28,.96);animation:modalSpring .35s cubic-bezier(.34,1.56,.64,1) both;backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border:1px solid rgba(255,255,255,.1);border-radius:28px;padding:44px;max-width:480px;width:100%;color:white;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05);animation:modalIn .26s cubic-bezier(.34,1.56,.64,1)}@keyframes modalSpring{from{opacity:0;transform:translate3d(0,16px,0) scale(.88)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}@keyframes modalIn{from{opacity:0;transform:scale(.9) translateY(16px)}to{opacity:1;transform:none}}
 .mod h2{font-family:var(--hd);font-size:30px;font-weight:800;margin-bottom:8px;letter-spacing:-1px}
 .mod p{font-size:13px;color:rgba(255,255,255,.42);margin-bottom:20px;line-height:1.7}
 .mod-pr{font-family:var(--hd);font-size:44px;font-weight:800;color:var(--em);margin-bottom:4px;letter-spacing:-2px}
@@ -360,7 +551,7 @@ h1.hh em{font-style:normal;color:var(--em)}
 /* EMAIL */
 .eml-note{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.14);border-radius:10px;padding:11px 14px;font-size:13px;color:rgba(11,11,18,.56);margin-top:12px;display:flex;gap:8px;line-height:1.6}
 /* INLINE PW */
-.ipw{background:var(--dk);border-radius:var(--r2);padding:32px;margin-top:18px;text-align:center;color:white}
+.ipw{animation:modalSpring .3s cubic-bezier(.34,1.56,.64,1) both;background:rgba(12,12,22,.97);backdrop-filter:blur(32px);-webkit-backdrop-filter:blur(32px);border:1px solid rgba(16,185,129,.16);border-radius:24px;padding:32px;margin-top:18px;text-align:center;color:white;box-shadow:0 20px 50px rgba(0,0,0,.4),0 0 40px rgba(16,185,129,.06)}
 .ipw h3{font-family:var(--hd);font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-.5px}
 .ipw p{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:4px;line-height:1.7}
 .ipw-pr{font-family:var(--hd);font-size:40px;font-weight:800;color:var(--em);margin:12px 0 3px;letter-spacing:-1.5px}
@@ -383,11 +574,11 @@ footer{background:var(--dk);padding:50px 28px 24px}
 .fcol button,.fcol a{display:block;font-size:13px;color:rgba(255,255,255,.36);margin-bottom:7px;cursor:pointer;text-decoration:none;background:none;border:none;font-family:var(--bd);text-align:left;transition:color .18s;padding:0}.fcol button:hover,.fcol a:hover{color:white}
 .fbot{max-width:1200px;margin:0 auto;padding-top:18px;font-size:11px;color:rgba(255,255,255,.25);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 @media(max-width:820px){
-  .why-vs,.tools-grid,.feat-g6,.feat-row,.srow,.tg,.pgrid,.vb,.fg2,.fi{grid-template-columns:1fr}
+  .why-vs,.tools-grid,.feat-g6,.feat-row,.srow,.tg,.vb,.fg2{grid-template-columns:1fr}
   .srow::before{display:none}
   .hstats{gap:16px;margin-top:36px}
   .hstats>div{flex:1;min-width:calc(50% - 8px)}
-  .btog{flex-direction:column;gap:8px}
+  .btog{flex-direction:row;gap:6px;flex-wrap:wrap;justify-content:center}
   .card{padding:20px 16px;border-radius:16px}
   .ct{font-size:19px}
   .mod{padding:24px 14px}
@@ -416,11 +607,14 @@ footer{background:var(--dk);padding:50px 28px 24px}
   .field label{font-size:10px}
   .frow{flex-direction:column-reverse;gap:8px}
   .frow .btn{width:100%;text-align:center;justify-content:center}
-  section{padding:52px 0}
+  section{padding:44px 0}
   .tool-card{padding:20px 16px}
   .tools-grid{gap:12px}
   .feat-g6{gap:12px}
-  .pgrid{gap:12px}
+  .pgrid{grid-template-columns:1fr;gap:16px;padding:0 4px}
+  .pc{padding:24px 20px}
+  .ppr{font-size:34px}
+  .pfl li{font-size:13px;padding:8px 0}
   .fi{gap:24px}
   .fbot{font-size:10px}
   .legal{padding:32px 16px 60px}
@@ -464,7 +658,7 @@ const mkT = (lang) => {
       ],
     },
     tools:{
-      label: L("6 Tools. Ein Copilot.","6 Outils. Un Copilote.","6 Strumenti. Un Copilota.","6 Tools. One Copilot."),
+      label: L("20+ Tools. Ein Copilot.","20+ Outils. Un Copilote.","20+ Strumenti. Un Copilota.","20+ Tools. One Copilot."),
       title: L("Alles für deine Karriere in der Schweiz.","Tout pour votre carrière en Suisse.","Tutto per la tua carriera in Svizzera.","Everything for your career in Switzerland."),
       sub:   L("Kein Hin-und-Her zwischen verschiedenen Apps. Alles an einem Ort.","Fini les allers-retours entre apps. Tout en un endroit.","Niente avanti e indietro tra app. Tutto in un posto.","No more switching between apps. Everything in one place."),
       items:[
@@ -499,8 +693,8 @@ const mkT = (lang) => {
     },
     how:{
       label:L("Wie es funktioniert","Comment ça marche","Come funziona","How it works"),
-      title:L("Profil einmal anlegen. Alle 6 Tools nutzen.","Créez votre profil une fois. Utilisez les 6 outils.","Crea il profilo una volta. Usa tutti i 6 strumenti.","Set up your profile once. Use all 6 tools."),
-      sub:  L("Dein Profil ist die Basis für alle Tools.","Votre profil est la base de tous les outils.","Il tuo profilo è la base per tutti gli strumenti.","Your profile is the basis for all tools."),
+      title:L("Profil einmal anlegen. Alle 20+ Tools nutzen.","Créez votre profil une fois. Utilisez les 20+ outils.","Crea il profilo una volta. Usa tutti i 20+ strumenti.","Set up your profile once. Use all 20+ tools."),
+      sub:  L("Dein Profil ist die Basis für alle 20+ Tools.","Votre profil est la base de tous les 20+ outils.","Il tuo profilo è la base per tutti i 20+ strumenti.","Your profile is the basis for all 20+ tools."),
       steps:L(
         [{n:"01",t:"Profil anlegen",p:"Stelle, Erfahrung, Skills – einmal eingeben oder CV hochladen. Die KI liest alles automatisch."},{n:"02",t:"Tool wählen",p:"Bewerbung schreiben, ATS prüfen, Zeugnis analysieren, Jobs finden oder Interview üben."},{n:"03",t:"Live-Ergebnis",p:"Das Ergebnis erscheint Wort für Wort in Echtzeit – du siehst sofort, wie dein Dokument entsteht."}],
         [{n:"01",t:"Créer le profil",p:"Poste, expérience, compétences – entrer une fois ou uploader un CV. L'IA lit tout automatiquement."},{n:"02",t:"Choisir l'outil",p:"Rédiger candidature, ATS, analyser certificat, trouver emplois ou s'entraîner."},{n:"03",t:"Résultat en direct",p:"Le résultat apparaît mot par mot en temps réel – vous voyez votre document prendre forme instantanément."}],
@@ -533,32 +727,62 @@ const mkT = (lang) => {
       title: L("Ein Preis. 19+ Tools.","One price. 19+ tools.","Un prix. 19+ outils.","Un prezzo. 19+ strumenti."),
       sub:   L("Jederzeit kündbar. Keine versteckten Kosten.","Résiliable à tout moment.","Cancellabile in qualsiasi momento.","Cancel anytime. No hidden costs."),
       monthly:L("Monatlich","Mensuel","Mensile","Monthly"),
-      yearly: L("Jährlich","Annuel","Annuale","Yearly"),
-      save:   L("25% sparen","Économisez 25%","Risparmia 25%","Save 25%"),
+      yearly: L("Jährlich 🎁","Annuel 🎁","Annuale 🎁","Yearly 🎁"),
+      save:   L("2 Monate gratis","2 mois offerts","2 mesi gratis","2 months free"),
       recom:  L("Empfohlen","Recommandé","Consigliato","Recommended"),
       tiers:[
         {id:"free",name:L("Gratis","Gratuit","Gratuito","Free"),price:0,
-         note:L("Für immer kostenlos","Gratuit pour toujours","Sempre gratuito","Free forever"),
-         list:L([`${C.FREE_LIMIT} Generierungen / Monat`,"Motivationsschreiben","Lebenslauf","CV hochladen","Text kopieren"],[`${C.FREE_LIMIT} générations / mois`,"Lettre de motivation","CV","Upload CV","Copier"],[`${C.FREE_LIMIT} generazioni / mese`,"Lettera motivazione","CV","Upload CV","Copia"],[`${C.FREE_LIMIT} generations / month`,"Cover letter","CV","Upload CV","Copy text"]),
-         no:L(["LinkedIn","ATS-Check","Zeugnis-Analyse","Job-Matching","Interview-Coach","PDF-Export","E-Mail senden"],["LinkedIn","ATS","Analyse certificat","Matching","Coach","PDF","E-mail"],["LinkedIn","ATS","Analisi certificato","Matching","Coach","PDF","E-mail"],["LinkedIn","ATS check","Reference analysis","Job matching","Interview coach","PDF export","Email send"]),
+         note:L("Kostenlos loslegen – ohne Kreditkarte.","Start for free – no credit card needed.","Gratuit pour toujours – sans carte.","Gratis per sempre – senza carta."),
+         desc:L(
+           "Einmal ausprobieren – kostenlos und ohne Kreditkarte.",
+           "Try it once – free, no credit card needed.",
+           "Essayez une fois – gratuit, sans carte bancaire.",
+           "Prova una volta – gratuito, senza carta di credito."
+         ),
+         list:L(
+           [`Eine vollständige KI-Bewerbung inklusive Motivationsschreiben und Lebenslauf.`,`Du kannst dein CV hochladen – Stellify liest es automatisch.`,`${C.CHAT_FREE_LIMIT} Fragen an Stella, die KI-Karriereberaterin.`,`Kein Abo, keine Kreditkarte nötig.`],
+           [`One complete AI application including cover letter and CV.`,`Upload your CV – Stellify reads it automatically.`,`${C.CHAT_FREE_LIMIT} questions to Stella, the AI career advisor.`,`No subscription, no credit card needed.`],
+           [`Une candidature complète avec lettre de motivation et CV.`,`Importez votre CV – Stellify le lit automatiquement.`,`${C.CHAT_FREE_LIMIT} questions à Stella, la conseillère carrière IA.`,`Sans abonnement ni carte bancaire.`],
+           [`Una candidatura completa con lettera di motivazione e CV.`,`Carica il tuo CV – Stellify lo legge automaticamente.`,`${C.CHAT_FREE_LIMIT} domande a Stella, la consulente carriera IA.`,`Senza abbonamento né carta di credito.`]
+         ),
+         no:L(["LinkedIn","ATS-Check","Zeugnis-Analyse","Job-Matching","Interview-Coach","PDF-Export","20+ weitere Tools"],["LinkedIn","ATS check","Reference analysis","Job matching","Interview coach","PDF export","20+ more tools"],["LinkedIn","ATS","Certificat","Matching","Coach","PDF","20+ outils"],["LinkedIn","ATS","Certificato","Matching","Coach","PDF","20+ strumenti"]),
          btn:L("Kostenlos starten","Commencer gratuitement","Inizia gratis","Start for free"),btnS:"b-out"},
         {id:"pro",name:"Pro",priceM:19.90,priceY:14.90,best:true,
-         note:L("CHF 19.90/Monat · CHF 178.80/Jahr","CHF 19.90/month · CHF 178.80/year","CHF 19.90/mois · CHF 178.80/an","CHF 19.90/mese · CHF 178.80/anno"),
-         list:L(
-           ["Unbegrenzte Bewerbungen","✍️ Motivationsschreiben & Lebenslauf","💼 LinkedIn Analyse & Optimierung","🤖 ATS-Simulation mit Score","📜 Zeugnis-Analyse & Decoder","🎯 Job-Matching (Top 5 Profile)","🎤 Interview-Coach (Note 0–100)","📊 Excel-Generator mit Formeln (NEU)","📽️ PowerPoint-Maker (NEU)","✅ Bewerbungs-Checkliste","✉️ E-Mail & PDF Export","Alle 4 Sprachen"],
-           ["Unlimited applications","✍️ Cover letter & CV","💼 LinkedIn analysis & optimization","🤖 ATS simulation with score","📜 Work reference analysis","🎯 Job matching (Top 5)","🎤 Interview coach (score 0–100)","📊 Excel generator with formulas (NEW)","📽️ PowerPoint maker (NEW)","✅ Application checklist","✉️ Email & PDF export","All 4 languages"],
-           ["Documents illimités","✍️ Lettre & CV","💼 LinkedIn analyse & optimisation","🤖 Simulation ATS avec score","📜 Analyse certificat de travail","🎯 Matching emploi (Top 5)","🎤 Coach entretien (note 0–100)","📊 Générateur Excel avec formules (NOUVEAU)","📽️ Créateur PowerPoint (NOUVEAU)","✅ Check-liste","✉️ E-mail & PDF","4 langues"],
-           ["Documenti illimitati","✍️ Lettera & CV","💼 LinkedIn analisi & ottimizzazione","🤖 Simulazione ATS con score","📜 Analisi certificato di lavoro","🎯 Job matching (Top 5)","🎤 Coach colloquio (voto 0–100)","📊 Generatore Excel con formule (NUOVO)","📽️ Creatore PowerPoint (NUOVO)","✅ Checklist","✉️ E-mail & PDF","4 lingue"]
+         note:L("Monatlich kündbar · Erneuerung jeden Montag 07:00","Monthly · Erneuerung every Monday 07:00","Mensuel · Rechargement lundi 07:00","Mensile · Ricarica lunedì 07:00"),
+         yearNote:L("🎁 Jahresabo – 2 Monate gratis · CHF 14.90/Mo.","🎁 Annual plan – 2 months free · CHF 14.90/mo","🔥 CHF 14.90/mois avec abonnement annuel","🔥 CHF 14.90/mese con abbonamento annuale"),
+         desc:L(
+           "Pro gibt dir vollen Zugriff auf alle 20+ Tools. Du erhältst täglich ein festes Nutzungsvolumen – perfekt für regelmässige Bewerbungen und Karriere-Optimierungen.",
+           "Pro is limited – you have a weekly volume that erneuerungs automatically every Monday.",
+           "Pro est limité – vous avez un volume hebdomadaire rechargé automatiquement chaque lundi.",
+           "Pro è limitato – hai una volume settimanale che si ricarica automaticamente ogni lunedì."
          ),
-         btn:L("Jetzt Pro werden → CHF 19.90/Mo.","Become Pro → CHF 19.90/mo","Devenir Pro → CHF 19.90/mois","Diventa Pro → CHF 19.90/mese"),btnS:"b-em"},
-        {id:"team",name:L("Team","Équipe","Team","Team"),price:null,
-         note:L("Für Schulen & HR-Teams","Écoles & équipes RH","Scuole & team HR","Schools & HR teams"),
-         list:L(["Alles in Pro","Bis 25 Nutzer","Admin-Dashboard","Onboarding"],["Tout en Pro","25 utilisateurs","Dashboard","Onboarding"],["Tutto in Pro","25 utenti","Dashboard","Onboarding"],["Everything in Pro","Up to 25 users","Admin dashboard","Onboarding"]),
-         btn:L("Kontakt →","Contact →","Contatto →","Contact →"),btnS:"b-out"},
+         list:L(
+           ["Alle 20+ Tools sind vollständig freigeschaltet – keine Einschränkungen.","Du siehst im Profil jederzeit wie viel deines Wochennutzungsvolumens noch übrig ist.","Jeden Montag um 07:00 Uhr wird dein Nutzungsvolumen automatisch aufgefüllt.","Die KI optimiert dein LinkedIn-Profil gezielt für Schweizer Recruiter.","Der ATS-Check prüft ob dein CV durch Recruiter-Software kommt und gibt dir einen Score.","Die Zeugnis-Analyse entschlüsselt den versteckten Code in Schweizer Arbeitszeugnissen.","Job-Matching zeigt dir die fünf Stellen die am besten zu deinem Profil passen.","Der Interview-Coach simuliert echte Fragen und bewertet deine Antworten mit 0–100.","Im Bewerbungs-Tracker behältst du alle laufenden Bewerbungen im Überblick.","Der Swiss Bias-Checker prüft deinen Text auf unbewusste Formulierungen.","Die Skill-Gap-Analyse zeigt dir was dir für eine Stelle noch fehlt – und wie du es schliesst."],
+           ["All 20+ tools are fully unlocked – no restrictions.","Your profile always shows how much of your weekly volume is left.","Every Monday at 07:00 your volume is automatically erneuerunged.","The AI optimises your LinkedIn profile specifically for Swiss recruiters.","The ATS check tests if your CV passes recruiter software and gives you a score.","The reference analysis decodes the hidden language in Swiss work references.","Job matching shows the five positions that fit your profile best.","The interview coach simulates real questions and scores your answers 0–100.","The application tracker gives you a clear overview of all ongoing applications.","The Swiss bias checker reviews your text for unconscious phrasing.","The skill gap analysis shows what you need for a role – and how to get there."],
+           ["Tous les 20+ outils entièrement débloqués – sans restrictions.","Votre profil indique toujours combien de votre volume hebdomadaire il vous reste.","Chaque lundi à 07h00, votre volume est automatiquement rechargé.","L'IA optimise votre profil LinkedIn pour les recruteurs suisses.","Le contrôle ATS vérifie si votre CV passe les logiciels RH et vous donne un score.","L'analyse de certificat déchiffre le langage caché des certificats suisses.","Le matching emploi montre les cinq postes qui correspondent le mieux à votre profil.","Le coach entretien simule de vraies questions et note vos réponses de 0 à 100.","Le tracker candidatures vous donne une vue d'ensemble de toutes vos candidatures.","Le vérificateur de biais suisse analyse vos formulations inconscientes.","L'analyse des lacunes montre ce qu'il vous manque pour un poste."],
+           ["Tutti i 20+ strumenti completamente sbloccati – senza restrizioni.","Il tuo profilo mostra sempre quanto del tuo volume settimanale rimane.","Ogni lunedì alle 07:00 il tuo volume viene ricaricato automaticamente.","L'IA ottimizza il tuo profilo LinkedIn per i recruiter svizzeri.","Il controllo ATS verifica se il tuo CV supera i software HR e ti dà un punteggio.","L'analisi del certificato decodifica il linguaggio nascosto dei certificati svizzeri.","Il job matching mostra i cinque posti che si adattano meglio al tuo profilo.","Il coach colloquio simula domande reali e valuta le tue risposte da 0 a 100.","Il tracker candidature ti dà una panoramica di tutte le candidature in corso.","Il controllo bias svizzero esamina le tue formulazioni inconsce.","L'analisi skill gap mostra cosa ti manca per un posto e come colmare il divario."]
+         ),
+         btn:L("Pro werden → CHF 19.90/Mo.","Become Pro → CHF 19.90/mo","Devenir Pro → CHF 19.90/mois","Diventa Pro → CHF 19.90/mese"),btnS:"b-em"},
+        {id:"ultimate",name:L("Ultimate ♾️","Ultimate ♾️","Ultimate ♾️","Ultimate ♾️"),priceM:49.90,priceY:39.90,best:false,
+         note:L("Absolut keine Limits – für tägliche Intensivnutzung.","Absolutely no limits – for daily intensive use.","Aucune limite – pour une utilisation quotidienne intensive.","Nessun limite – per un uso intensivo quotidiano."),
+         yearNote:L("🎁 Jahresabo – 2 Monate gratis · CHF 39.90/Mo.","🎁 Annual plan – 2 months free · CHF 39.90/mo","🔥 CHF 39.90/mois avec abonnement annuel","🔥 CHF 39.90/mese con abbonamento annuale"),
+         desc:L(
+           "Ultimate ist unlimitiert – keine Limits, kein Nutzungsvolumen, kein Warten.",
+           "Ultimate is your personal career copilot without any restrictions. Unlimited use of all tools, 24/7, for maximum career success.",
+           "Ultimate est illimité – aucune limite, aucun volume, aucune attente.",
+           "Ultimate è illimitato – nessun limite, nessuna volume, nessuna attesa."
+         ),
+         list:L(
+           ["Kein Nutzungsvolumen, kein Erneuerung, kein Warten – du nutzt Stellify ohne jede Einschränkung.","Alle 20+ Tools in allen vier Sprachen sind jederzeit und unbegrenzt verfügbar.","Der Swiss Bias-Checker prüft deine Texte auf unbewusste Formulierungen.","Die Skill-Gap-Analyse zeigt dir konkret was dir für eine Stelle noch fehlt.","Die KI optimiert dein LinkedIn-Profil gezielt für den Schweizer Markt.","Der ATS-Check gibt dir einen Score und zeigt welche Keywords noch fehlen.","Die Zeugnis-Analyse entschlüsselt den versteckten Code in Schweizer Arbeitszeugnissen.","Job-Matching findet die fünf Stellen die am besten zu deinem Profil passen.","Der Interview-Coach simuliert echte Gespräche und gibt dir eine Bewertung 0–100.","Priority Support – bei Fragen antwortet das Stellify-Team bevorzugt."],
+           ["No volume, no erneuerung, no waiting – use Stellify without any restrictions.","All 20+ tools in all four languages are available at any time without limits.","The Swiss bias checker reviews your texts for unconscious phrasing.","The skill gap analysis shows you exactly what you need for a position.","The AI optimises your LinkedIn profile specifically for the Swiss market.","The ATS check gives you a score and shows which keywords are missing.","The reference analysis decodes the hidden language in Swiss work references.","Job matching finds the five positions that fit your profile best.","The interview coach simulates real conversations and scores you 0–100.","Priority support – the Stellify team responds to your questions first."],
+           ["Aucun volume, aucune recharge, aucune attente – utilisez Stellify sans aucune restriction.","Tous les 20+ outils dans les quatre langues sont disponibles à tout moment.","Le vérificateur de biais suisse analyse vos formulations inconscientes.","L'analyse des lacunes vous montre exactement ce qu'il vous manque pour un poste.","L'IA optimise votre profil LinkedIn pour le marché suisse.","Le contrôle ATS vous donne un score et montre les mots-clés manquants.","L'analyse de certificat déchiffre le langage caché des certificats suisses.","Le matching emploi trouve les cinq postes qui correspondent le mieux à votre profil.","Le coach entretien simule de vraies conversations et vous note de 0 à 100.","Support prioritaire – l'équipe Stellify répond à vos questions en premier."],
+           ["Nessuna volume, nessuna ricarica, nessuna attesa – usa Stellify senza alcuna restrizione.","Tutti i 20+ strumenti in tutte e quattro le lingue sono sempre disponibili.","Il controllo bias svizzero esamina le tue formulazioni inconsce.","L'analisi skill gap mostra esattamente cosa ti manca per un posto.","L'IA ottimizza il tuo profilo LinkedIn per il mercato svizzero.","Il controllo ATS ti dà un punteggio e mostra le keyword mancanti.","L'analisi del certificato decodifica il linguaggio nascosto dei certificati svizzeri.","Il job matching trova i cinque posti che si adattano meglio al tuo profilo.","Il coach colloquio simula conversazioni reali e ti valuta da 0 a 100.","Supporto prioritario – il team Stellify risponde alle tue domande per primo."]
+         ),
+         btn:L("Ultimate starten → CHF 49.90/Mo.","Start Ultimate → CHF 49.90/mo","Démarrer Ultimate → CHF 49.90/mois","Avvia Ultimate → CHF 49.90/mese"),btnS:"b-out"},
       ],
-      valTitle:L("CHF 19.90 – lohnt sich das?","CHF 19.90 – ça vaut la peine?","CHF 19.90 – vale la pena?","CHF 19.90 – is it worth it?"),
+      valTitle:L("CHF 19.90 – lohnt sich das?","CHF 19.90 – is it worth it?","CHF 19.90 – ça vaut la peine?","CHF 19.90 – vale la pena?"),
       valPts:L(
-        ["Ein Karriereberater kostet CHF 200–400 / Sitzung","Ein schlechter ATS-Score = dein CV wird nie gelesen","Zeugnis nicht verstanden = falscher Job","Stellify spart Zeit & Geld bei jeder Bewerbung"],
+        ["Ein Karriereberater kostet CHF 200–400 / Sitzung","Eine schlechte Bewerbung = verpasste Stelle","Zeugnis nicht verstanden = falscher Job","1 erfolgreiche Bewerbung = Abo hat sich gerechnet","Ein schlechter ATS-Score = CV wird nie gelesen","Stellify spart dir 3–5 Std. pro Bewerbung"],
         ["Un conseiller coûte CHF 200–400 / séance","Mauvais score ATS = votre CV n'est jamais lu","Certificat mal compris = mauvais emploi","1 mois de candidature réussie rembourse tout"],
         ["Un consulente costa CHF 200–400 / seduta","Score ATS basso = il tuo CV non viene mai letto","Certificato non capito = lavoro sbagliato","1 mese di candidatura riuscita ripaga tutto"],
         ["A career advisor costs CHF 200–400 / session","Bad ATS score = your CV is never read","Reference misunderstood = wrong job","1 successful application month pays for everything"]
@@ -567,12 +791,12 @@ const mkT = (lang) => {
     payments:{
       label:L("Bezahle wie du willst","Payez comme vous voulez","Paga come vuoi","Pay your way"),
       sub:L("Sicher via Stripe verarbeitet.","Traitement sécurisé via Stripe.","Elaborazione sicura via Stripe.","Securely processed via Stripe."),
-      methods:["🇨🇭 Twint","💳 Visa","💳 Mastercard","💳 Amex","🅿️ PayPal","🍎 Apple Pay","🤖 Google Pay","🏦 SEPA","🛒 Klarna"],
+      methods:["🇨🇭 Twint","💳 Visa","💳 Mastercard","💳 Amex","🍎 Apple Pay","🤖 Google Pay","🏦 SEPA","🏦 PostFinance","🛒 Klarna"],
     },
     cta:{
       title:L("Deine Karriere verdient","Votre carrière mérite","La tua carriera merita","Your career deserves"),
       italic:L("deinen persönlichen Copilot.","votre copilote personnel.","il tuo copilota personale.","your personal copilot."),
-      sub:L("Kostenlos starten. 6 Tools. Schweizer Standard. Pro jederzeit kündbar.","Commencer gratuitement. 6 outils. Standard suisse. Pro résiliable.","Inizia gratis. 6 strumenti. Standard svizzero. Pro cancellabile.","Start free. 6 tools. Swiss standard. Pro cancellable anytime."),
+      sub:L("Kostenlos starten. 20+ Tools. Schweizer Standard. Jederzeit kündbar.","Commencer gratuitement. 20+ outils. Standard suisse. Résiliable.","Inizia gratis. 20+ strumenti. Standard svizzero. Cancellabile.","Start free. 20+ tools. Swiss standard. Cancel anytime."),
       btn:L("Jetzt kostenlos starten →","Commencer gratuitement →","Inizia gratis ora →","Start for free now →"),
     },
     app:{
@@ -580,7 +804,7 @@ const mkT = (lang) => {
       sub:L("Live-Streaming · Schweizer Format · 60 Sekunden","Streaming live · Format suisse · 60 secondes","Streaming live · Formato svizzero · 60 secondi","Live streaming · Swiss format · 60 seconds"),
       steps:L(["Stelle","Profil","Dokument"],["Poste","Profil","Document"],["Posto","Profilo","Documento"],["Position","Profile","Document"]),
       uLeft:(n)=>L(`kostenlose Generierung${n!==1?"en":""} übrig`,`génération${n!==1?"s":""} restante${n!==1?"s":""}`,`generazion${n!==1?"i":"e"} rimast${n!==1?"e":"a"}`,`free generation${n!==1?"s":""} remaining`),
-      proActive:L("✦ Pro aktiv – alle 18+ Tools freigeschaltet","✦ Pro active – all 18+ tools unlocked","✦ Pro actif – 18+ outils disponibles","✦ Pro attivo – 18+ strumenti disponibili"),
+      proActive:L("✦ Pro aktiv – alle 20+ Tools freigeschaltet","✦ Pro active – all 20+ tools unlocked","✦ Pro actif – 20+ outils disponibles","✦ Pro attivo – 20+ strumenti disponibili"),
       branches:L(
         ["Technologie / IT","Finanzen / Versicherung","Gesundheit / Pharma","Marketing","Handel","Industrie","Bildung / Forschung","Öffentlicher Dienst","Tourismus","Andere"],
         ["Technologie / IT","Finance / Assurance","Santé / Pharma","Marketing","Commerce","Industrie","Éducation","Service public","Tourisme","Autre"],
@@ -606,7 +830,7 @@ const mkT = (lang) => {
         title:L("Noch mehr mit Pro ✦","Plus avec Pro ✦","Di più con Pro ✦","More with Pro ✦"),
         sub:L("Du siehst wie gut es funktioniert.","Vous voyez comment ça marche.","Vedi come funziona bene.","You see how well it works."),
         feats:L(["LinkedIn","ATS","Zeugnis","Coach","Matching"],["LinkedIn","ATS","Certificat","Coach","Matching"],["LinkedIn","ATS","Certificato","Coach","Matching"],["LinkedIn","ATS","Reference","Coach","Matching"]),
-        btn:L(`Pro werden – CHF ${C.priceM}/Mo. →`,`Devenir Pro – CHF ${C.priceM}/Mo. →`,`Diventa Pro – CHF ${C.priceM}/Mo. →`,`Become Pro – CHF ${C.priceM}/mo →`),
+        btn:L(`Pro werden → CHF ${C.priceM}/Mo.`,`Devenir Pro → CHF ${C.priceM}/Mo.`,`Diventa Pro → CHF ${C.priceM}/Mo.`,`Become Pro → CHF ${C.priceM}/mo`),
         secure:L("Stripe · Twint · Jederzeit kündbar","Stripe · Twint · Résiliable","Stripe · Twint · Cancellabile","Stripe · Twint · Cancel anytime"),
       },
     },
@@ -645,7 +869,7 @@ const mkT = (lang) => {
       miss:L("✗ Fehlende Keywords","✗ Mots-clés manquants","✗ Keywords mancanti","✗ Missing keywords"),
       tips:L("💡 Optimierungstipps","💡 Conseils d'optimisation","💡 Consigli di ottimizzazione","💡 Optimization tips"),
       prompt:(cv,job,desc)=>L(
-        `Du bist ein ATS-System (Applicant Tracking System) für Schweizer HR. Analysiere diesen Lebenslauf für die Stelle "${job}". Antworte NUR mit JSON:\n{"score":82,"grade":"Gut","summary":"2 Sätze zur Gesamtbewertung","keywords_found":["Python","Projektmanagement","Deutsch"],"keywords_missing":["Scrum","SQL","Englisch"],"tips":["Tipp 1 (konkret)","Tipp 2","Tipp 3"]}\nStelle: ${job}\nInserat: ${desc||"nicht angegeben"}\nLebenslauf:\n${cv}`,
+        `Du bist ein KI-Simulator für ATS-Systeme (Applicant Tracking Software). Analysiere diesen Lebenslauf für die Stelle "${job}" auf Keyword-Match und Vollständigkeit. Hinweis: Score ist KI-Schätzung, kein offizieller Wert. Antworte NUR mit JSON:\n{"score":82,"grade":"Gut","summary":"2 Sätze zur Gesamtbewertung","keywords_found":["Python","Projektmanagement","Deutsch"],"keywords_missing":["Scrum","SQL","Englisch"],"tips":["Tipp 1 (konkret)","Tipp 2","Tipp 3"]}\nStelle: ${job}\nInserat: ${desc||"nicht angegeben"}\nLebenslauf:\n${cv}`,
         `Tu es un système ATS pour RH suisses. Analyse ce CV pour le poste "${job}". Réponds UNIQUEMENT avec JSON:\n{"score":82,"grade":"Bien","summary":"2 phrases","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Conseil 1","Conseil 2","Conseil 3"]}\nPoste: ${job}\nAnnonce: ${desc||"non fournie"}\nCV:\n${cv}`,
         `Sei un sistema ATS per HR svizzeri. Analizza questo CV per il posto "${job}". Rispondi SOLO con JSON:\n{"score":82,"grade":"Bene","summary":"2 frasi","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Consiglio 1","Consiglio 2","Consiglio 3"]}\nPosto: ${job}\nAnnuncio: ${desc||"non fornito"}\nCV:\n${cv}`,
         `You are an ATS system for Swiss HR. Analyze this CV for the position "${job}". Reply ONLY with JSON:\n{"score":82,"grade":"Good","summary":"2 sentences","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Tip 1","Tip 2","Tip 3"]}\nPosition: ${job}\nJob ad: ${desc||"not provided"}\nCV:\n${cv}`
@@ -662,7 +886,7 @@ const mkT = (lang) => {
       phrases:L("Entschlüsselte Formulierungen","Formulations déchiffrées","Formulazioni decifrate","Decoded phrases"),
       tips:L("💡 Was du tun solltest","💡 Ce que vous devriez faire","💡 Cosa dovresti fare","💡 What you should do"),
       prompt:(text)=>L(
-        `Du bist Experte für Schweizer Arbeitszeugnisse. Analysiere dieses Zeugnis und entschlüssle den Schweizer Zeugnis-Code. Antworte NUR mit JSON:\n{"grade":"A","grade_text":"Sehr gut","overall":"2-3 Sätze zur Gesamtbewertung","phrases":[{"original":"hat die ihm übertragenen Aufgaben stets zu unserer vollsten Zufriedenheit erledigt","decoded":"Bestnote – entspricht einer 6","rating":"A"},{"original":"war bemüht","decoded":"Schwache Formulierung – bedeutet mangelhafte Leistung","rating":"D"}],"tips":["Tipp 1","Tipp 2"]}\nZeugnis:\n${text}`,
+        `Du bist Schweizer HR-Experte und kennst den vollständigen Zeugnis-Code des Schweizerischen Obligationenrechts (OR). Analysiere dieses Zeugnis und entschlüssle jede Formulierung gemäss dem offiziellen Schweizer Zeugnis-Decoder ("stets zu unserer vollsten Zufriedenheit" = sehr gut, "zu unserer vollsten Zufriedenheit" = gut, "zu unserer Zufriedenheit" = befriedigend, "im Grossen und Ganzen" = genügend, "war bemüht" = ungenügend). Antworte NUR mit JSON:\n{"grade":"A","grade_text":"Sehr gut","overall":"2-3 Sätze zur Gesamtbewertung","phrases":[{"original":"hat die ihm übertragenen Aufgaben stets zu unserer vollsten Zufriedenheit erledigt","decoded":"Bestnote – entspricht einer 6","rating":"A"},{"original":"war bemüht","decoded":"Schwache Formulierung – bedeutet mangelhafte Leistung","rating":"D"}],"tips":["Tipp 1","Tipp 2"]}\nZeugnis:\n${text}`,
         `Tu es expert en certificats de travail suisses. Analyse ce certificat. Réponds UNIQUEMENT avec JSON:\n{"grade":"A","grade_text":"Très bien","overall":"2-3 phrases","phrases":[{"original":"phrase originale","decoded":"sens réel","rating":"A"}],"tips":["Conseil"]}\nCertificat:\n${text}`,
         `Sei esperto di certificati di lavoro svizzeri. Analizza questo certificato. Rispondi SOLO con JSON:\n{"grade":"A","grade_text":"Molto bene","overall":"2-3 frasi","phrases":[{"original":"frase originale","decoded":"significato reale","rating":"A"}],"tips":["Consiglio"]}\nCertificato:\n${text}`,
         `You are an expert in Swiss work references. Analyse this reference. Reply ONLY with JSON:\n{"grade":"A","grade_text":"Excellent","overall":"2-3 sentences","phrases":[{"original":"original phrase","decoded":"real meaning","rating":"A"}],"tips":["Tip"]}\nReference:\n${text}`
@@ -740,11 +964,11 @@ const mkT = (lang) => {
       resA:L("📝 About-Sektion","📝 Section About","📝 Sezione About","📝 About section"),
       resS:L("🏷️ Empfohlene Skills","🏷️ Compétences","🏷️ Skills consigliati","🏷️ Recommended skills"),
       copy:L("Kopieren","Copier","Copia","Copy"),
-      prompt:(d)=>`You are a LinkedIn career coach for the Swiss job market. Optimize this profile. Reply ONLY with valid JSON.\nLanguage: ${L("Schweizer Hochdeutsch","français","italiano","English")}\nCurrent text: ${d.text||"not provided"}\nTarget role: ${d.role||"not provided"}\nAchievements: ${d.ach||"not provided"}\nCurrent job: ${d.beruf||"not provided"} | Experience: ${d.erfahrung||0} years | Skills: ${d.skills||"not provided"}\nRequired JSON: {"headline":"max 220 chars","about":"3-4 paragraphs first person ~250 words","skills":["Skill1","Skill2","Skill3","Skill4","Skill5","Skill6","Skill7","Skill8","Skill9","Skill10"]}`,
+      prompt:(d)=>`You are a LinkedIn career coach for the Swiss job market. Optimize this profile. Reply ONLY with valid JSON. Write the headline and about section in ${L("Schweizer Hochdeutsch (kein ß)","français","italiano","English")}.\nCurrent text: ${d.text||"not provided"}\nTarget role: ${d.role||"not provided"}\nAchievements: ${d.ach||"not provided"}\nCurrent job: ${d.beruf||"not provided"} | Experience: ${d.erfahrung||0} years | Skills: ${d.skills||"not provided"}\nRequired JSON: {"headline":"max 220 chars","about":"3-4 paragraphs first person ~250 words","skills":["Skill1","Skill2","Skill3","Skill4","Skill5","Skill6","Skill7","Skill8","Skill9","Skill10"]}`,
     },
     modal:{
       title:`${C.name} Pro`,
-      sub:L("Alle 6 KI-Tools freischalten.","Débloquer les 6 outils IA.","Sblocca i 6 strumenti IA.","Unlock all 6 AI tools."),
+      sub:L("Alle 20+ KI-Tools freischalten.","Débloquer les 20+ outils IA.","Sblocca i 20+ strumenti IA.","Unlock all 20+ AI tools."),
       feats:L([["✍️","Bewerbungen"],["🤖","ATS"],["📜","Zeugnis"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
               [["✍️","Candidatures"],["🤖","ATS"],["📜","Certificat"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
               [["✍️","Candidature"],["🤖","ATS"],["📜","Certificato"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
@@ -813,7 +1037,7 @@ const GENERIC_TOOLS = [
   },
   { id:"kuendigung", ico:"📤", color:"#dc2626", cat:"karriere",
     t:{de:"Kündigung schreiben",en:"Resignation Letter",fr:"Lettre de démission",it:"Lettera di dimissioni"},
-    sub:{de:"Professionelle Kündigung im Schweizer Format, rechtlich korrekt.",en:"Professional resignation letter in Swiss format, legally correct.",fr:"Lettre de démission professionnelle au format suisse.",it:"Lettera di dimissioni professionale nel formato svizzero."},
+    sub:{de:"Entwurf im Schweizer Format – bitte Kündigungsfristen im Arbeitsvertrag prüfen.",en:"Draft in Swiss format – please verify notice periods in your employment contract.",fr:"Brouillon au format suisse – vérifiez les délais dans votre contrat de travail.",it:"Bozza in formato svizzero – verifica i termini nel contratto di lavoro."},
     inputs:[
       {k:"name",  lbl:{de:"Dein Name",en:"Your name",fr:"Votre nom",it:"Il tuo nome"},ph:{de:"Max Mustermann",en:"John Doe",fr:"Jean Dupont",it:"Mario Rossi"},req:true},
       {k:"firma", lbl:{de:"Arbeitgeber / Firma",en:"Employer / Company",fr:"Employeur / Entreprise",it:"Datore di lavoro / Azienda"},ph:{de:"Musterfirma AG, Zürich",en:"Example Corp, Zurich",fr:"Exemple SA, Zurich",it:"Esempio SA, Zurigo"},req:true},
@@ -821,7 +1045,7 @@ const GENERIC_TOOLS = [
       {k:"grund", lbl:{de:"Grund (optional – erscheint NICHT im Brief)",en:"Reason (optional – will NOT appear in letter)",fr:"Raison (optionnel – n'apparaît PAS dans la lettre)",it:"Motivo (opzionale – NON appare nella lettera)"},ph:{de:"z.B. Neuer Job, bessere Perspektiven",en:"e.g. New job, better opportunities",fr:"ex. Nouvel emploi",it:"es. Nuovo lavoro"},req:false},
     ],
     prompt:(v,l)=>({
-      de:`Schreibe eine professionelle Kündigung auf Schweizer Hochdeutsch (kein ß). Schweizer Recht, neutrale Formulierung, Dank für die Zusammenarbeit.\nName: ${v.name} | Firma: ${v.firma} | Letzter Tag: ${v.datum}\nNICHT erwähnen: ${v.grund||"–"}. Vollständiger Brief mit Datum, Anschrift, Betreff.`,
+      de:`Schreibe eine professionelle Kündigung auf Schweizer Hochdeutsch (kein ß) gemäss Schweizer Obligationenrecht (OR Art. 335). Neutrale, sachliche Formulierung. Dank für die Zusammenarbeit. Kein Grund angeben.\nName: ${v.name} | Firma: ${v.firma} | Letzter Arbeitstag: ${v.datum}\nNICHT erwähnen: ${v.grund||"–"}. Vollständiger Brief: Ort/Datum, vollständige Anschrift, Betreff, Anrede, Kündigung per Datum, Dankesformel, freundliche Grüsse, Unterschrift. Einschreiben-Hinweis am Ende.`,
       en:`Write a professional resignation letter in English for the Swiss job market.\nName: ${v.name} | Company: ${v.firma} | Last day: ${v.datum}\nDO NOT mention: ${v.grund||"–"}. Complete letter with date, address, subject line.`,
       fr:`Rédige une lettre de démission professionnelle en français pour le marché suisse.\nNom: ${v.name} | Entreprise: ${v.firma} | Dernier jour: ${v.datum}\nNE PAS mentionner: ${v.grund||"–"}. Lettre complète.`,
       it:`Scrivi una lettera di dimissioni professionale in italiano per il mercato svizzero.\nNome: ${v.name} | Azienda: ${v.firma} | Ultimo giorno: ${v.datum}\nNON menzionare: ${v.grund||"–"}. Lettera completa.`,
@@ -843,7 +1067,7 @@ const GENERIC_TOOLS = [
   },
   { id:"referenz", ico:"🏆", color:"#b45309", cat:"karriere",
     t:{de:"Referenzschreiben",en:"Reference Letter",fr:"Lettre de référence",it:"Lettera di referenza"},
-    sub:{de:"Für Arbeitgeber, die ein professionelles Zeugnis schreiben müssen.",en:"For employers who need to write a professional reference.",fr:"Pour les employeurs qui doivent rédiger une référence professionnelle.",it:"Per datori di lavoro che devono scrivere una referenza professionale."},
+    sub:{de:"KI erstellt einen Entwurf – Arbeitgeber prüft und unterschreibt. Kein Ersatz für rechtliche Beratung.",en:"AI creates a draft – employer reviews and signs. Not a substitute for legal advice.",fr:"L'IA crée un brouillon – l'employeur vérifie et signe. Ne remplace pas un conseil juridique.",it:"L'IA crea una bozza – il datore verifica e firma. Non sostituisce la consulenza legale."},
     inputs:[
       {k:"mitarb",lbl:{de:"Name des Mitarbeiters",en:"Employee name",fr:"Nom de l'employé(e)",it:"Nome del dipendente"},ph:{de:"Max Mustermann",en:"John Doe",fr:"Jean Dupont",it:"Mario Rossi"},req:true},
       {k:"stelle", lbl:{de:"Stelle & Dauer",en:"Position & duration",fr:"Poste & durée",it:"Posto & durata"},ph:{de:"z.B. Projektleiter, 3 Jahre",en:"e.g. Project manager, 3 years",fr:"ex. Chef de projet, 3 ans",it:"es. Project manager, 3 anni"},req:true},
@@ -1065,6 +1289,96 @@ Crea:
 [3 argomenti forti e concreti]`,
     }[l]),
   },
+  // ── GEHALTSRECHNER ──
+  { id:"gehaltsrechner", ico:"💰", color:"#059669", cat:"karriere",
+    t:{de:"KI-Gehaltsrechner Schweiz",en:"AI Salary Calculator Switzerland",fr:"Calculateur salaire IA Suisse",it:"Calcolatore stipendio IA Svizzera"},
+    sub:{de:"Gehaltsschätzung nach Jobtitel, Branche, Kanton & Erfahrung – Richtwerte, keine Garantie.",en:"Salary estimate by job title, industry, canton & experience – indicative values, not guaranteed.",fr:"Estimation salariale par titre, secteur, canton & expérience – valeurs indicatives.",it:"Stima salariale per titolo, settore, cantone & esperienza – valori indicativi."},
+    inputs:[
+      {k:"job",    lbl:{de:"Jobtitel *",en:"Job title *",fr:"Titre du poste *",it:"Titolo del posto *"},ph:{de:"z.B. Senior Software Engineer, HR Business Partner, Projektleiter",en:"e.g. Senior Software Engineer, HR Business Partner, Project Manager",fr:"ex. Ingénieur logiciel senior, Chef de projet",it:"es. Senior Software Engineer, Project Manager"},req:true},
+      {k:"branche",lbl:{de:"Branche *",en:"Industry *",fr:"Secteur *",it:"Settore *"},type:"select",opts:{de:["IT & Software","Finanzen & Banking","Gesundheitswesen","Ingenieurwesen","Marketing & Kommunikation","Recht & Compliance","Bildung","Logistik","Personalwesen (HR)","Beratung","Gastronomie","Bau & Architektur"],en:["IT & Software","Finance & Banking","Healthcare","Engineering","Marketing","Legal","Education","Logistics","HR","Consulting","Hospitality","Construction"],fr:["IT & Logiciels","Finance","Santé","Ingénierie","Marketing","Juridique","Éducation","Logistique","RH","Conseil","Hôtellerie","Construction"],it:["IT & Software","Finanza","Sanità","Ingegneria","Marketing","Legale","Istruzione","Logistica","HR","Consulenza","Ospitalità","Costruzione"]},req:true},
+      {k:"kanton", lbl:{de:"Kanton / Region",en:"Canton / Region",fr:"Canton / Région",it:"Cantone / Regione"},type:"select",opts:{de:["Zürich","Genf","Basel-Stadt","Zug","Bern","Lausanne","Luzern","St. Gallen","Winterthur","Aarau","Thun","Chur","Sion/Sitten"],en:["Zurich","Geneva","Basel-City","Zug","Bern","Lausanne","Lucerne","St. Gallen","Winterthur","Aarau","Thun","Chur","Sion"],fr:["Zurich","Genève","Bâle-Ville","Zoug","Berne","Lausanne","Lucerne","Saint-Gall","Winterthour","Aarau","Thoune","Coire","Sion"],it:["Zurigo","Ginevra","Basilea-Città","Zugo","Berna","Losanna","Lucerna","San Gallo","Winterthur","Aarau","Thun","Coira","Sion"]},req:false},
+      {k:"erfahrung",lbl:{de:"Berufserfahrung",en:"Experience",fr:"Expérience",it:"Esperienza"},type:"select",opts:{de:["0–2 Jahre","3–5 Jahre","6–10 Jahre","11–15 Jahre","16+ Jahre"],en:["0–2 years","3–5 years","6–10 years","11–15 years","16+ years"],fr:["0–2 ans","3–5 ans","6–10 ans","11–15 ans","16+ ans"],it:["0–2 anni","3–5 anni","6–10 anni","11–15 anni","16+ anni"]},req:false},
+      {k:"abschluss",lbl:{de:"Höchster Abschluss",en:"Highest degree",fr:"Diplôme le plus élevé",it:"Titolo di studio più alto"},type:"select",opts:{de:["Lehre / Berufsausbildung","Berufsmaturität","Bachelor","Master / Lizentiat","Doktorat / PhD"],en:["Apprenticeship","Vocational Maturity","Bachelor","Master","PhD"],fr:["Apprentissage","Maturité professionnelle","Bachelor","Master","Doctorat"],it:["Apprendistato","Maturità professionale","Bachelor","Master","Dottorato"]},req:false},
+    ],
+    prompt:(v,l)=>(({
+      de:`Du bist Schweizer Gehaltsexperte 2025/26. Erstelle eine Gehaltsschätzung basierend auf Marktdaten (Salarium BFS, Lohnrechner, Michael Page, Robert Half). Antworte NUR mit JSON (kein Markdown). Wichtig: Alle Angaben sind Richtwerte, keine Garantien.
+{"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% über dem Schweizer Median","kanton_faktor":"Zürich: +8% vs CH-Durchschnitt","tipps":["Tipp 1","Tipp 2","Tipp 3"],"verhandlungstipp":"Konkreter Satz für die Verhandlung","branchentrend":"Einschätzung zur Gehaltsentwicklung"}
+Profil: Jobtitel: ${v.job} | Branche: ${v.branche||"k.A."} | Kanton: ${v.kanton||"Schweiz"} | Erfahrung: ${v.erfahrung||"k.A."} | Abschluss: ${v.abschluss||"k.A."}`,
+      en:`You are a Swiss salary expert 2025/26. Analyse the job market and create a realistic salary estimate. Reply ONLY with JSON (no markdown):
+{"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% above Swiss median","kanton_faktor":"Zurich: +8% vs CH average","tipps":["Tip 1","Tip 2","Tip 3"],"verhandlungstipp":"Concrete negotiation sentence","branchentrend":"Industry salary outlook"}
+Profile: Job: ${v.job} | Industry: ${v.branche||"n/a"} | Canton: ${v.kanton||"Switzerland"} | Experience: ${v.erfahrung||"n/a"} | Degree: ${v.abschluss||"n/a"}`,
+      fr:`Tu es expert salarial suisse 2025/26. Crée une estimation salariale réaliste. Réponds UNIQUEMENT avec JSON:
+{"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% au-dessus de la médiane suisse","kanton_faktor":"Genève: +10% vs moyenne CH","tipps":["Conseil 1","Conseil 2","Conseil 3"],"verhandlungstipp":"Phrase concrète pour négocier","branchentrend":"Perspectives salariales du secteur"}
+Profil: Titre: ${v.job} | Secteur: ${v.branche||"n/d"} | Canton: ${v.kanton||"Suisse"} | Expérience: ${v.erfahrung||"n/d"} | Diplôme: ${v.abschluss||"n/d"}`,
+      it:`Sei un esperto di stipendi svizzeri 2025/26. Crea una stima salariale realistica. Rispondi SOLO con JSON:
+{"min":85000,"median":105000,"max":130000,"vergleich_schweiz":"12% sopra la mediana svizzera","kanton_faktor":"Zurigo: +8% vs media CH","tipps":["Consiglio 1","Consiglio 2","Consiglio 3"],"verhandlungstipp":"Frase concreta per la negoziazione","branchentrend":"Prospettive salariali del settore"}
+Profilo: Titolo: ${v.job} | Settore: ${v.branche||"n/d"} | Cantone: ${v.kanton||"Svizzera"} | Esperienza: ${v.erfahrung||"n/d"} | Titolo: ${v.abschluss||"n/d"}`,
+    })[l]),
+  },
+  // ── SWISS BIAS CHECKER ──
+  { id:"biaschecker", ico:"🔍", color:"#7c3aed", cat:"karriere",
+    t:{de:"Swiss-Bias-Checker",en:"Swiss Bias Checker",fr:"Vérificateur biais suisse",it:"Controllo bias svizzero"},
+    sub:{de:"Prüft dein Bewerbungsdossier auf unbewusste Vorurteile & Diskriminierungsrisiken.",en:"Checks your application for unconscious bias & discrimination risks.",fr:"Vérifie votre dossier pour biais inconscients et risques de discrimination.",it:"Controlla il tuo dossier per pregiudizi inconsci e rischi di discriminazione."},
+    inputs:[
+      {k:"text",lbl:{de:"Text prüfen (Motivationsschreiben / CV) *",en:"Text to check (cover letter / CV) *",fr:"Texte à vérifier *",it:"Testo da verificare *"},ph:{de:"Deinen Text hier einfügen…",en:"Paste your text here…",fr:"Collez votre texte ici…",it:"Incolla il tuo testo qui…"},type:"textarea",req:true,tall:true},
+      {k:"ziel",lbl:{de:"Zielstelle / Branche",en:"Target position / Industry",fr:"Poste cible / Secteur",it:"Posizione target / Settore"},ph:{de:"z.B. Projektleiter, Finanzsektor",en:"e.g. Project manager, finance sector",fr:"ex. Chef de projet, secteur financier",it:"es. Project manager, settore finanziario"},req:false},
+    ],
+    prompt:(v,l)=>(({
+      de:`Du bist Schweizer HR-Experte für Diversity & Inclusion. Analysiere diesen Text auf unbewusste Vorurteile (Alter, Geschlecht, Herkunft, Religion, Sprache) und Formulierungen die im Schweizer Arbeitsmarkt diskriminierend wirken könnten. Antworte auf Schweizer Hochdeutsch (kein ß). NUR JSON:\n{"risiko":"niedrig|mittel|hoch","score":85,"zusammenfassung":"2 Sätze","probleme":[{"phrase":"Originaltext","problem":"Erklärung","besser":"Verbesserte Version"}],"staerken":["positiver Aspekt 1","positiver Aspekt 2"],"empfehlung":"Gesamttipp"}\nText: ${v.text}\nZielstelle: ${v.ziel||"nicht angegeben"}`,
+      en:`You are a Swiss HR expert for Diversity & Inclusion. Analyse this text for unconscious bias (age, gender, origin, religion, language) and phrasing that could be discriminatory in the Swiss job market. JSON only:\n{"risiko":"low|medium|high","score":85,"zusammenfassung":"2 sentences","probleme":[{"phrase":"original text","problem":"explanation","besser":"improved version"}],"staerken":["positive 1"],"empfehlung":"Overall tip"}\nText: ${v.text}\nTarget role: ${v.ziel||"not provided"}`,
+      fr:`Tu es un expert RH suisse en Diversité & Inclusion. Analyse ce texte pour les biais inconscients et formulations potentiellement discriminatoires. JSON uniquement:\n{"risiko":"faible|moyen|élevé","score":85,"zusammenfassung":"2 phrases","probleme":[{"phrase":"texte original","problem":"explication","besser":"version améliorée"}],"staerken":["point fort 1"],"empfehlung":"Conseil global"}\nTexte: ${v.text}`,
+      it:`Sei un esperto HR svizzero di Diversity & Inclusion. Analizza questo testo per pregiudizi inconsci. Solo JSON:\n{"risiko":"basso|medio|alto","score":85,"zusammenfassung":"2 frasi","probleme":[{"phrase":"testo originale","problem":"spiegazione","besser":"versione migliorata"}],"staerken":["punto forte 1"],"empfehlung":"Consiglio generale"}\nTesto: ${v.text}`,
+    })[l]),
+  },
+  // ── SKILL GAP ANALYSE ──
+  { id:"skillgap", ico:"📊", color:"#0891b2", cat:"karriere",
+    t:{de:"Skill-Gap-Analyse",en:"Skill Gap Analysis",fr:"Analyse des lacunes",it:"Analisi skill gap"},
+    sub:{de:"Vergleicht dein Profil mit dem Stelleninserat und zeigt was dir noch fehlt.",en:"Compares your profile with the job ad and shows what you're missing.",fr:"Compare votre profil avec l'annonce et montre ce qui manque.",it:"Confronta il tuo profilo con l'annuncio e mostra cosa manca."},
+    inputs:[
+      {k:"profil",lbl:{de:"Dein Profil (Skills / Erfahrung) *",en:"Your profile (skills / experience) *",fr:"Votre profil (compétences / expérience) *",it:"Il tuo profilo (competenze / esperienza) *"},ph:{de:"z.B. 5 Jahre Python, Projektmanagement, Deutsch/Englisch, Bachelor Informatik…",en:"e.g. 5 years Python, project management, German/English, BSc Computer Science…",fr:"ex. 5 ans Python, gestion de projet, allemand/anglais…",it:"es. 5 anni Python, gestione progetti, tedesco/inglese…"},type:"textarea",req:true,tall:true},
+      {k:"inserat",lbl:{de:"Stelleninserat *",en:"Job advertisement *",fr:"Offre d'emploi *",it:"Annuncio di lavoro *"},ph:{de:"Das Inserat hier einfügen…",en:"Paste the job ad here…",fr:"Collez l'offre ici…",it:"Incolla l'annuncio qui…"},type:"textarea",req:true,tall:true},
+    ],
+    prompt:(v,l)=>(({
+      de:`Du bist Karriereberater Schweiz. Analysiere die Lücken zwischen diesem Profil und diesem Stelleninserat. Schweizer Hochdeutsch (kein ß). NUR JSON:\n{"match_score":72,"zusammenfassung":"2 Sätze Gesamtbild","staerken":[{"skill":"Python","relevanz":"hoch","vorhanden":true}],"luecken":[{"skill":"Scrum Master Zertifikat","relevanz":"hoch","lernzeit":"2–3 Monate","ressource":"Scrum.org / Coursera"}],"sofort_machbar":["Tipp der sofort umsetzbar ist"],"fazit":"Empfehlung ob Bewerbung lohnt"}\nProfil:\n${v.profil}\nInserat:\n${v.inserat}`,
+      en:`You are a Swiss career advisor. Analyse the gaps between this profile and this job ad. JSON only:\n{"match_score":72,"zusammenfassung":"2 sentences overview","staerken":[{"skill":"Python","relevanz":"high","vorhanden":true}],"luecken":[{"skill":"Scrum Master cert","relevanz":"high","lernzeit":"2–3 months","ressource":"Scrum.org"}],"sofort_machbar":["Immediately actionable tip"],"fazit":"Recommendation on whether to apply"}\nProfile:\n${v.profil}\nJob ad:\n${v.inserat}`,
+      fr:`Tu es un conseiller carrière suisse. Analyse les lacunes entre ce profil et cette offre. JSON uniquement:\n{"match_score":72,"zusammenfassung":"2 phrases","staerken":[{"skill":"Python","relevanz":"élevée","vorhanden":true}],"luecken":[{"skill":"Certif. Scrum","relevanz":"élevée","lernzeit":"2–3 mois","ressource":"Scrum.org"}],"sofort_machbar":["Conseil immédiat"],"fazit":"Recommandation"}\nProfil:\n${v.profil}\nOffre:\n${v.inserat}`,
+      it:`Sei un consulente carriera svizzero. Analizza le lacune tra questo profilo e questo annuncio. Solo JSON:\n{"match_score":72,"zusammenfassung":"2 frasi","staerken":[{"skill":"Python","relevanz":"alta","vorhanden":true}],"luecken":[{"skill":"Cert. Scrum","relevanz":"alta","lernzeit":"2–3 mesi","ressource":"Scrum.org"}],"sofort_machbar":["Consiglio immediato"],"fazit":"Raccomandazione"}\nProfilo:\n${v.profil}\nAnnuncio:\n${v.inserat}`,
+    })[l]),
+  },
+  // ── LINKEDIN POST GENERATOR ──
+
+  { id:"lipost", ico:"✍️", color:"#0a66c2", cat:"karriere",
+    t:{de:"LinkedIn-Post Generator",en:"LinkedIn Post Generator",fr:"Générateur post LinkedIn",it:"Generatore post LinkedIn"},
+    sub:{de:"3 massgeschneiderte Posts – Swiss-Style, keine Corporate-Floskeln, sofort kopierbar.",en:"3 tailored posts – Swiss style, no corporate clichés, ready to copy.",fr:"3 posts sur mesure – style suisse, sans clichés d'entreprise, prêts à copier.",it:"3 post su misura – stile svizzero, senza cliché aziendali, pronti da copiare."},
+    inputs:[
+      {k:"typ",  lbl:{de:"Post-Typ *",en:"Post type *",fr:"Type de post *",it:"Tipo di post *"},type:"select",opts:{de:["🎉 Neue Stelle angetreten","📚 Weiterbildung / Zertifikat","💡 Erfahrung & Erkenntnisse teilen","🏆 Projekterfolg / Meilenstein","🔍 Offen für neue Möglichkeiten","💬 Fachliche Meinung zu Branchenthema"],en:["🎉 Started new position","📚 Training / Certificate","💡 Share experience & insights","🏆 Project success / Milestone","🔍 Open to opportunities","💬 Professional opinion on industry topic"],fr:["🎉 Nouveau poste","📚 Formation / Certificat","💡 Partager expérience","🏆 Succès projet","🔍 Ouvert aux opportunités","💬 Opinion professionnelle"],it:["🎉 Nuovo posto","📚 Formazione / Certificato","💡 Condividere esperienza","🏆 Successo progetto","🔍 Aperto a opportunità","💬 Opinione professionale"]},req:true},
+      {k:"details",lbl:{de:"Details & Kontext *",en:"Details & context *",fr:"Détails & contexte *",it:"Dettagli & contesto *"},ph:{de:"z.B. Ich trete als Head of Product bei einem Zürcher FinTech an. Davor 4 Jahre bei Swisscom. Freue mich besonders auf das internationale Team und die Mission...",en:"e.g. I'm joining as Head of Product at a Zurich FinTech. Previously 4 years at Swisscom. Especially excited about the international team and the mission...",fr:"ex. Je rejoins en tant que Head of Product dans une FinTech zurichoise. Auparavant 4 ans chez Swisscom...",it:"es. Entro come Head of Product in una FinTech di Zurigo. Prima 4 anni a Swisscom..."},type:"textarea",req:true,tall:true},
+      {k:"ton",  lbl:{de:"Tonalität",en:"Tone",fr:"Tonalité",it:"Tonalità"},type:"select",opts:{de:["Persönlich & authentisch","Professionell & sachlich","Motivierend & inspirierend","Direkt & prägnant"],en:["Personal & authentic","Professional & factual","Motivating & inspiring","Direct & concise"],fr:["Personnel & authentique","Professionnel & factuel","Motivant & inspirant","Direct & concis"],it:["Personale & autentico","Professionale & fattuale","Motivante & ispirante","Diretto & conciso"]},req:false},
+      {k:"laenge",lbl:{de:"Länge",en:"Length",fr:"Longueur",it:"Lunghezza"},type:"select",opts:{de:["Kurz (100–150 Wörter)","Mittel (200–300 Wörter)","Lang (400+ Wörter)"],en:["Short (100–150 words)","Medium (200–300 words)","Long (400+ words)"],fr:["Court (100–150 mots)","Moyen (200–300 mots)","Long (400+ mots)"],it:["Breve (100–150 parole)","Medio (200–300 parole)","Lungo (400+ parole)"]},req:false},
+    ],
+    prompt:(v,l)=>(({
+      de:`Du bist LinkedIn-Experte für den Schweizer Stellenmarkt. Erstelle 3 verschiedene LinkedIn-Posts auf Schweizer Hochdeutsch (kein ß, kein "herzlichen Dank" Klischee, kein "Freue mich riesig").
+Post-Typ: ${v.typ} | Ton: ${v.ton||"Persönlich & authentisch"} | Länge: ${v.laenge||"Mittel"}
+Details: ${v.details}
+Antworte NUR mit JSON-Array (kein Markdown):
+[{"variante":"Variante 1","post":"vollständiger Post-Text mit \\n für Zeilenumbrüche","warum":"Kurze Begründung warum dieser Stil wirkt"},{"variante":"Variante 2","post":"...","warum":"..."},{"variante":"Variante 3","post":"...","warum":"..."}]`,
+      en:`You are a LinkedIn expert for the Swiss job market. Create 3 different LinkedIn posts in English. No corporate clichés.
+Post type: ${v.typ} | Tone: ${v.ton||"Personal & authentic"} | Length: ${v.laenge||"Medium"}
+Details: ${v.details}
+Reply ONLY with JSON array (no markdown):
+[{"variante":"Variant 1","post":"full post text with \\n for line breaks","warum":"Short reason why this style works"},{"variante":"Variant 2","post":"...","warum":"..."},{"variante":"Variant 3","post":"...","warum":"..."}]`,
+      fr:`Tu es expert LinkedIn pour le marché suisse. Crée 3 posts LinkedIn différents en français. Pas de clichés d'entreprise.
+Type: ${v.typ} | Ton: ${v.ton||"Personnel & authentique"} | Longueur: ${v.laenge||"Moyen"}
+Détails: ${v.details}
+Réponds UNIQUEMENT avec un tableau JSON:
+[{"variante":"Variante 1","post":"texte complet avec \\n","warum":"Raison courte"},{"variante":"Variante 2","post":"...","warum":"..."},{"variante":"Variante 3","post":"...","warum":"..."}]`,
+      it:`Sei un esperto LinkedIn per il mercato svizzero. Crea 3 post LinkedIn diversi in italiano. No cliché aziendali.
+Tipo: ${v.typ} | Tono: ${v.ton||"Personale & autentico"} | Lunghezza: ${v.laenge||"Medio"}
+Dettagli: ${v.details}
+Rispondi SOLO con array JSON:
+[{"variante":"Variante 1","post":"testo completo con \\n","warum":"Motivo breve"},{"variante":"Variante 2","post":"...","warum":"..."},{"variante":"Variante 3","post":"...","warum":"..."}]`,
+    })[l]),
+  },
 ];
 
 const TOOL_CATS = {
@@ -1255,8 +1569,15 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
   const [docText, setDocText] = useState("");
   const [docLoading, setDocLoading] = useState(false);
   const stripeLink = () => yearly ? C.stripeYearly : C.stripeMonthly;
-  const nextReset=()=>{const d=new Date();d.setMonth(d.getMonth()+1);d.setDate(1);return d.toLocaleDateString(lang==="de"?"de-CH":lang==="fr"?"fr-CH":lang==="it"?"it-CH":"en-CH",{day:"numeric",month:"long",year:"numeric"});};
-  const limitHit = pro && proUsage >= C.PRO_LIMIT;
+  const nextReset=()=>{
+    const d=new Date();
+    d.setDate(d.getDate()+1);d.setHours(0,0,0,0);
+    const diff=d-new Date();
+    const h=Math.floor(diff/3600000);
+    const min=Math.floor((diff%3600000)/60000);
+    return lang==="de"?`in ${h}h ${min}min (Mitternacht)`:lang==="fr"?`dans ${h}h ${min}min (minuit)`:lang==="it"?`tra ${h}h ${min}min (mezzanotte)`:`in ${h}h ${min}min (midnight)`;
+  };
+  const limitHit = pro && authSession?.plan!=="ultimate" && proUsage >= C.PRO_LIMIT;
 
   const setV = (k,v) => setVals(p=>({...p,[k]:v}));
   const canRun = tool.inputs.filter(i=>i.req).every(i=>(vals[i.k]||"").trim()) || !!docFile;
@@ -1295,11 +1616,83 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
     } catch(e) { setErr(e.message); } finally { setStreaming(false); }
   };
 
+  // Special JSON result rendering for bias + skillgap
+  const renderSpecialResult = () => {
+    if(!result) return null;
+    try {
+      const d = JSON.parse(result.replace(/```json|```/g,"").trim());
+      if(tool.id==="biaschecker") {
+        const col = d.risiko==="niedrig"||d.risiko==="low"?"#10b981":d.risiko==="mittel"||d.risiko==="medium"?"#f59e0b":"#ef4444";
+        return (
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+              <div style={{fontFamily:"var(--hd)",fontSize:42,fontWeight:800,color:col}}>{d.score}</div>
+              <div>
+                <div style={{fontSize:11,color:"rgba(0,0,0,.4)",textTransform:"uppercase",letterSpacing:"1px"}}>Bias-Score</div>
+                <div style={{fontSize:13,fontWeight:700,color:col,textTransform:"uppercase"}}>{d.risiko}</div>
+              </div>
+            </div>
+            <p style={{fontSize:14,color:"var(--mu)",marginBottom:16}}>{d.zusammenfassung}</p>
+            {d.probleme?.length>0&&<div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#dc2626",marginBottom:8}}>⚠️ Gefundene Probleme</div>
+              {d.probleme.map((p,i)=>(
+                <div key={i} style={{background:"rgba(239,68,68,.05)",border:"1px solid rgba(239,68,68,.15)",borderRadius:10,padding:"12px",marginBottom:8}}>
+                  <div style={{fontSize:12,fontWeight:600,color:"#dc2626",marginBottom:4}}>«{p.phrase}»</div>
+                  <div style={{fontSize:12,color:"var(--mu)",marginBottom:6}}>{p.problem}</div>
+                  <div style={{fontSize:12,color:"#059669",fontWeight:600}}>✓ Besser: {p.besser}</div>
+                </div>
+              ))}
+            </div>}
+            {d.staerken?.length>0&&<div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#059669",marginBottom:8}}>✅ Stärken</div>
+              {d.staerken.map((s,i)=><div key={i} style={{fontSize:13,color:"var(--mu)",padding:"4px 0"}}>✓ {s}</div>)}
+            </div>}
+            {d.empfehlung&&<div style={{background:"rgba(16,185,129,.08)",borderRadius:10,padding:"12px",fontSize:13,color:"var(--ink)"}}><strong>💡 Empfehlung:</strong> {d.empfehlung}</div>}
+          </div>
+        );
+      }
+      if(tool.id==="skillgap") {
+        const pct = d.match_score||0;
+        const col = pct>=80?"#10b981":pct>=60?"#f59e0b":"#ef4444";
+        return (
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+              <div style={{fontFamily:"var(--hd)",fontSize:42,fontWeight:800,color:col}}>{pct}%</div>
+              <div><div style={{fontSize:11,color:"rgba(0,0,0,.4)",textTransform:"uppercase",letterSpacing:"1px"}}>Match Score</div></div>
+            </div>
+            <div style={{background:"rgba(0,0,0,.04)",borderRadius:8,overflow:"hidden",marginBottom:16}}>
+              <div style={{height:8,width:`${pct}%`,background:col,transition:"width .8s ease"}}/>
+            </div>
+            <p style={{fontSize:14,color:"var(--mu)",marginBottom:16}}>{d.zusammenfassung}</p>
+            {d.luecken?.length>0&&<div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#dc2626",marginBottom:8}}>📚 Zu schliessende Lücken</div>
+              {d.luecken.map((l,i)=>(
+                <div key={i} style={{background:"rgba(239,68,68,.05)",border:"1px solid rgba(239,68,68,.12)",borderRadius:10,padding:"12px",marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                    <div style={{fontSize:13,fontWeight:700}}>{l.skill}</div>
+                    <div style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"rgba(239,68,68,.12)",color:"#dc2626"}}>{l.relevanz}</div>
+                  </div>
+                  <div style={{fontSize:12,color:"var(--mu)"}}>⏱ {l.lernzeit} · 📖 {l.ressource}</div>
+                </div>
+              ))}
+            </div>}
+            {d.sofort_machbar?.length>0&&<div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:700,color:"#059669",marginBottom:8}}>⚡ Sofort umsetzbar</div>
+              {d.sofort_machbar.map((s,i)=><div key={i} style={{fontSize:13,color:"var(--mu)",padding:"4px 0"}}>→ {s}</div>)}
+            </div>}
+            {d.fazit&&<div style={{background:"rgba(16,185,129,.08)",borderRadius:10,padding:"12px",fontSize:13,color:"var(--ink)"}}><strong>🎯 Fazit:</strong> {d.fazit}</div>}
+          </div>
+        );
+      }
+    } catch(e) {}
+    return null;
+  };
+
   const hdrColor = tool.color || "#10b981";
 
   return (
     <>
-      <div style={{background:`linear-gradient(135deg,${hdrColor}dd,${hdrColor})`,padding:"48px 28px 34px",textAlign:"center"}}>
+      <div style={{background:`linear-gradient(135deg,${hdrColor}cc,${hdrColor}ee)`,padding:"52px 28px 36px",textAlign:"center",position:"relative",overflow:"hidden"}}>
         <div style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>{tool.ico} {tool.t[lang]}</div>
         <div style={{fontSize:14,color:"rgba(255,255,255,.5)"}}>{tool.sub[lang]}</div>
       </div>
@@ -1308,7 +1701,7 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
         {limitHit&&(
           <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",borderRadius:12,padding:"16px 20px",marginBottom:16,textAlign:"center"}}>
             <div style={{fontSize:24,marginBottom:6}}>⏳</div>
-            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,marginBottom:4}}>{L("Monatliches Kontingent aufgebraucht","Monthly quota used up","Quota mensuel épuisé","Quota mensile esaurito")}</div>
+            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,marginBottom:4}}>{L("Monatliches Nutzungsvolumen aufgebraucht","Monthly volume used up","Volume mensuel épuisé","Volume mensile esaurito")}</div>
             <div style={{fontSize:13,color:"var(--mu)"}}>{L("Nächster Reset:","Next reset:","Prochaine réinitialisation:","Prossimo reset:")} <strong>{nextReset()}</strong></div>
           </div>
         )}
@@ -1495,7 +1888,11 @@ Con Pro ottieni il tuo risultato personale in secondi.`)}
                   {!streaming&&<button className="btn b-outd b-sm" onClick={()=>dlPptxFromText(result, tool.t?.[lang]||page, page)}>📽️ PPTX</button>}
                   {!streaming&&<button className="btn b-outd b-sm" onClick={()=>{setResult("");setVals({});}}>🔄 {L("Neu","New","Nouveau","Nuovo")}</button>}
                 </div>
-                <div className="r-doc">{result}{streaming&&<span className="cursor"/>}</div>
+                {(tool.id==="biaschecker"||tool.id==="skillgap")&&!streaming&&result?(
+                  <div style={{background:"white",borderRadius:14,padding:"22px",border:"1px solid var(--bo)"}}>{renderSpecialResult()||<div className="r-doc">{result}</div>}</div>
+                ):(
+                  <div className="r-doc">{result||(!streaming&&<span style={{color:"rgba(11,11,18,.25)",fontSize:13,fontStyle:"italic"}}>{L("Noch kein Inhalt.","No content yet.","Pas encore de contenu.","Nessun contenuto.")}</span>)}{streaming&&<span className="cursor"/>}</div>
+                )}
               </div>
             )}
           </>
@@ -1504,6 +1901,7 @@ Con Pro ottieni il tuo risultato personale in secondi.`)}
     </>
   );
 }
+
 
 function AppDemo({lang}) {
   const [open,setOpen] = useState(false);
@@ -2032,31 +2430,31 @@ function FaqSection({lang, email}) {
   const faqs=lang==="de"?[
     {q:"Wie sicher sind meine Daten?",a:"Deine Daten werden nicht gespeichert. Jede Anfrage wird direkt an die Anthropic API gesendet und danach nicht protokolliert. Kein Training auf deinen Daten."},
     {q:"Kann ich jederzeit kündigen?",a:"Ja – du kannst monatlich kündigen, ohne Mindestlaufzeit oder versteckte Gebühren. Über Stripe verwaltest du dein Abo selbst."},
-    {q:"Was passiert nach den 60 Generierungen?",a:"Nach 60 Pro-Generierungen pro Monat wird dein Limit am 1. des nächsten Monats automatisch zurückgesetzt. Du kannst aber trotzdem gratis 1× die Kernfunktion nutzen."},
+    {q:"Wie viele Generierungen habe ich?",a:`Gratis: ${C.FREE_LIMIT} Generierung${C.FREE_LIMIT!==1?"en":""} zum Testen. Pro: ${C.PRO_LIMIT} Generierungen/Woche (Erneuerung jeden Montag 07:00). Ultimate: unbegrenzt.`},
     {q:"Funktioniert Stellify für alle Branchen?",a:"Ja. Die KI ist auf den Schweizer Jobmarkt trainiert und kennt Gepflogenheiten aus IT, Finanzen, Gesundheit, Bildung, Gastronomie und mehr."},
     {q:"Welche Sprachen werden unterstützt?",a:"Vollständig auf Deutsch, Englisch, Französisch und Italienisch – ideal für Jobs in allen Sprachregionen der Schweiz."},
-    {q:"Gibt es einen Studentenrabatt?",a:"Aktuell nicht, aber der Jahrespreis (CHF 14.90/Mo.) macht das Abo für alle erschwinglich. Meld dich bei uns für spezielle Konditionen."},
+    {q:"Gibt es einen Studentenrabatt?",a:"Aktuell nicht, aber der Jahrespreis (CHF 18.90/Mo.) macht das Abo für alle erschwinglich. Meld dich bei uns für spezielle Konditionen."},
   ]:lang==="fr"?[
     {q:"Mes données sont-elles sécurisées?",a:"Vos données ne sont pas stockées. Chaque requête est envoyée directement à l'API Anthropic et n'est pas enregistrée."},
     {q:"Puis-je résilier à tout moment?",a:"Oui – résiliation mensuelle possible, sans durée minimale ni frais cachés."},
-    {q:"Que se passe-t-il après 60 générations?",a:"Après 60 générations Pro par mois, votre limite est automatiquement réinitialisée le 1er du mois suivant."},
+    {q:"Combien de générations par plan?",a:"Gratuit: 1 génération. Pro: 60/mois par personne. Famille: 60/mois par personne (3 personnes). Unlimited: 60/mois par personne, membres illimités. Le volume se renouvelle automatiquement le 1er du mois suivant."},
     {q:"Fonctionne pour tous les secteurs?",a:"Oui. L'IA connaît les habitudes du marché suisse dans tous les secteurs."},
     {q:"Quelles langues sont supportées?",a:"Allemand, anglais, français et italien – idéal pour toutes les régions linguistiques."},
-    {q:"Y a-t-il une réduction étudiants?",a:"Pas actuellement, mais le prix annuel (CHF 14.90/mois) est accessible à tous."},
+    {q:"Y a-t-il une réduction étudiants?",a:"Pas actuellement, mais le prix annuel (CHF 18.90/mois) est accessible à tous."},
   ]:lang==="it"?[
     {q:"I miei dati sono sicuri?",a:"I tuoi dati non vengono salvati. Ogni richiesta viene inviata direttamente all'API Anthropic e non viene registrata."},
     {q:"Posso cancellare in qualsiasi momento?",a:"Sì – cancellazione mensile possibile, senza durata minima o costi nascosti."},
     {q:"Cosa succede dopo 60 generazioni?",a:"Dopo 60 generazioni Pro al mese, il limite si ripristina automaticamente il 1° del mese successivo."},
     {q:"Funziona per tutti i settori?",a:"Sì. L'IA conosce le abitudini del mercato svizzero in tutti i settori."},
     {q:"Quali lingue sono supportate?",a:"Tedesco, inglese, francese e italiano – ideale per tutte le regioni linguistiche."},
-    {q:"C'è uno sconto studenti?",a:"Al momento no, ma il prezzo annuale (CHF 14.90/mese) è accessibile a tutti."},
+    {q:"C'è uno sconto studenti?",a:"Al momento no, ma il prezzo annuale (CHF 18.90/mese) è accessibile a tutti."},
   ]:[
     {q:"Is my data secure?",a:"Your data is not stored. Each request is sent directly to the Anthropic API and not logged. No training on your data."},
     {q:"Can I cancel at any time?",a:"Yes – monthly cancellation possible, no minimum term or hidden fees. Manage your subscription directly via Stripe."},
     {q:"What happens after 60 generations?",a:"After 60 Pro generations per month, your limit resets automatically on the 1st of the following month."},
     {q:"Does it work for all industries?",a:"Yes. The AI is trained on the Swiss job market and knows conventions across IT, finance, health, education, hospitality and more."},
     {q:"Which languages are supported?",a:"Fully available in German, English, French and Italian – ideal for jobs across all Swiss language regions."},
-    {q:"Is there a student discount?",a:"Not currently, but the annual price (CHF 14.90/mo.) makes the subscription affordable for everyone."},
+    {q:"Is there a student discount?",a:"Not currently, but the annual price (CHF 18.90/mo.) makes the subscription affordable for everyone."},
   ];
   return(
     <section className="sec sec-w" id="faq">
@@ -2130,6 +2528,118 @@ function DocUpload({lang, onFile, onText, file, onClear}) {
 // ════════════════════════════════════════
 // 🍪 COOKIE BANNER
 // ════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// SPLASH SCREEN
+// ══════════════════════════════════════════════════════════
+function SplashScreen({ onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, []);
+  return (
+    <div style={{position:"fixed",inset:0,background:"linear-gradient(135deg,#07070e 0%,#0f1a12 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:9999,animation:"splashOut 0.5s ease 1.8s forwards"}}>
+      <style>{`
+        @keyframes splashOut { to { opacity:0; pointer-events:none; } }
+        @keyframes logoIn { from { opacity:0; transform:translate3d(0,20px,0) scale(.7); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } }
+        @keyframes tagIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+      `}</style>
+      <div style={{animation:"logoIn .7s cubic-bezier(.34,1.56,.64,1) .2s both"}}>
+        <div style={{width:88,height:88,borderRadius:24,background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:42,marginBottom:20,boxShadow:"0 0 60px rgba(16,185,129,.4)",animation:"pulse 2s ease 0.8s infinite"}}>✦</div>
+      </div>
+      <div style={{fontFamily:"'Bricolage Grotesque',system-ui",fontSize:34,fontWeight:800,color:"white",letterSpacing:"-1.5px",animation:"logoIn .7s ease .4s both"}}>Stellify</div>
+      <div style={{fontSize:13,color:"rgba(255,255,255,.35)",marginTop:8,animation:"tagIn .6s ease .8s both"}}>AI Career Copilot Schweiz</div>
+      <div style={{position:"absolute",bottom:48,display:"flex",gap:6}}>
+        {[0,1,2].map(i=>(
+          <div key={i} style={{width:6,height:6,borderRadius:"50%",background:"rgba(16,185,129,.6)",animation:`pulse 1s ease ${.2+i*.15}s infinite`}}/>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// OFFLINE BANNER
+// ══════════════════════════════════════════════════════════
+function OfflineBanner({ lang }) {
+  const [offline, setOffline] = useState(!navigator.onLine);
+  useEffect(() => {
+    const on  = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener("online",  on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online",on); window.removeEventListener("offline",off); };
+  }, []);
+  if (!offline) return null;
+  const msg = lang==="de"?"📡 Keine Internetverbindung – bitte Verbindung prüfen.":
+              lang==="fr"?"📡 Pas de connexion – vérifiez votre réseau.":
+              lang==="it"?"📡 Nessuna connessione – controlla la rete.":
+              "📡 No internet connection – please check your network.";
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:8888,background:"linear-gradient(90deg,#dc2626,#b91c1c)",color:"white",textAlign:"center",padding:"10px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--bd)"}}>
+      {msg}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// REFERRAL PANEL
+// ══════════════════════════════════════════════════════════
+function ReferralPanel({ lang, session, onClose }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const code = session?.email ? genReferralCode(session.email) : "–";
+  const link = `https://stellify.ch?ref=${code}`;
+  const [copied, setCopied] = useState(false);
+  const [refInput, setRefInput] = useState("");
+  const [refMsg, setRefMsg] = useState("");
+
+  const copy = () => {
+    navigator.clipboard?.writeText(link).catch(()=>{});
+    setCopied(true); setTimeout(()=>setCopied(false), 2000);
+  };
+  const applyCode = () => {
+    if(!refInput.trim()) return;
+    const res = applyReferral(refInput.trim().toUpperCase());
+    setRefMsg(res.ok ? L(`✅ ${C.REFERRAL_DISCOUNT}% Rabatt aktiviert!`,`✅ ${C.REFERRAL_DISCOUNT}% discount activated!`,`✅ ${C.REFERRAL_DISCOUNT}% de réduction activé!`,`✅ ${C.REFERRAL_DISCOUNT}% di sconto attivato!`) : `❌ ${res.msg}`);
+  };
+
+  return (
+    <div className="mbg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="mod" style={{maxWidth:440,textAlign:"left"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <h2 style={{fontSize:20,margin:0}}>🎁 {L("Freunde einladen","Invite friends","Inviter des amis","Invita amici")}</h2>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,.4)",fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+        <div style={{background:"rgba(16,185,129,.08)",border:"1px solid rgba(16,185,129,.2)",borderRadius:12,padding:"16px",marginBottom:16}}>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:8}}>{L("Dein persönlicher Einladungslink:","Your personal invite link:","Votre lien d'invitation:","Il tuo link di invito:")}</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <div style={{flex:1,fontSize:12,color:"var(--em)",wordBreak:"break-all",fontFamily:"monospace"}}>{link}</div>
+            <button onClick={copy} className="btn b-em b-sm" style={{flexShrink:0}}>{copied?"✓":L("Kopieren","Copy","Copier","Copia")}</button>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+          <div style={{background:"rgba(255,255,255,.04)",borderRadius:10,padding:"14px",textAlign:"center"}}>
+            <div style={{fontSize:24,fontWeight:800,color:"var(--em)"}}>1 Mt.</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:4}}>{L("Gratis für dich","Free for you","Gratuit pour vous","Gratis per te")}</div>
+          </div>
+          <div style={{background:"rgba(255,255,255,.04)",borderRadius:10,padding:"14px",textAlign:"center"}}>
+            <div style={{fontSize:24,fontWeight:800,color:"var(--am)"}}>-{C.REFERRAL_DISCOUNT}%</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:4}}>{L("Rabatt für Freund","Discount for friend","Réduction pour l'ami","Sconto per l'amico")}</div>
+          </div>
+        </div>
+        <div style={{borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:16,marginTop:4}}>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:8}}>{L("Hast du einen Code? Hier einlösen:","Have a code? Redeem here:","Vous avez un code? Saisissez-le ici:","Hai un codice? Riscattalo qui:")}</div>
+          <div style={{display:"flex",gap:8}}>
+            <input value={refInput} onChange={e=>setRefInput(e.target.value.toUpperCase())} placeholder="STF123ABC"
+              style={{flex:1,padding:"9px 12px",borderRadius:9,border:"1.5px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"white",fontFamily:"monospace",fontSize:13,outline:"none",letterSpacing:"1px"}}/>
+            <button onClick={applyCode} className="btn b-em b-sm">{L("Einlösen","Redeem","Utiliser","Riscatta")}</button>
+          </div>
+          {refMsg&&<div style={{fontSize:12,marginTop:8,color:refMsg.startsWith("✅")?"var(--em)":"#f87171"}}>{refMsg}</div>}
+        </div>
+        <button className="btn b-out b-sm" style={{width:"100%",marginTop:16,borderColor:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.4)"}} onClick={onClose}>{L("Schliessen","Close","Fermer","Chiudi")}</button>
+      </div>
+    </div>
+  );
+}
+
+
 function CookieBanner({ lang, onAccept }) {
   const L = (d,e,f,i) => ({de:d,en:e,fr:f,it:i}[lang]||d);
   const [details, setDetails] = useState(false);
@@ -2174,28 +2684,143 @@ function CookieBanner({ lang, onAccept }) {
 // ════════════════════════════════════════
 // 💬 STELLIFY CHAT BOT
 // ════════════════════════════════════════
-function ChatBot({ lang, pro, setPw, navTo }) {
+// ════════════════════════════════════════
+// 👤 MULTI-PROFIL MANAGER
+const PROFILES_KEY = "stf_profiles";
+const ACTIVE_PROFILE_KEY = "stf_active_profile";
+
+function loadProfiles() {
+  try {
+    const raw = localStorage.getItem(PROFILES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+function saveProfiles(profiles) {
+  try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch {}
+}
+function loadActiveProfileId() {
+  try { return localStorage.getItem(ACTIVE_PROFILE_KEY) || null; } catch { return null; }
+}
+function saveActiveProfileId(id) {
+  try { localStorage.setItem(ACTIVE_PROFILE_KEY, id); } catch {}
+}
+
+// 💬 CHAT VERLAUF
+const CHATS_KEY = "stf_chats";
+const ACTIVE_CHAT_KEY = "stf_active_chat";
+
+function loadChats() {
+  try {
+    const raw = localStorage.getItem(CHATS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+function saveChats(chats) {
+  try { localStorage.setItem(CHATS_KEY, JSON.stringify(chats)); } catch {}
+}
+function loadActiveChatId() {
+  try { return localStorage.getItem(ACTIVE_CHAT_KEY) || null; } catch { return null; }
+}
+function saveActiveChatId(id) {
+  try { localStorage.setItem(ACTIVE_CHAT_KEY, id); } catch {}
+}
+function makeChatId() { return "c" + Date.now(); }
+function makeChatTitle(msgs) {
+  const first = msgs.find(m => m.r === "u");
+  if (!first) return "Neuer Chat";
+  return first.t.slice(0, 36) + (first.t.length > 36 ? "…" : "");
+}
+
+function ChatBot({ lang, pro, setPw, navTo, authSession, onAuthOpen }) {
   const L = (d,e,f,i) => ({de:d,en:e,fr:f,it:i}[lang]||d);
   const [open, setOpen]       = useState(false);
   const [bubble, setBubble]   = useState(false);
   const [cookieDone, setCookieDone] = useState(false);
-  const [msgs, setMsgs]       = useState([]);
   const [input, setInput]     = useState("");
   const [loading, setLoading] = useState(false);
   const [chatUsage, setChatUsage] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
   const bottomRef = useRef(null);
 
+  // Chat-Verlauf State
+  const [chats, setChats] = useState(() => loadChats());
+  const [activeChatId, setActiveChatId] = useState(() => loadActiveChatId());
+
+  // Aktiver Chat Messages
+  const msgs = (() => {
+    const chat = chats.find(c => c.id === activeChatId);
+    return chat ? chat.msgs : [];
+  })();
+
+  function setMsgs(updater) {
+    setChats(prev => {
+      const updated = typeof updater === "function" ? updater(msgs) : updater;
+      let newChats;
+      if (!activeChatId) {
+        const id = makeChatId();
+        saveActiveChatId(id);
+        setActiveChatId(id);
+        newChats = [{id, title: makeChatTitle(updated), msgs: updated, ts: Date.now()}, ...prev];
+      } else {
+        newChats = prev.map(c => c.id === activeChatId
+          ? {...c, msgs: updated, title: makeChatTitle(updated), ts: Date.now()}
+          : c
+        );
+        if (!newChats.find(c => c.id === activeChatId)) {
+          newChats = [{id: activeChatId, title: makeChatTitle(updated), msgs: updated, ts: Date.now()}, ...prev];
+        }
+      }
+      saveChats(newChats);
+      return newChats;
+    });
+  }
+
+  function newChat() {
+    const id = makeChatId();
+    setActiveChatId(id);
+    saveActiveChatId(id);
+    setShowHistory(false);
+    // Grüssung direkt setzen
+    const welcome = {r:"ai", t: L(
+      "Hallo! Ich bin Stella 👋 Deine KI-Karriere-Assistentin von Stellify. Wie kann ich dir helfen?",
+      "Hi! I'm Stella 👋 Your AI career assistant from Stellify. How can I help?",
+      "Bonjour! Je suis Stella 👋 Comment puis-je vous aider?",
+      "Ciao! Sono Stella 👋 Come posso aiutarti?"
+    )};
+    const newChats = [{id, title: "Neuer Chat", msgs: [welcome], ts: Date.now()}, ...chats];
+    setChats(newChats);
+    saveChats(newChats);
+  }
+
+  function deleteChat(id, e) {
+    e.stopPropagation();
+    const updated = chats.filter(c => c.id !== id);
+    setChats(updated);
+    saveChats(updated);
+    if (activeChatId === id) {
+      const next = updated[0];
+      setActiveChatId(next ? next.id : null);
+      saveActiveChatId(next ? next.id : "");
+    }
+  }
+
+  function switchChat(id) {
+    setActiveChatId(id);
+    saveActiveChatId(id);
+    setShowHistory(false);
+  }
+
   useEffect(()=>{
-    try { setCookieDone(!!localStorage.getItem("stf_cookie")); } catch{}
-    // Re-check every 500ms until cookie is set
-    const iv = setInterval(()=>{ try { if(localStorage.getItem("stf_cookie")) { setCookieDone(true); clearInterval(iv); } } catch{} },500);
+    try { setCookieDone(!!localStorage.getItem("stf_cookie_v2")); } catch{}
+    const iv = setInterval(()=>{ try { if(localStorage.getItem("stf_cookie_v2")) { setCookieDone(true); clearInterval(iv); } } catch{} },500);
     return ()=>clearInterval(iv);
   },[]);
 
   useEffect(()=>{ setChatUsage(getChatCount()); },[open]);
   useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:"smooth"}); },[msgs]);
 
-  // Auto-Bubble nach 8 Sekunden – nur einmal pro Session
   useEffect(()=>{
     const seen = sessionStorage.getItem("stf_bubble");
     if(seen) return;
@@ -2203,14 +2828,16 @@ function ChatBot({ lang, pro, setPw, navTo }) {
     return ()=>clearTimeout(t);
   },[]);
 
-  const canChat = pro || chatUsage < C.CHAT_FREE_LIMIT;
+  const isLoggedIn = !!authSession;
+  const canChat = isLoggedIn && (pro || chatUsage < C.CHAT_FREE_LIMIT);
+  const needsLogin = !isLoggedIn;
 
   const SYSTEM = `Du bist Stella, die KI-Karriere-Assistentin von Stellify. Du hast tiefes Wissen über Karriere, Bewerbungen, den Schweizer Arbeitsmarkt und Produktivität.
 
-Dein Wissen umfasst: Schweizer Bewerbungsunterlagen (Motivationsschreiben, Lebenslauf mit Foto, 1-2 Seiten), ATS-Optimierung, Schweizer Arbeitsrecht (Kündigungsfristen, Sperrfristen, Zeugnis-Code: "stets zu vollsten Zufriedenheit"=sehr gut), Gehälter nach Branche/Erfahrung, LinkedIn-Optimierung, Interview-Vorbereitung (STAR-Methode), Gehaltsverhandlungs-Taktiken, Schweizer Bildungssystem (EFZ, FH, Uni, CAS/MAS).
+Dein Wissen umfasst: Schweizer Bewerbungsunterlagen (Motivationsschreiben, Lebenslauf mit Foto, 1-2 Seiten), ATS-Optimierung, Schweizer Arbeitsrecht (Kündigungsfristen, Sperrfristen, Zeugnis-Code: \"stets zu vollsten Zufriedenheit\"=sehr gut), Gehälter nach Branche/Erfahrung, LinkedIn-Optimierung, Interview-Vorbereitung (STAR-Methode), Gehaltsverhandlungs-Taktiken, Schweizer Bildungssystem (EFZ, FH, Uni, CAS/MAS).
 
 Tools von Stellify:
-✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer
+✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer, 💰 KI-Gehaltsrechner Schweiz, 📋 Bewerbungs-Tracker, ✍️ LinkedIn-Post Generator
 
 Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib Beispieltexte direkt aus wenn gefragt. Empfehle Tool-Namen exakt wie oben damit Links funktionieren. Sei warm, direkt, wie ein erfahrener Karriere-Coach.`;
 
@@ -2225,9 +2852,11 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
     "lernplan":["📚 Lernplan","lernplan"], "zusammenfassung":["📝 Zusammenfassung","zusammenfassung"],
     "lehrstelle":["🎓 Lehrstelle","lehrstelle"], "e-mail":["✉️ E-Mail","email"],
     "protokoll":["📋 Protokoll","protokoll"], "übersetzer":["🌍 Übersetzer","uebersetzer"],
+    "gehaltsrechner":["💰 KI-Gehaltsrechner","gehaltsrechner"],
+    "tracker":["📋 Bewerbungs-Tracker","tracker"],
+    "linkedin-post":["✍️ LinkedIn-Post","lipost"],
   };
 
-  // Parse tool links from assistant response
   const renderMsg = (text) => {
     const parts = [];
     let remaining = text;
@@ -2247,6 +2876,7 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
 
   const send = async () => {
     if(!input.trim()||loading) return;
+    if(needsLogin){ onAuthOpen && onAuthOpen(); return; }
     if(!canChat){ setPw(true); return; }
     const userMsg = input.trim();
     setInput("");
@@ -2255,29 +2885,19 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
     setLoading(true);
     if(!pro){ incChat(); setChatUsage(c=>c+1); }
     try {
-      // Nur user/assistant abwechselnd, immer mit user starten
       const apiMsgs = [];
       for(const m of newMsgs) {
         const role = m.r==="u" ? "user" : "assistant";
-        // Keine zwei gleichen Rollen hintereinander
         if(apiMsgs.length > 0 && apiMsgs[apiMsgs.length-1].role === role) continue;
         apiMsgs.push({role, content: m.t});
       }
-      // Muss mit user starten
       while(apiMsgs.length && apiMsgs[0].role !== "user") apiMsgs.shift();
-      // Letzten 10 nehmen
       const finalMsgs = apiMsgs.slice(-10);
-
-      // System als erste Nachricht einfügen
       const msgsWithSystem = [{role:"system",content:SYSTEM}, ...finalMsgs];
       const res = await fetch(GROQ_URL, {
         method: "POST",
         headers: groqHeaders(),
-        body: JSON.stringify({
-          model: C.MODEL_FAST,
-          max_tokens: 600,
-          messages: msgsWithSystem
-        })
+        body: JSON.stringify({ model: C.MODEL_FAST, max_tokens: 600, messages: msgsWithSystem })
       });
       const data = await res.json();
       if(!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
@@ -2293,104 +2913,887 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
   const remaining = pro ? "∞" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage);
   const openChat = () => {
     setBubble(false);
+    if (!open && msgs.length === 0 && !activeChatId) {
+      newChat();
+    }
     setOpen(o=>!o);
-    if(!msgs.length) setMsgs([{r:"ai",t:L(
-      "Hallo! Ich bin Stella 👋 Deine KI-Karriere-Assistentin von Stellify. Wie kann ich dir helfen? Ich empfehle dir das passende Tool.",
-      "Hi! I'm Stella 👋 Your AI career assistant from Stellify. How can I help? I'll recommend the right tool.",
-      "Bonjour! Je suis Stella 👋 Votre assistante carrière IA de Stellify. Comment puis-je vous aider?",
-      "Ciao! Sono Stella 👋 La tua assistente di carriera IA di Stellify. Come posso aiutarti?"
-    )}]);
+  };
+
+  const fmtDate = (ts) => {
+    if(!ts) return "";
+    const d = new Date(ts);
+    const now = new Date();
+    const diff = now - d;
+    if(diff < 86400000) return d.toLocaleTimeString("de-CH",{hour:"2-digit",minute:"2-digit"});
+    if(diff < 604800000) return d.toLocaleDateString("de-CH",{weekday:"short"});
+    return d.toLocaleDateString("de-CH",{day:"2-digit",month:"2-digit"});
   };
 
   return (<>
-    {/* Auto-Bubble – nur wenn Cookie akzeptiert */}
+    {/* Auto-Bubble */}
     {cookieDone&&bubble&&!open&&<div style={{position:"fixed",bottom:90,right:20,maxWidth:220,background:"var(--dk2)",border:"1px solid rgba(16,185,129,.3)",borderRadius:"14px 14px 4px 14px",padding:"11px 14px",zIndex:1002,boxShadow:"0 8px 32px rgba(0,0,0,.4)",cursor:"pointer",animation:"fadeSlideUp .4s ease"}}
       onClick={openChat}>
       <button onClick={e=>{e.stopPropagation();setBubble(false);}} style={{position:"absolute",top:6,right:8,background:"none",border:"none",color:"rgba(255,255,255,.3)",fontSize:12,cursor:"pointer",lineHeight:1}}>✕</button>
       <div style={{fontSize:13,color:"rgba(255,255,255,.85)",lineHeight:1.5,paddingRight:12}}>
-        {L("Hallo 👋 Welches Tool passt zu dir? Frag mich!","Hi 👋 Which tool suits you? Ask me!","Bonjour 👋 Quel outil vous convient? Demandez-moi!","Ciao 👋 Quale tool fa per te? Chiedimi!")}
+        {L("Hallo 👋 Welches Tool passt zu dir? Frag mich!","Hi 👋 Which tool suits you? Ask me!","Bonjour 👋 Quel outil vous convient?","Ciao 👋 Quale tool fa per te?")}
       </div>
       <div style={{fontSize:11,color:"var(--em)",fontWeight:600,marginTop:5}}>{L("Mit Stella chatten →","Chat with Stella →","Discuter avec Stella →","Chatta con Stella →")}</div>
     </div>}
 
-    {/* Floating Button – nur wenn Cookie akzeptiert */}
-    {cookieDone&&<button onClick={openChat}
-      style={{position:"fixed",bottom:open?248:24,right:24,width:56,height:56,borderRadius:"50%",background:"var(--em)",border:"none",cursor:"pointer",zIndex:1001,boxShadow:"0 4px 20px rgba(16,185,129,.45)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,transition:"all .3s",transform:open?"rotate(10deg)":"none"}}>
-      {open?"✕":"💬"}
-      {bubble&&!open&&<div style={{position:"absolute",top:0,right:0,width:14,height:14,borderRadius:"50%",background:"#ef4444",border:"2px solid white"}}/>}
-    </button>}
+    {/* Floating Button */}
+    {cookieDone&&<div style={{position:"fixed",bottom:open?248:24,right:24,zIndex:1001}}>
+      {/* Apple pulse rings */}
+      {!open&&<><div style={{position:"absolute",inset:-5,borderRadius:"50%",border:"2px solid rgba(16,185,129,.45)",animation:"chatPulse 2.2s ease-out infinite",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",inset:-11,borderRadius:"50%",border:"1.5px solid rgba(16,185,129,.22)",animation:"chatPulse 2.2s ease-out infinite",animationDelay:".55s",pointerEvents:"none"}}/></>}
+      <button onClick={openChat}
+        style={{position:"relative",width:56,height:56,borderRadius:"50%",background:"linear-gradient(135deg,#10b981,#059669)",border:"none",cursor:"pointer",boxShadow:"0 4px 24px rgba(16,185,129,.55),inset 0 1px 0 rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,transition:"transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .2s",transform:open?"rotate(90deg) scale(1)":"scale(1)"}}
+        onMouseEnter={e=>{e.currentTarget.style.transform=open?"rotate(90deg) scale(1.08)":"scale(1.1) translateY(-2px)";e.currentTarget.style.boxShadow="0 8px 28px rgba(16,185,129,.65),inset 0 1px 0 rgba(255,255,255,.2)"}}
+        onMouseLeave={e=>{e.currentTarget.style.transform=open?"rotate(90deg)":"scale(1)";e.currentTarget.style.boxShadow="0 4px 24px rgba(16,185,129,.55),inset 0 1px 0 rgba(255,255,255,.2)"}}>
+        {open?"✕":"💬"}
+        {bubble&&!open&&<div style={{position:"absolute",top:1,right:1,width:14,height:14,borderRadius:"50%",background:"#ef4444",border:"2px solid white",boxShadow:"0 2px 6px rgba(239,68,68,.5)"}}/>}
+      </button>
+    </div>}
 
     {/* Chat Window */}
-    {open&&<div style={{position:"fixed",bottom:92,right:24,width:340,maxWidth:"calc(100vw - 32px)",background:"var(--dk2)",border:"1px solid rgba(255,255,255,.1)",borderRadius:20,boxShadow:"0 20px 60px rgba(0,0,0,.5)",zIndex:1000,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+    {open&&<div style={{position:"fixed",bottom:92,right:24,width:360,maxWidth:"calc(100vw - 32px)",background:"rgba(15,15,26,.92)",backdropFilter:"blur(32px)",WebkitBackdropFilter:"blur(32px)",border:"1px solid rgba(255,255,255,.12)",borderRadius:20,boxShadow:"0 24px 64px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05) inset",zIndex:1000,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+
       {/* Header */}
-      <div style={{background:"linear-gradient(135deg,rgba(16,185,129,.2),rgba(16,185,129,.08))",borderBottom:"1px solid rgba(255,255,255,.07)",padding:"14px 18px",display:"flex",alignItems:"center",gap:12}}>
-        <div style={{width:36,height:36,background:"var(--em)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>🤖</div>
-        <div style={{flex:1}}>
-          <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:800,color:"white"}}>Stella – Stellify Assistant</div>
-          <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>
-            {pro ? L("Pro · Unbegrenzte Nachrichten","Pro · Unlimited messages","Pro · Messages illimités","Pro · Messaggi illimitati")
-                 : L(`${remaining} von ${C.CHAT_FREE_LIMIT} Gratis-Nachrichten`,`${remaining} of ${C.CHAT_FREE_LIMIT} free messages`,`${remaining} sur ${C.CHAT_FREE_LIMIT} messages gratuits`,`${remaining} di ${C.CHAT_FREE_LIMIT} messaggi gratuiti`)}
+      <div style={{background:"linear-gradient(135deg,rgba(16,185,129,.2),rgba(16,185,129,.08))",borderBottom:"1px solid rgba(255,255,255,.07)",padding:"12px 14px",display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:34,height:34,background:"var(--em)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🤖</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontFamily:"var(--hd)",fontSize:13,fontWeight:800,color:"white"}}>Stella – Stellify</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.4)"}}>
+            {pro ? L("Pro · Unbegrenzt","Pro · Unlimited","Pro · Illimité","Pro · Illimitato")
+                 : `${remaining}/${C.CHAT_FREE_LIMIT} ${L("Nachrichten","messages","messages","messaggi")}`}
           </div>
         </div>
-        <button onClick={()=>{setOpen(false);navTo("chat");}} title={L("Vollbild öffnen","Open fullscreen","Plein écran","Schermo intero")}
+        {/* Verlauf Button */}
+        <button onClick={()=>setShowHistory(h=>!h)} title={L("Verlauf","History","Historique","Cronologia")}
+          style={{background:showHistory?"rgba(16,185,129,.25)":"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,color:showHistory?"var(--em)":"rgba(255,255,255,.6)",flexShrink:0,transition:"all .2s"}}>
+          🕐
+        </button>
+        {/* Neuer Chat */}
+        <button onClick={newChat} title={L("Neuer Chat","New chat","Nouveau chat","Nuova chat")}
           style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14,color:"rgba(255,255,255,.6)",flexShrink:0,transition:"all .2s"}}
           onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.15)"}
           onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.08)"}>
-          ⤢
+          ✏️
         </button>
-        <div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/>
+        <div style={{width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e",flexShrink:0}}/>
       </div>
+
+      {/* Chat-Verlauf Panel */}
+      {showHistory && (
+        <div style={{background:"rgba(7,7,14,.98)",borderBottom:"1px solid rgba(255,255,255,.07)",maxHeight:260,overflowY:"auto"}}>
+          <div style={{padding:"10px 14px 6px",fontSize:10,fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase",color:"rgba(255,255,255,.25)"}}>{L("Verlauf","History","Historique","Cronologia")}</div>
+          {chats.length === 0 && (
+            <div style={{padding:"14px",fontSize:12,color:"rgba(255,255,255,.3)",textAlign:"center"}}>{L("Noch keine Chats","No chats yet","Pas encore de chats","Nessuna chat")}</div>
+          )}
+          {chats.map(chat => (
+            <div key={chat.id} onClick={()=>switchChat(chat.id)}
+              style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",cursor:"pointer",background:chat.id===activeChatId?"rgba(16,185,129,.1)":"transparent",borderLeft:`2px solid ${chat.id===activeChatId?"var(--em)":"transparent"}`,transition:"all .15s"}}
+              onMouseEnter={e=>{if(chat.id!==activeChatId)e.currentTarget.style.background="rgba(255,255,255,.04)";}}
+              onMouseLeave={e=>{if(chat.id!==activeChatId)e.currentTarget.style.background="transparent";}}>
+              <div style={{fontSize:14,flexShrink:0}}>💬</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,fontWeight:600,color:chat.id===activeChatId?"var(--em)":"rgba(255,255,255,.75)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{chat.title||"Chat"}</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,.25)",marginTop:1}}>{fmtDate(chat.ts)} · {chat.msgs.length} {L("Nachrichten","messages","messages","messaggi")}</div>
+              </div>
+              <button onClick={e=>deleteChat(chat.id,e)}
+                style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",cursor:"pointer",fontSize:12,padding:"2px 4px",borderRadius:4,flexShrink:0,transition:"color .15s"}}
+                onMouseEnter={e=>e.currentTarget.style.color="#ef4444"}
+                onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,.2)"}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Login Gate */}
+      {!showHistory && needsLogin && (
+        <div style={{padding:"28px 20px",textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
+          <div style={{fontSize:36}}>🔐</div>
+          <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:800,color:"white"}}>
+            {lang==="de"?"Einloggen zum Chatten":lang==="fr"?"Connexion pour chatter":"Sign in to chat"}
+          </div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",lineHeight:1.6}}>
+            {lang==="de"?"20 kostenlose Fragen an Stella – registriere dich gratis.":lang==="fr"?"20 questions gratuites – inscrivez-vous.":"20 free questions for Stella – register free."}
+          </div>
+          <button onClick={()=>onAuthOpen&&onAuthOpen()} className="btn b-em b-w" style={{fontSize:13}}>
+            {lang==="de"?"Einloggen / Registrieren →":lang==="fr"?"Connexion / Inscription →":"Sign in / Register →"}
+          </button>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.2)"}}>
+            {lang==="de"?"Kein Abo nötig · Sofort starten":"No subscription needed · Start instantly"}
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
-      <div style={{flex:1,overflowY:"auto",padding:14,display:"flex",flexDirection:"column",gap:10,maxHeight:320,minHeight:200}}>
-        {msgs.map((m,i)=>(
-          <div key={i} style={{display:"flex",gap:8,flexDirection:m.r==="u"?"row-reverse":"row",alignItems:"flex-start"}}>
-            <div style={{width:28,height:28,borderRadius:"50%",background:m.r==="u"?"rgba(16,185,129,.2)":"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{m.r==="u"?"👤":"🤖"}</div>
-            <div style={{maxWidth:"78%",background:m.r==="u"?"rgba(16,185,129,.15)":"rgba(255,255,255,.05)",border:`1px solid ${m.r==="u"?"rgba(16,185,129,.25)":"rgba(255,255,255,.07)"}`,borderRadius:m.r==="u"?"14px 14px 4px 14px":"14px 14px 14px 4px",padding:"9px 12px",fontSize:13,color:"rgba(255,255,255,.85)",lineHeight:1.6}}>
-              {m.r==="ai"?renderMsg(m.t):m.t}
+      {!showHistory && !needsLogin && <>
+        <div style={{flex:1,overflowY:"auto",padding:14,display:"flex",flexDirection:"column",gap:10,maxHeight:320,minHeight:200}}>
+          {msgs.map((m,i)=>(
+            <div key={i} style={{display:"flex",gap:8,flexDirection:m.r==="u"?"row-reverse":"row",alignItems:"flex-start"}}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:m.r==="u"?"rgba(16,185,129,.2)":"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>{m.r==="u"?"👤":"🤖"}</div>
+              <div style={{maxWidth:"78%",background:m.r==="u"?"rgba(16,185,129,.15)":"rgba(255,255,255,.05)",border:`1px solid ${m.r==="u"?"rgba(16,185,129,.25)":"rgba(255,255,255,.07)"}`,borderRadius:m.r==="u"?"14px 14px 4px 14px":"14px 14px 14px 4px",padding:"9px 12px",fontSize:13,color:"rgba(255,255,255,.85)",lineHeight:1.6}}>
+                {m.r==="ai"?renderMsg(m.t):m.t}
+              </div>
             </div>
-          </div>
-        ))}
-        {loading&&<div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
-          <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🤖</div>
-          <div style={{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",borderRadius:"14px 14px 14px 4px",padding:"9px 12px"}}>
-            <div style={{display:"flex",gap:4}}>{[0,1,2].map(j=><div key={j} style={{width:6,height:6,borderRadius:"50%",background:"var(--em)",opacity:.7,animation:`pulse 1.2s ease-in-out ${j*0.2}s infinite`}}/>)}</div>
-          </div>
+          ))}
+          {loading&&<div style={{display:"flex",gap:8,alignItems:"flex-start"}}>
+            <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🤖</div>
+            <div style={{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.07)",borderRadius:"14px 14px 14px 4px",padding:"9px 12px"}}>
+              <div style={{display:"flex",gap:4}}>{[0,1,2].map(j=><div key={j} style={{width:6,height:6,borderRadius:"50%",background:"var(--em)",opacity:.7,animation:`pulse 1.2s ease-in-out ${j*0.2}s infinite`}}/>)}</div>
+            </div>
+          </div>}
+          <div ref={bottomRef}/>
+        </div>
+
+        {!canChat&&<div style={{padding:"10px 14px",background:"rgba(245,158,11,.08)",borderTop:"1px solid rgba(245,158,11,.15)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+          <div style={{fontSize:12,color:"rgba(245,158,11,.8)"}}>{L("Gratis-Limit erreicht","Free limit reached","Limite gratuit atteint","Limite raggiunto")}</div>
+          <button onClick={()=>setPw(true)} style={{background:"var(--am)",color:"white",border:"none",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Pro {L("freischalten","unlock","activer","sblocca")} →</button>
         </div>}
-        <div ref={bottomRef}/>
-      </div>
 
-      {/* Limit reached */}
-      {!canChat&&<div style={{padding:"10px 14px",background:"rgba(245,158,11,.08)",borderTop:"1px solid rgba(245,158,11,.15)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-        <div style={{fontSize:12,color:"rgba(245,158,11,.8)"}}>{L("Gratis-Limit erreicht","Free limit reached","Limite gratuit atteint","Limite gratuito raggiunto")}</div>
-        <button onClick={()=>setPw(true)} style={{background:"var(--am)",color:"white",border:"none",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>Pro {L("freischalten","unlock","activer","sblocca")} →</button>
-      </div>}
-
-      {/* Input */}
-      <div style={{borderTop:"1px solid rgba(255,255,255,.07)",padding:"10px 12px",display:"flex",gap:8,alignItems:"flex-end"}}>
-        <textarea value={input} onChange={e=>setInput(e.target.value)}
-          onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!loading&&canChat){e.preventDefault();send();}}}
-          placeholder={canChat ? L("Frag mich etwas…","Ask me anything…","Posez-moi une question…","Chiedimi qualcosa…") : L("Pro freischalten für mehr…","Unlock Pro for more…","Activer Pro pour plus…","Sblocca Pro per di più…")}
-          disabled={!canChat||loading}
-          style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 11px",fontSize:13,color:"white",resize:"none",minHeight:36,maxHeight:90,outline:"none",lineHeight:1.5}}
-          rows={1}/>
-        <button onClick={send} disabled={!input.trim()||loading||!canChat}
-          style={{width:36,height:36,borderRadius:10,background:input.trim()&&canChat?"var(--em)":"rgba(255,255,255,.08)",border:"none",cursor:input.trim()&&canChat?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,transition:"background .2s"}}>
-          {loading?"⏳":"➤"}
-        </button>
-      </div>
+        <div style={{borderTop:"1px solid rgba(255,255,255,.07)",padding:"10px 12px",display:"flex",gap:8,alignItems:"flex-end"}}>
+          <textarea value={input} onChange={e=>setInput(e.target.value)}
+            onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!loading&&canChat){e.preventDefault();send();}}}
+            placeholder={canChat ? L("Frag mich etwas…","Ask me anything…","Posez-moi une question…","Chiedimi qualcosa…") : L("Pro freischalten…","Unlock Pro…","Activer Pro…","Sblocca Pro…")}
+            disabled={!canChat||loading}
+            style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"8px 11px",fontSize:13,color:"white",resize:"none",minHeight:36,maxHeight:90,outline:"none",lineHeight:1.5}}
+            rows={1}/>
+          <button onClick={send} disabled={!input.trim()||loading||!canChat}
+            style={{width:36,height:36,borderRadius:10,background:input.trim()&&canChat?"var(--em)":"rgba(255,255,255,.08)",border:"none",cursor:input.trim()&&canChat?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0,transition:"background .2s"}}>
+            {loading?"⏳":"➤"}
+          </button>
+        </div>
+      </>}
     </div>}
 
-    <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.3);opacity:1}}@keyframes fadeSlideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
+    <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.3);opacity:1}}@keyframes fadeSlideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes chatPulse{0%{transform:scale(1);opacity:.6}70%{transform:scale(1.25);opacity:0}100%{transform:scale(1.25);opacity:0}}`}</style>
   </>);
+}
+// ════════════════════════════════════════
+// 📋 BEWERBUNGS-TRACKER
+function BewerbungsTracker({lang, pro, setPw, navTo}) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const STATUS = {
+    beworben:  {de:"Beworben",       en:"Applied",       fr:"Postulé",      it:"Candidato",    col:"#3b82f6", bg:"rgba(59,130,246,.1)"},
+    pruefung:  {de:"In Prüfung",     en:"Under review",  fr:"En cours",     it:"In esame",     col:"#f59e0b", bg:"rgba(245,158,11,.1)"},
+    interview: {de:"Interview",      en:"Interview",     fr:"Entretien",    it:"Colloquio",    col:"#8b5cf6", bg:"rgba(139,92,246,.1)"},
+    angebot:   {de:"Angebot",        en:"Offer",         fr:"Offre",        it:"Offerta",      col:"#10b981", bg:"rgba(16,185,129,.1)"},
+    abgelehnt: {de:"Abgelehnt",      en:"Rejected",      fr:"Refusé",       it:"Rifiutato",    col:"#ef4444", bg:"rgba(239,68,68,.1)"},
+    zurueck:   {de:"Zurückgezogen",  en:"Withdrawn",     fr:"Retiré",       it:"Ritirato",     col:"#6b7280", bg:"rgba(107,114,128,.1)"},
+  };
+  const DEMO = [
+    {id:1, firma:"Migros", stelle:"Product Manager", datum:"2026-02-15", status:"interview", prio:"hoch", notiz:"2. Interview am 20.3."},
+    {id:2, firma:"Swiss Re", stelle:"Risk Analyst", datum:"2026-02-20", status:"pruefung", prio:"mittel", notiz:""},
+    {id:3, firma:"Nestlé", stelle:"Marketing Manager", datum:"2026-03-01", status:"beworben", prio:"tief", notiz:"Über LinkedIn beworben"},
+  ];
+  const [jobs, setJobs] = useState(DEMO);
+  const [filter, setFilter] = useState("alle");
+  const [modal, setModal] = useState(null); // null | {mode:"add"} | {mode:"edit", job}
+  const [form, setForm] = useState({firma:"",stelle:"",datum:"",status:"beworben",prio:"mittel",notiz:""});
+
+  const filtered = filter==="alle" ? jobs : jobs.filter(j=>j.status===filter);
+  const stats = Object.keys(STATUS).map(k=>({key:k, label:STATUS[k][lang]||STATUS[k].de, count:jobs.filter(j=>j.status===k).length, col:STATUS[k].col}));
+
+  function openAdd() { setForm({firma:"",stelle:"",datum:new Date().toISOString().slice(0,10),status:"beworben",prio:"mittel",notiz:""}); setModal({mode:"add"}); }
+  function openEdit(job) { setForm({...job}); setModal({mode:"edit",job}); }
+  function save() {
+    if(!form.firma||!form.stelle) return;
+    if(modal.mode==="add") setJobs(j=>[...j,{...form,id:Date.now()}]);
+    else setJobs(j=>j.map(x=>x.id===modal.job.id?{...form,id:x.id}:x));
+    setModal(null);
+  }
+  function del(id) { setJobs(j=>j.filter(x=>x.id!==id)); }
+  function changeStatus(id,st) { setJobs(j=>j.map(x=>x.id===id?{...x,status:st}:x)); }
+
+  const prioCol = {hoch:"#ef4444",mittel:"#f59e0b",tief:"#6b7280"};
+
+  return (
+    <div style={{minHeight:"80vh",background:"var(--bg)"}}>
+      {/* Header */}
+      <div className="page-hdr dk" style={{paddingBottom:32}}>
+        <div className="con" style={{maxWidth:900}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+            <button onClick={()=>navTo("landing")} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"rgba(255,255,255,.7)",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontFamily:"var(--bd)"}}>← {L("Zurück","Back","Retour","Indietro")}</button>
+            {!pro && <span style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20}}>PRO</span>}
+          </div>
+          <h1>📋 {L("Bewerbungs-Tracker","Application Tracker","Suivi des candidatures","Tracker candidature")}</h1>
+          <p>{L("Alle Bewerbungen im Überblick – Status, Priorität, Notizen.","All applications at a glance – status, priority, notes.","Toutes les candidatures – statut, priorité, notes.","Tutte le candidature – stato, priorità, note.")}</p>
+        </div>
+      </div>
+
+      {!pro ? (
+        <div className="abody" style={{maxWidth:640,textAlign:"center"}}>
+          <div className="ipw">
+            <h3>📋 {L("Bewerbungs-Tracker freischalten","Unlock Application Tracker","Débloquer le tracker","Sblocca il tracker")}</h3>
+            <p>{L("Behalte alle Bewerbungen im Blick. Status, Priorität, Notizen – alles an einem Ort.","Keep all applications in view. Status, priority, notes – all in one place.","Suivez toutes vos candidatures. Statut, priorité, notes – tout en un.","Tieni traccia di tutte le candidature. Stato, priorità, note – tutto in un posto.")}</p>
+            <div className="ipw-pr">CHF {C.priceM}<span>/Mo.</span></div>
+            <div className="ipw-fts">
+              {["📋 Tracker","✍️ Bewerbungen","🤖 ATS","📜 Zeugnis","🎯 Matching"].map(f=><span key={f} className="ipw-ft">✓ {f}</span>)}
+            </div>
+            <button className="btn b-em b-lg b-w" onClick={()=>setPw(true)}>✦ {L("Pro freischalten →","Unlock Pro →","Activer Pro →","Attiva Pro →")}</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{maxWidth:900,margin:"0 auto",padding:"32px 20px 80px"}}>
+          {/* Stats */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10,marginBottom:24}}>
+            <div onClick={()=>setFilter("alle")} style={{cursor:"pointer",padding:"14px 16px",background:filter==="alle"?"var(--ink)":"white",border:"1.5px solid "+(filter==="alle"?"var(--ink)":"var(--bo)"),borderRadius:12,textAlign:"center"}}>
+              <div style={{fontFamily:"var(--hd)",fontSize:26,fontWeight:800,color:filter==="alle"?"white":"var(--ink)"}}>{jobs.length}</div>
+              <div style={{fontSize:11,color:filter==="alle"?"rgba(255,255,255,.6)":"var(--mu)",marginTop:3}}>{L("Alle","All","Toutes","Tutte")}</div>
+            </div>
+            {stats.map(s=>(
+              <div key={s.key} onClick={()=>setFilter(filter===s.key?"alle":s.key)} style={{cursor:"pointer",padding:"14px 16px",background:filter===s.key?s.col:"white",border:"1.5px solid "+(filter===s.key?s.col:"var(--bo)"),borderRadius:12,textAlign:"center",transition:"all .18s"}}>
+                <div style={{fontFamily:"var(--hd)",fontSize:26,fontWeight:800,color:filter===s.key?"white":s.col}}>{s.count}</div>
+                <div style={{fontSize:11,color:filter===s.key?"rgba(255,255,255,.7)":"var(--mu)",marginTop:3}}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add button */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{fontSize:13,color:"var(--mu)"}}>{filtered.length} {L("Einträge","entries","entrées","voci")}</div>
+            <button className="btn b-em b-sm" onClick={openAdd}>+ {L("Neue Bewerbung","New application","Nouvelle candidature","Nuova candidatura")}</button>
+          </div>
+
+          {/* List */}
+          {filtered.length===0 ? (
+            <div style={{textAlign:"center",padding:"48px 20px",color:"var(--mu)",fontSize:14}}>
+              {L("Keine Bewerbungen in dieser Kategorie.","No applications in this category.","Aucune candidature dans cette catégorie.","Nessuna candidatura in questa categoria.")}
+            </div>
+          ) : filtered.map(job=>(
+            <div key={job.id} style={{background:"white",border:"1.5px solid var(--bo)",borderRadius:14,padding:"16px 20px",marginBottom:10,display:"flex",flexWrap:"wrap",gap:12,alignItems:"flex-start",transition:"box-shadow .18s"}}>
+              <div style={{flex:1,minWidth:200}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                  <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700}}>{job.stelle}</div>
+                  <div style={{width:8,height:8,borderRadius:"50%",background:prioCol[job.prio],flexShrink:0}} title={job.prio}/>
+                </div>
+                <div style={{fontSize:13,color:"var(--mu)",marginBottom:job.notiz?6:0}}>{job.firma} · {job.datum}</div>
+                {job.notiz && <div style={{fontSize:12,color:"var(--mu)",background:"var(--bos)",borderRadius:6,padding:"4px 9px",display:"inline-block"}}>{job.notiz}</div>}
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
+                <select value={job.status} onChange={e=>changeStatus(job.id,e.target.value)}
+                  style={{padding:"5px 10px",borderRadius:8,border:"1.5px solid",borderColor:STATUS[job.status].col,background:STATUS[job.status].bg,color:STATUS[job.status].col,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"var(--bd)"}}>
+                  {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v[lang]||v.de}</option>)}
+                </select>
+                <button onClick={()=>openEdit(job)} style={{background:"none",border:"1px solid var(--bo)",borderRadius:8,padding:"5px 10px",fontSize:12,cursor:"pointer",fontFamily:"var(--bd)",color:"var(--ink)"}}>✏️</button>
+                <button onClick={()=>del(job.id)} style={{background:"none",border:"1px solid rgba(239,68,68,.2)",borderRadius:8,padding:"5px 10px",fontSize:12,cursor:"pointer",color:"#ef4444",fontFamily:"var(--bd)"}}>✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal */}
+      {modal && (
+        <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)setModal(null)}}>
+          <div className="mod" style={{maxWidth:520}}>
+            <h2 style={{marginBottom:20}}>{modal.mode==="add"?L("Neue Bewerbung","New application","Nouvelle candidature","Nuova candidatura"):L("Bearbeiten","Edit","Modifier","Modifica")}</h2>
+            <div className="fg2" style={{textAlign:"left"}}>
+              <div className="field"><label>{L("Stelle *","Position *","Poste *","Posizione *")}</label><input value={form.stelle} onChange={e=>setForm(f=>({...f,stelle:e.target.value}))} placeholder={L("z.B. Product Manager","e.g. Product Manager","ex. Chef de produit","es. Product Manager")}/></div>
+              <div className="field"><label>{L("Firma *","Company *","Entreprise *","Azienda *")}</label><input value={form.firma} onChange={e=>setForm(f=>({...f,firma:e.target.value}))} placeholder={L("z.B. Nestlé AG","e.g. Nestlé AG","ex. Nestlé SA","es. Nestlé SA")}/></div>
+              <div className="field"><label>{L("Datum","Date","Date","Data")}</label><input type="date" value={form.datum} onChange={e=>setForm(f=>({...f,datum:e.target.value}))}/></div>
+              <div className="field"><label>Status</label>
+                <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} style={{width:"100%",padding:"10px 13px",border:"1.5px solid var(--bo)",borderRadius:10,fontFamily:"var(--bd)",fontSize:14,background:"#fafafa"}}>
+                  {Object.entries(STATUS).map(([k,v])=><option key={k} value={k}>{v[lang]||v.de}</option>)}
+                </select>
+              </div>
+              <div className="field"><label>{L("Priorität","Priority","Priorité","Priorità")}</label>
+                <select value={form.prio} onChange={e=>setForm(f=>({...f,prio:e.target.value}))} style={{width:"100%",padding:"10px 13px",border:"1.5px solid var(--bo)",borderRadius:10,fontFamily:"var(--bd)",fontSize:14,background:"#fafafa"}}>
+                  <option value="hoch">{L("Hoch","High","Haute","Alta")}</option>
+                  <option value="mittel">{L("Mittel","Medium","Moyenne","Media")}</option>
+                  <option value="tief">{L("Tief","Low","Basse","Bassa")}</option>
+                </select>
+              </div>
+            </div>
+            <div className="field" style={{textAlign:"left",marginTop:12}}>
+              <label>{L("Notiz","Note","Note","Nota")}</label>
+              <textarea value={form.notiz} onChange={e=>setForm(f=>({...f,notiz:e.target.value}))} placeholder={L("z.B. Nächster Schritt, Kontaktperson…","e.g. Next step, contact person…","ex. Prochaine étape, contact…","es. Prossimo passo, contatto…")} style={{width:"100%",padding:"10px 13px",border:"1.5px solid var(--bo)",borderRadius:10,fontFamily:"var(--bd)",fontSize:14,background:"#fafafa",minHeight:64,resize:"none"}}/>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:20}}>
+              <button className="btn b-outd" style={{flex:1}} onClick={()=>setModal(null)}>{L("Abbrechen","Cancel","Annuler","Annulla")}</button>
+              <button className="btn b-em" style={{flex:1}} onClick={save} disabled={!form.firma||!form.stelle}>{L("Speichern","Save","Enregistrer","Salva")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ════════════════════════════════════════
+// 🔐 AUTH MODAL (Login / Registrierung / Admin)
+function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const [mode, setMode] = useState(defaultMode); // "login"|"register"|"forgot"|"reset"
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+
+  const inp = {background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",borderRadius:12,padding:"12px 14px",width:"100%",color:"white",fontFamily:"inherit",fontSize:14,outline:"none",boxSizing:"border-box",transition:"border-color .2s"};
+
+  const GOOGLE_CLIENT_ID = "370460173343-bnc71e8tib764unofcd6sqf7slesehih.apps.googleusercontent.com";
+  const handleGoogleLogin = () => {
+    const redirect = encodeURIComponent(window.location.origin + "/api/auth/google");
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirect}&response_type=code&scope=email%20profile&prompt=select_account`;
+  };
+
+  function handleLogin(e) {
+    e.preventDefault(); setErr(""); setLoading(true);
+    setTimeout(()=>{
+      if(authIsAdmin(email,pw)){ onSuccess({email,plan:"admin",isAdmin:true}); return; }
+      const r = authLogin(email, pw);
+      if(r.ok) onSuccess(r.user);
+      else setErr(r.err);
+      setLoading(false);
+    },400);
+  }
+
+  function handleRegister(e) {
+    e.preventDefault(); setErr("");
+    if(!email.includes("@")) return setErr(L("Ungültige E-Mail.","Invalid email.","E-mail invalide.","E-mail non valida."));
+    if(pw.length<6) return setErr(L("Passwort mind. 6 Zeichen.","Password min. 6 chars.","Min. 6 caractères.","Min. 6 caratteri."));
+    if(pw!==pw2) return setErr(L("Passwörter stimmen nicht überein.","Passwords don't match.","Mots de passe différents.","Password diverse."));
+    setLoading(true);
+    setTimeout(()=>{
+      const r = authRegister(email, pw, "free");
+      if(r.ok) onSuccess(r.user);
+      else setErr(r.err);
+      setLoading(false);
+    },400);
+  }
+
+  function handleForgot(e) {
+    e.preventDefault(); setErr(""); setLoading(true);
+    setTimeout(()=>{
+      const r = authRequestReset(email);
+      if(r.ok) {
+        setInfo(r.msg);
+        setMode("reset");
+      } else setErr(r.err);
+      setLoading(false);
+    },400);
+  }
+
+  function handleReset(e) {
+    e.preventDefault(); setErr("");
+    if(newPw.length<6) return setErr(L("Passwort mind. 6 Zeichen.","Min. 6 chars.","Min. 6 car.","Min. 6 car."));
+    const r = authResetPassword(resetToken.toUpperCase(), newPw);
+    if(r.ok) { setInfo(L("Passwort geändert! Bitte einloggen.","Password changed! Please sign in.","Mot de passe changé!","Password cambiata!")); setMode("login"); }
+    else setErr(r.err);
+  }
+
+  return (
+    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
+      <div className="mod" style={{maxWidth:420,textAlign:"left",padding:"32px"}}>
+
+        {/* Logo */}
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{fontSize:28,fontFamily:"var(--hd)",fontWeight:800,color:"white",letterSpacing:"-1px"}}>
+            Stellify<span style={{color:"var(--em)"}}>.</span>
+          </div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.3)",marginTop:2}}>AI Career Copilot Schweiz</div>
+        </div>
+
+        {/* Tabs */}
+        {(mode==="login"||mode==="register") && (
+          <div style={{display:"flex",gap:4,background:"rgba(255,255,255,.06)",borderRadius:12,padding:4,marginBottom:24}}>
+            {[["login",L("Einloggen","Sign in","Connexion","Accedi")],["register",L("Registrieren","Register","S'inscrire","Registrati")]].map(([m,lbl])=>(
+              <button key={m} onClick={()=>{setMode(m);setErr("");setInfo("");}}
+                style={{flex:1,padding:"9px 0",borderRadius:9,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:13,fontWeight:700,transition:"all .2s",
+                  background:mode===m?"var(--em)":"transparent",color:mode===m?"white":"rgba(255,255,255,.4)"}}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Google Button */}
+        {(mode==="login"||mode==="register") && (
+          <>
+            <button onClick={handleGoogleLogin}
+              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:10,background:"white",border:"none",borderRadius:12,padding:"12px",cursor:"pointer",fontFamily:"inherit",fontSize:14,fontWeight:600,color:"#1a1a2e",boxShadow:"0 2px 8px rgba(0,0,0,.15)",transition:"all .2s",marginBottom:16}}
+              onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 16px rgba(0,0,0,.25)"}
+              onMouseLeave={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,.15)"}>
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              {L("Mit Google fortfahren","Continue with Google","Continuer avec Google","Continua con Google")}
+            </button>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+              <div style={{flex:1,height:1,background:"rgba(255,255,255,.1)"}}/>
+              <span style={{fontSize:11,color:"rgba(255,255,255,.3)",fontWeight:500}}>{L("oder mit E-Mail","or with email","ou avec e-mail","o con e-mail")}</span>
+              <div style={{flex:1,height:1,background:"rgba(255,255,255,.1)"}}/>
+            </div>
+          </>
+        )}
+
+        {/* Login Form */}
+        {mode==="login" && <>
+          <form onSubmit={handleLogin} style={{display:"flex",flexDirection:"column",gap:10}}>
+            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
+            <div style={{position:"relative"}}>
+              <input type={showPw?"text":"password"} placeholder={L("Passwort","Password","Mot de passe","Password")} value={pw} onChange={e=>setPw(e.target.value)} required style={{...inp,paddingRight:44}} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
+              <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.3)",fontSize:16}}>{showPw?"🙈":"👁"}</button>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <button type="button" onClick={()=>{setMode("forgot");setErr("");setInfo("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,.35)",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>
+                {L("Passwort vergessen?","Forgot password?","Mot de passe oublié?","Password dimenticata?")}
+              </button>
+            </div>
+            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:8,border:"1px solid rgba(239,68,68,.2)"}}>{err}</div>}
+            {info&&<div style={{color:"#10b981",fontSize:12,padding:"8px 12px",background:"rgba(16,185,129,.08)",borderRadius:8}}>{info}</div>}
+            <button type="submit" className="btn b-em b-w" disabled={loading} style={{marginTop:4,padding:"13px"}}>
+              {loading?"⏳ …":L("Einloggen →","Sign in →","Connexion →","Accedi →")}
+            </button>
+          </form>
+          <div style={{textAlign:"center",marginTop:14,fontSize:12,color:"rgba(255,255,255,.25)"}}>
+            {L("Noch kein Konto?","No account yet?","Pas encore de compte?","Nessun account?")} <button onClick={()=>{setMode("register");setErr("");}} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:700,fontSize:12}}>{L("Gratis registrieren","Register free","S'inscrire","Registrati")}</button>
+          </div>
+        </>}
+
+        {/* Register Form */}
+        {mode==="register" && <>
+          <form onSubmit={handleRegister} style={{display:"flex",flexDirection:"column",gap:10}}>
+            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
+            <div style={{position:"relative"}}>
+              <input type={showPw?"text":"password"} placeholder={L("Passwort (mind. 6 Zeichen)","Password (min. 6 chars)","Mot de passe (min. 6 car.)","Password (min. 6 car.)")} value={pw} onChange={e=>setPw(e.target.value)} required style={{...inp,paddingRight:44}} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
+              <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.3)",fontSize:16}}>{showPw?"🙈":"👁"}</button>
+            </div>
+            <input type="password" placeholder={L("Passwort wiederholen","Repeat password","Répétez le mot de passe","Ripeti password")} value={pw2} onChange={e=>setPw2(e.target.value)} required style={inp} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
+            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:8,border:"1px solid rgba(239,68,68,.2)"}}>{err}</div>}
+            <button type="submit" className="btn b-em b-w" disabled={loading} style={{marginTop:4,padding:"13px"}}>
+              {loading?"⏳ …":L("Konto erstellen →","Create account →","Créer →","Crea →")}
+            </button>
+          </form>
+          <div style={{textAlign:"center",marginTop:14,fontSize:11,color:"rgba(255,255,255,.2)",lineHeight:1.6}}>
+            {L("Mit der Registrierung stimmst du den AGB und der Datenschutzerklärung zu.","By registering you agree to our Terms and Privacy Policy.","En vous inscrivant vous acceptez les CGU.","Registrandoti accetti i T&C.")}
+          </div>
+          <div style={{textAlign:"center",marginTop:10,fontSize:12,color:"rgba(255,255,255,.25)"}}>
+            {L("Bereits ein Konto?","Already have an account?","Déjà un compte?","Hai già un account?")} <button onClick={()=>{setMode("login");setErr("");}} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:700,fontSize:12}}>{L("Einloggen","Sign in","Connexion","Accedi")}</button>
+          </div>
+        </>}
+
+        {/* Passwort vergessen */}
+        {mode==="forgot" && <>
+          <h2 style={{fontSize:20,marginBottom:4}}>🔑 {L("Passwort zurücksetzen","Reset password","Réinitialiser","Reimposta")}</h2>
+          <p style={{fontSize:13,color:"rgba(255,255,255,.4)",marginBottom:20}}>{L("Gib deine E-Mail ein. Du erhältst einen Reset-Code.","Enter your email. You'll receive a reset code.","Entrez votre e-mail. Vous recevrez un code.","Inserisci l'email per ricevere il codice.")}</p>
+          <form onSubmit={handleForgot} style={{display:"flex",flexDirection:"column",gap:10}}>
+            <input type="email" placeholder="E-Mail" value={email} onChange={e=>setEmail(e.target.value)} required style={inp} onFocus={e=>e.target.style.borderColor="var(--em)"} onBlur={e=>e.target.style.borderColor="rgba(255,255,255,.12)"}/>
+            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:8}}>{err}</div>}
+            <button type="submit" className="btn b-em b-w" disabled={loading} style={{padding:"13px"}}>
+              {loading?"⏳ …":L("Code senden →","Send code →","Envoyer →","Invia →")}
+            </button>
+          </form>
+          <div style={{textAlign:"center",marginTop:14}}>
+            <button onClick={()=>{setMode("login");setErr("");}} style={{background:"none",border:"none",color:"rgba(255,255,255,.3)",cursor:"pointer",fontSize:12}}>← {L("Zurück","Back","Retour","Indietro")}</button>
+          </div>
+        </>}
+
+        {/* Reset Code eingeben */}
+        {mode==="reset" && <>
+          <h2 style={{fontSize:20,marginBottom:4}}>✅ {L("Neues Passwort","New password","Nouveau mot de passe","Nuova password")}</h2>
+          {info&&<div style={{color:"#10b981",fontSize:12,padding:"8px 12px",background:"rgba(16,185,129,.08)",borderRadius:8,marginBottom:14,lineHeight:1.5}}>{info}</div>}
+          <form onSubmit={handleReset} style={{display:"flex",flexDirection:"column",gap:10}}>
+            <input placeholder={L("Reset-Code eingeben","Enter reset code","Code de réinitialisation","Codice reset")} value={resetToken} onChange={e=>setResetToken(e.target.value)} required style={{...inp,fontFamily:"monospace",letterSpacing:2,textTransform:"uppercase"}}/>
+            <input type="password" placeholder={L("Neues Passwort","New password","Nouveau mot de passe","Nuova password")} value={newPw} onChange={e=>setNewPw(e.target.value)} required style={inp}/>
+            {err&&<div style={{color:"#ef4444",fontSize:12,padding:"8px 12px",background:"rgba(239,68,68,.08)",borderRadius:8}}>{err}</div>}
+            <button type="submit" className="btn b-em b-w" style={{padding:"13px"}}>
+              {L("Passwort ändern →","Change password →","Changer →","Cambia →")}
+            </button>
+          </form>
+        </>}
+
+        <div style={{textAlign:"center",marginTop:20}}>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,.2)",cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>
+            {L("Schliessen","Close","Fermer","Chiudi")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ════════════════════════════════════════
+// 🛡️ ADMIN DASHBOARD
+function MemberPanel({ lang, session, onClose }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const [members, setMembers] = React.useState([]);
+  const [newEmail, setNewEmail] = React.useState("");
+  const [err, setErr] = React.useState("");
+  const [ok, setOk] = React.useState("");
+  const maxSeats = 9999999;
+  const planLabel = session.plan==="family" ? L("Familie","Family","Famille","Famiglia") : "Team";
+
+  React.useEffect(()=>{
+    const users = JSON.parse(localStorage.getItem("stf_auth_users")||"[]");
+    const owner = users.find(u=>u.email.toLowerCase()===session.email.toLowerCase());
+    setMembers(owner?.members||[session.email]);
+  },[]);
+
+  const add = () => {
+    setErr(""); setOk("");
+    if(!newEmail.trim()) return;
+    const res = authAddMember(session.email, newEmail.trim());
+    if(res.ok){
+      setMembers(m=>[...m, newEmail.trim().toLowerCase()]);
+      setNewEmail("");
+      setOk(L("Mitglied hinzugefügt ✓","Member added ✓","Membre ajouté ✓","Membro aggiunto ✓"));
+    } else { setErr(res.err); }
+  };
+
+  const remove = (email) => {
+    if(email.toLowerCase()===session.email.toLowerCase()) return;
+    const users = JSON.parse(localStorage.getItem("stf_auth_users")||"[]");
+    const owner = users.find(u=>u.email.toLowerCase()===session.email.toLowerCase());
+    if(owner){ owner.members = owner.members.filter(m=>m!==email.toLowerCase()); localStorage.setItem("stf_auth_users", JSON.stringify(users)); }
+    setMembers(m=>m.filter(x=>x!==email.toLowerCase()));
+  };
+
+  return (
+    <div className="mbg" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="mod" style={{maxWidth:460,textAlign:"left"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div>
+            <h2 style={{fontSize:20,margin:0}}>👥 {planLabel}-{L("Mitglieder","Members","Membres","Membri")}</h2>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:3}}>{members.length}/{maxSeats} {L("Plätze belegt","seats used","places occupées","posti occupati")}</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,.4)",fontSize:20,cursor:"pointer"}}>✕</button>
+        </div>
+
+        {/* Mitgliederliste */}
+        <div style={{marginBottom:16}}>
+          {members.map((m,i)=>(
+            <div key={m} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:"rgba(255,255,255,.04)",borderRadius:9,marginBottom:6,border:"1px solid rgba(255,255,255,.07)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:9}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,var(--em),#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"white"}}>{m[0].toUpperCase()}</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:600,color:"white"}}>{m}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,.3)"}}>{i===0?L("Admin (du)","Admin (you)","Admin (vous)","Admin (tu)"):L("Mitglied","Member","Membre","Membro")}</div>
+                </div>
+              </div>
+              {i>0&&<button onClick={()=>remove(m)} style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.2)",color:"#f87171",borderRadius:7,padding:"4px 9px",fontSize:11,cursor:"pointer",fontWeight:600}}>
+                {L("Entfernen","Remove","Retirer","Rimuovi")}
+              </button>}
+            </div>
+          ))}
+        </div>
+
+        {/* E-Mail hinzufügen */}
+        {members.length < maxSeats ? (
+          <div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginBottom:8}}>{L("E-Mail-Adresse des neuen Mitglieds eingeben:","Enter the email address of the new member:","Entrez l'adresse e-mail du nouveau membre:","Inserisci l'indirizzo e-mail del nuovo membro:")}</div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={newEmail} onChange={e=>setNewEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()}
+                placeholder="name@beispiel.ch" type="email"
+                style={{flex:1,padding:"9px 12px",borderRadius:9,border:"1.5px solid rgba(255,255,255,.12)",background:"rgba(255,255,255,.06)",color:"white",fontFamily:"var(--bd)",fontSize:13,outline:"none"}}/>
+              <button onClick={add} className="btn b-em b-sm">{L("Hinzufügen","Add","Ajouter","Aggiungi")}</button>
+            </div>
+            {err&&<div style={{color:"#f87171",fontSize:12,marginTop:7}}>{err}</div>}
+            {ok&&<div style={{color:"var(--em)",fontSize:12,marginTop:7}}>{ok}</div>}
+            <div style={{fontSize:11,color:"rgba(255,255,255,.25)",marginTop:10,lineHeight:1.6}}>
+              {L("Das Mitglied muss sich mit dieser E-Mail bei Stellify registrieren, um Zugang zu erhalten.","The member must register at Stellify with this email to gain access.","Le membre doit s'inscrire sur Stellify avec cet e-mail pour accéder.","Il membro deve registrarsi su Stellify con questa email per accedere.")}
+            </div>
+          </div>
+        ) : (
+          <div style={{textAlign:"center",padding:"16px",background:"rgba(245,158,11,.08)",borderRadius:10,border:"1px solid rgba(245,158,11,.2)",fontSize:13,color:"rgba(245,158,11,.8)"}}>
+            {L(`Alle ${maxSeats} Plätze belegt.`,`All ${maxSeats} seats used.`,`Les ${maxSeats} places sont occupées.`,`Tutti i ${maxSeats} posti sono occupati.`)}
+          </div>
+        )}
+
+        <button className="btn b-out b-sm" style={{width:"100%",marginTop:18,borderColor:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.5)"}} onClick={onClose}>
+          {L("Schliessen","Close","Fermer","Chiudi")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+function AdminDashboard({ lang, onClose }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const [tab, setTab] = useState("users");
+  const [search, setSearch] = useState("");
+  const users = authGetUsers();
+  const chats = (() => { try { return JSON.parse(localStorage.getItem("stf_chats")||"[]"); } catch { return []; }})();
+
+  const filtered = users.filter(u=>
+    u.email.includes(search.toLowerCase()) || (u.plan||"").includes(search.toLowerCase())
+  );
+
+  const stats = {
+    total: users.length,
+    pro: users.filter(u=>u.plan==="pro").length,
+    ultimate: users.filter(u=>u.plan==="ultimate").length,
+    free: users.filter(u=>!u.plan||u.plan==="free").length,
+  };
+
+  const PLAN_COLORS = {pro:"#10b981",ultimate:"#f59e0b",free:"rgba(255,255,255,.2)"};
+
+  return (
+    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
+      <div className="mod" style={{maxWidth:700,textAlign:"left",maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+          <div>
+            <h2 style={{fontSize:22,margin:0}}>🛡️ Admin Dashboard</h2>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>{C.name} · {C.domain}</div>
+          </div>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,padding:"6px 12px",color:"rgba(255,255,255,.5)",cursor:"pointer",fontSize:12}}>✕ Schliessen</button>
+        </div>
+
+        {/* Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
+          {[["👥","Total",stats.total,"rgba(255,255,255,.06)"],["✦","Pro",stats.pro,"rgba(16,185,129,.1)"],["♾️","Ultimate",stats.ultimate,"rgba(245,158,11,.1)"],["🆓","Free",stats.free,"rgba(255,255,255,.04)"]].map(([ico,lbl,val,bg])=>(
+            <div key={lbl} style={{background:bg,border:"1px solid rgba(255,255,255,.08)",borderRadius:12,padding:"12px 14px",textAlign:"center"}}>
+              <div style={{fontSize:20}}>{ico}</div>
+              <div style={{fontFamily:"var(--hd)",fontSize:22,fontWeight:800,color:"white",lineHeight:1}}>{val}</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.3)",marginTop:2}}>{lbl}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:4,background:"rgba(255,255,255,.04)",borderRadius:10,padding:4,marginBottom:16}}>
+          {[["users",L("Nutzer","Users","Utilisateurs","Utenti")],["chats","Chats"]].map(([t,l])=>(
+            <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"7px 0",borderRadius:7,border:"none",cursor:"pointer",fontFamily:"inherit",fontSize:12,fontWeight:700,background:tab===t?"rgba(255,255,255,.1)":"transparent",color:tab===t?"white":"rgba(255,255,255,.35)"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {tab==="users" && <>
+          <input placeholder={L("Suchen…","Search…","Rechercher…","Cerca…")} value={search} onChange={e=>setSearch(e.target.value)}
+            style={{width:"100%",padding:"9px 13px",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,color:"white",fontFamily:"inherit",fontSize:13,outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
+          {filtered.length===0 && <div style={{textAlign:"center",padding:24,color:"rgba(255,255,255,.25)",fontSize:13}}>Keine Nutzer gefunden</div>}
+          {filtered.map(u=>(
+            <div key={u.email} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
+                {u.plan==="ultimate"?"♾️":u.plan==="pro"?"✦":"👤"}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:700,color:"white",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:1}}>
+                  {new Date(u.activatedAt||0).toLocaleDateString("de-CH")} · {(u.members||[]).length}/{u.seats} Seats
+                </div>
+              </div>
+              <div style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,background:`${PLAN_COLORS[u.plan]||PLAN_COLORS.free}22`,color:PLAN_COLORS[u.plan]||"rgba(255,255,255,.4)",border:`1px solid ${PLAN_COLORS[u.plan]||"rgba(255,255,255,.1)"}44`,flexShrink:0,textTransform:"uppercase"}}>
+                {u.plan||"Free"}
+              </div>
+            </div>
+          ))}
+        </>}
+
+        {tab==="chats" && <>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.3)",marginBottom:12}}>{chats.length} {L("gespeicherte Chats (aktuelle Session)","saved chats (current session)","chats enregistrés","chat salvate")}</div>
+          {chats.slice(0,20).map((c,i)=>(
+            <div key={c.id||i} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",borderRadius:10,padding:"10px 13px",marginBottom:6}}>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.7)"}}>{c.title||"Chat"}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.25)",marginTop:2}}>{c.msgs?.length||0} Nachrichten · {new Date(c.ts||0).toLocaleString("de-CH")}</div>
+            </div>
+          ))}
+        </>}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════
+// 👤 PROFIL-MANAGER MODAL
+function ProfileManager({ lang, onClose, onSelect }) {
+  const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
+  const [profiles, setProfiles] = useState(() => loadProfiles());
+  const [activeId, setActiveId] = useState(() => loadActiveProfileId());
+  const [editing, setEditing] = useState(null); // null | {mode:"new"} | {mode:"edit", id}
+  const EMPTY = {name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:"",emoji:"👤"};
+  const [form, setForm] = useState(EMPTY);
+
+  const EMOJIS = ["👤","👨‍💼","👩‍💼","👨‍💻","👩‍💻","👨‍🔬","👩‍🔬","👨‍🎓","👩‍🎓","🧑‍⚕️","🧑‍🏫","🧑‍🎨","🧑‍🔧"];
+
+  function openNew() { setForm({...EMPTY, id: "p"+Date.now()}); setEditing({mode:"new"}); }
+  function openEdit(p) { setForm({...p}); setEditing({mode:"edit",id:p.id}); }
+
+  function save() {
+    if(!form.name) return;
+    let updated;
+    if(editing.mode==="new") {
+      updated = [...profiles, {...form, id: form.id||("p"+Date.now())}];
+    } else {
+      updated = profiles.map(p => p.id===editing.id ? {...form, id:editing.id} : p);
+    }
+    setProfiles(updated);
+    saveProfiles(updated);
+    setEditing(null);
+  }
+
+  function del(id) {
+    const updated = profiles.filter(p => p.id !== id);
+    setProfiles(updated);
+    saveProfiles(updated);
+    if(activeId === id) {
+      const next = updated[0];
+      setActiveId(next ? next.id : null);
+      saveActiveProfileId(next ? next.id : "");
+      onSelect(next || null);
+    }
+  }
+
+  function activate(profile) {
+    setActiveId(profile.id);
+    saveActiveProfileId(profile.id);
+    onSelect(profile);
+    onClose();
+  }
+
+  if(editing) return (
+    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)setEditing(null)}}>
+      <div className="mod" style={{maxWidth:500,textAlign:"left"}}>
+        <h2 style={{marginBottom:4,fontSize:22}}>{editing.mode==="new"?L("Neues Profil","New profile","Nouveau profil","Nuovo profilo"):L("Profil bearbeiten","Edit profile","Modifier profil","Modifica profilo")}</h2>
+        <p style={{marginBottom:18}}>{L("Angaben werden für alle Tools verwendet.","Used across all tools.","Utilisé pour tous les outils.","Usato per tutti gli strumenti.")}</p>
+
+        {/* Emoji Picker */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:10,fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase",color:"rgba(255,255,255,.3)",marginBottom:8}}>{L("Avatar","Avatar","Avatar","Avatar")}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {EMOJIS.map(e=><button key={e} onClick={()=>setForm(f=>({...f,emoji:e}))}
+              style={{width:36,height:36,borderRadius:8,border:`2px solid ${form.emoji===e?"var(--em)":"rgba(255,255,255,.1)"}`,background:form.emoji===e?"rgba(16,185,129,.15)":"rgba(255,255,255,.04)",fontSize:18,cursor:"pointer",transition:"all .15s"}}>{e}</button>)}
+          </div>
+        </div>
+
+        <div className="fg2" style={{gap:10}}>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Vorname & Nachname *","First & Last Name *","Prénom & Nom *","Nome & Cognome *")}</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder={L("z.B. Max Muster","e.g. John Smith","ex. Jean Dupont","es. Mario Rossi")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Aktueller Beruf","Current job","Emploi actuel","Lavoro attuale")}</label><input value={form.beruf} onChange={e=>setForm(f=>({...f,beruf:e.target.value}))} placeholder={L("z.B. Product Manager","e.g. Product Manager","ex. Chef de produit","es. Product Manager")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Erfahrung (Jahre)","Experience (years)","Expérience (ans)","Esperienza (anni)")}</label><input value={form.erfahrung} onChange={e=>setForm(f=>({...f,erfahrung:e.target.value}))} placeholder="z.B. 5" type="number" min="0" max="50" style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+          <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Sprachen","Languages","Langues","Lingue")}</label><input value={form.sprachen} onChange={e=>setForm(f=>({...f,sprachen:e.target.value}))} placeholder={L("z.B. DE, EN, FR","e.g. EN, DE, FR","ex. FR, DE, EN","es. IT, DE, EN")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+        </div>
+        <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Skills","Skills","Compétences","Skills")}</label><textarea value={form.skills} onChange={e=>setForm(f=>({...f,skills:e.target.value}))} placeholder={L("z.B. Python, Projektmanagement, Teamführung","e.g. Python, project management, team leadership","ex. Python, gestion de projet","es. Python, gestione progetti")} style={{width:"100%",padding:"10px 13px",background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",borderRadius:10,color:"white",fontFamily:"var(--bd)",fontSize:14,minHeight:60,resize:"none"}}/></div>
+        <div className="field"><label style={{color:"rgba(255,255,255,.5)"}}>{L("Ausbildung","Education","Formation","Formazione")}</label><input value={form.ausbildung} onChange={e=>setForm(f=>({...f,ausbildung:e.target.value}))} placeholder={L("z.B. BSc Wirtschaftsinformatik, Uni Bern","e.g. BSc Business IT, Uni Berne","ex. BSc Informatique, Uni Berne","es. BSc Informatica, Uni Berna")} style={{background:"rgba(255,255,255,.07)",border:"1.5px solid rgba(255,255,255,.12)",color:"white"}}/></div>
+
+        <div style={{display:"flex",gap:10,marginTop:20}}>
+          <button className="btn b-outd" style={{flex:1,borderColor:"rgba(255,255,255,.15)",color:"rgba(255,255,255,.6)"}} onClick={()=>setEditing(null)}>{L("Abbrechen","Cancel","Annuler","Annulla")}</button>
+          <button className="btn b-em" style={{flex:1}} onClick={save} disabled={!form.name}>{L("Speichern","Save","Enregistrer","Salva")}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mbg" onClick={e=>{if(e.target===e.currentTarget)onClose()}}>
+      <div className="mod" style={{maxWidth:480,textAlign:"left",maxHeight:"85vh",overflowY:"auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+          <div>
+            <h2 style={{fontSize:22,margin:0,marginBottom:2}}>{L("Meine Profile","My Profiles","Mes Profils","I miei Profili")}</h2>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",fontWeight:400}}>{L("Profildaten für die KI (Name, Beruf, Skills…)","Your data for the AI (name, job, skills…)","Vos données pour l'IA (nom, métier, skills…)","I tuoi dati per l'IA (nome, lavoro, skill…)")}</div>
+          </div>
+          <button onClick={openNew} className="btn b-em b-sm">+ {L("Neu","New","Nouveau","Nuovo")}</button>
+        </div>
+
+        {profiles.length===0 && (
+          <div style={{textAlign:"center",padding:"32px 20px",color:"rgba(255,255,255,.3)",fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:10}}>👤</div>
+            <div>{L("Noch kein Profil. Erstelle dein erstes Profil.","No profile yet. Create your first profile.","Pas encore de profil. Créez votre premier profil.","Nessun profilo. Crea il tuo primo profilo.")}</div>
+          </div>
+        )}
+
+        {profiles.map(p=>(
+          <div key={p.id} style={{background:p.id===activeId?"rgba(16,185,129,.08)":"rgba(255,255,255,.04)",border:`1.5px solid ${p.id===activeId?"rgba(16,185,129,.3)":"rgba(255,255,255,.08)"}`,borderRadius:14,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:44,height:44,borderRadius:"50%",background:p.id===activeId?"rgba(16,185,129,.2)":"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0,border:`2px solid ${p.id===activeId?"var(--em)":"rgba(255,255,255,.1)"}`}}>{p.emoji||"👤"}</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:700,color:p.id===activeId?"var(--em)":"white",display:"flex",alignItems:"center",gap:8}}>
+                {p.name}
+                {p.id===activeId && <span style={{fontSize:10,background:"rgba(16,185,129,.2)",color:"var(--em)",padding:"1px 7px",borderRadius:20,fontWeight:700}}>AKTIV</span>}
+              </div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>{p.beruf||"–"}{p.erfahrung?` · ${p.erfahrung} J.`:""}{p.sprachen?` · ${p.sprachen}`:""}</div>
+            </div>
+            <div style={{display:"flex",gap:6,flexShrink:0}}>
+              <button onClick={()=>activate(p)}
+                style={{padding:"5px 12px",borderRadius:8,border:"none",background:p.id===activeId?"var(--em)":"rgba(255,255,255,.1)",color:p.id===activeId?"white":"rgba(255,255,255,.6)",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"var(--bd)"}}>
+                {p.id===activeId?"✓":L("Wählen","Select","Choisir","Scegli")}
+              </button>
+              <button onClick={()=>openEdit(p)} style={{padding:"5px 9px",borderRadius:8,border:"1px solid rgba(255,255,255,.1)",background:"rgba(255,255,255,.04)",color:"rgba(255,255,255,.5)",fontSize:12,cursor:"pointer"}}>✏️</button>
+              <button onClick={()=>del(p.id)} style={{padding:"5px 9px",borderRadius:8,border:"1px solid rgba(239,68,68,.15)",background:"rgba(239,68,68,.06)",color:"#ef4444",fontSize:12,cursor:"pointer"}}>✕</button>
+            </div>
+          </div>
+        ))}
+
+        <button className="btn b-outd b-w" style={{marginTop:8,borderColor:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.5)"}} onClick={onClose}>{L("Schliessen","Close","Fermer","Chiudi")}</button>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════
+  // Nav wird weiter unten in App() definiert
+
+  // Footer wird weiter unten in App() definiert
+
+function PromoBanner({ lang, navTo, setPw, onClose }) {
+  const L2=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]);
+  return (
+    <div style={{position:"fixed",top:0,left:0,right:0,zIndex:500,background:"linear-gradient(135deg,#10b981,#059669)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,boxShadow:"0 2px 12px rgba(16,185,129,.4)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,flex:1,flexWrap:"wrap"}}>
+        <span style={{fontSize:16}}>🎁</span>
+        <span style={{fontSize:13,fontWeight:600,color:"white"}}>
+          {L2(
+            "1× komplett gratis testen – kein Abo, keine Kreditkarte nötig.",
+            "Try once completely free – no subscription, no credit card needed.",
+            "Essai gratuit 1× – sans abonnement ni carte bancaire.",
+            "Prova 1× gratis – senza abbonamento né carta di credito."
+          )}
+        </span>
+        <button
+          onClick={()=>navTo("app")}
+          style={{background:"white",color:"#059669",border:"none",padding:"5px 14px",borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0,transition:"all .2s"}}
+          onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 4px 10px rgba(0,0,0,.15)";}}
+          onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
+          {L2("Jetzt starten →","Start now →","Commencer →","Inizia ora →")}
+        </button>
+      </div>
+      <button
+        onClick={onClose}
+        style={{background:"none",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",fontSize:18,flexShrink:0,padding:"0 4px",lineHeight:1,transition:"color .18s"}}
+        onMouseEnter={e=>e.currentTarget.style.color="white"}
+        onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,.7)"}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
-  const [lang,setLang]=useState("de"); const t=mkT(lang);
+  const [lang,setLang]=useState("de");
+  const t = React.useMemo(()=>mkT(lang), [lang]);
   const [page,setPage]=useState("landing");
   const [pro,setPro]=useState(false); const [usage,setUsage]=useState(0); const [proUsage,setProUsage]=useState(0);
-  const [pw,setPw]=useState(false); const [yearly,setYearly]=useState(false);
+  const [splash,setSplash]=useState(()=>!sessionStorage.getItem("stf_splashed"));
+  const [showPromo,setShowPromo]=useState(()=>{
+    try { return !sessionStorage.getItem("stf_promo_shown"); } catch { return true; }
+  });
+  const closePromo=()=>{ try{sessionStorage.setItem("stf_promo_shown","1");}catch{} setShowPromo(false); };
+  const [showReferral,setShowReferral]=useState(false);
+  const [pw,setPw]=useState(false); const [yearly,setYearly]=useState(true); // Jährlich Standard
+  // Auth
+  const [authSession, setAuthSession] = useState(()=>authGetSession());
+  const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
+  // Multi-Profil
+  const [showProfiles, setShowProfiles] = useState(false);
+  const [activeProfile, setActiveProfile] = useState(()=>{
+    const id = loadActiveProfileId();
+    if(!id) return null;
+    return loadProfiles().find(p=>p.id===id) || null;
+  });
   // app state
   const [step,setStep]=useState(0); const [docType,setDocType]=useState("motivation");
   const [tab,setTab]=useState(0); const [streaming,setStreaming]=useState(false);
@@ -2398,7 +3801,12 @@ export default function App() {
   const [copied,setCopied]=useState(false);
   const [results,setResults]=useState({motivation:"",lebenslauf:""});
   const [job,setJob]=useState({title:"",company:"",desc:"",branch:""});
-  const [prof,setProf]=useState({name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:""});
+  const [prof,setProf]=useState(()=>{
+    const id = loadActiveProfileId();
+    if(!id) return {name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:""};
+    const p = loadProfiles().find(x=>x.id===id);
+    return p ? {name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""} : {name:"",beruf:"",erfahrung:"",skills:"",sprachen:"",ausbildung:""};
+  });
   const [appDoc,setAppDoc]=useState(null); // uploaded CV for app page
   const [ck,setCk]=useState({});
   const [eTo,setETo]=useState(""); const [eSub,setESub]=useState(""); const [eMsg,setEMsg]=useState("");
@@ -2420,15 +3828,69 @@ export default function App() {
   // pptx
   const [ppTask,setPpTask]=useState(""); const [ppSlides,setPpSlides]=useState(""); const [ppTone,setPpTone]=useState("professional"); const [ppRes,setPpRes]=useState(null); const [ppLoad,setPpLoad]=useState(false);
   // cookie banner
-  const [cookieBanner,setCookieBanner]=useState(()=>{ try { return !localStorage.getItem("stf_cookie"); } catch{ return true; } });
-  const acceptCookie=(all)=>{ try { localStorage.setItem("stf_cookie",all?"all":"essential"); } catch{} setCookieBanner(false); };
+  const [cookieBanner,setCookieBanner]=useState(()=>{
+    try {
+      const v = localStorage.getItem("stf_cookie_v2");
+      return !v;
+    } catch { return true; }
+  });
+  const acceptCookie=(all)=>{ try { localStorage.setItem("stf_cookie_v2",all?"all":"essential"); } catch{} setCookieBanner(false); };
+
+  // Promo-Modal: erscheint nach 8 Sekunden beim ersten Besuch
+  useEffect(()=>{
+    const seen = sessionStorage.getItem("stf_promo_seen");
+    if(!seen) {
+      const timer = setTimeout(()=>{
+        setShowPromo(true);
+        sessionStorage.setItem("stf_promo_seen","1");
+      }, 8000);
+      return ()=>clearTimeout(timer);
+    }
+  },[]);
+
+  // PromoModal Komponente
+  const PromoModal=()=>(
+    <div className="mbg" onClick={e=>e.target===e.currentTarget&&closePromo()}>
+      <div className="mod">
+        <div style={{fontSize:36,marginBottom:10}}>🎁</div>
+        <h2>{L("Stellify gratis testen","Try Stellify for free","Essayez Stellify gratuitement","Prova Stellify gratis")}</h2>
+        <p style={{marginBottom:16}}>{L(
+          "1 vollständige KI-Bewerbung kostenlos – ohne Kreditkarte, ohne Abo.",
+          "1 complete AI application for free – no credit card, no subscription.",
+          "1 candidature IA complète gratuitement – sans carte ni abonnement.",
+          "1 candidatura IA completa gratis – senza carta né abbonamento."
+        )}</p>
+        <div className="mod-fts">
+          {[["✍️",L("Motivationsschreiben","Cover letter","Lettre motivation","Lettera motivazione")],
+            ["📄",L("Lebenslauf","CV","CV","CV")],
+            ["🤖","ATS-Check"],
+            ["📜",L("Zeugnis-Analyse","Reference Analysis","Analyse certificat","Analisi certificato")]
+          ].map(([ico,tx])=><div key={tx} className="mod-f"><div className="mod-fi">{ico}</div>{tx}</div>)}
+        </div>
+        <button className="btn b-em b-w" style={{marginBottom:8}} onClick={()=>{ closePromo(); }}>
+          {L("Jetzt kostenlos starten →","Start for free now →","Commencer gratuitement →","Inizia gratis ora →")}
+        </button>
+        <div className="mod-note">{L("Keine Kreditkarte · Kein Abo · Jederzeit kündbar","No credit card · No subscription · Cancel anytime","Sans carte · Sans abonnement · Résiliable","Senza carta · Senza abbonamento · Cancellabile")}</div>
+        <button className="btn b-out b-sm" style={{marginTop:9,width:"100%"}} onClick={closePromo}>
+          {L("Vielleicht später","Maybe later","Peut-être plus tard","Forse dopo")}
+        </button>
+      </div>
+    </div>
+  );
 
   const uj=(k,v)=>setJob(p=>({...p,[k]:v})); const up=(k,v)=>setProf(p=>({...p,[k]:v}));
   const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]);
   const stripeLink=()=>yearly?C.stripeYearly:C.stripeMonthly;
   const canGen=()=>pro?(proUsage<C.PRO_LIMIT):(usage<C.FREE_LIMIT);
-  const canGenPro=()=>proUsage<C.PRO_LIMIT;
-  const nextReset=()=>{const d=new Date();d.setMonth(d.getMonth()+1);d.setDate(1);return d.toLocaleDateString(lang==="de"?"de-CH":lang==="fr"?"fr-CH":lang==="it"?"it-CH":"en-CH",{day:"numeric",month:"long",year:"numeric"});};
+  const canGenPro=()=>authSession?.plan==="ultimate"||proUsage<C.PRO_LIMIT;
+  const nextReset=()=>{
+    const d=new Date();
+    d.setDate(d.getDate()+1);d.setHours(0,0,0,0);
+    const diff=d-new Date();
+    const h=Math.floor(diff/3600000);
+    const min=Math.floor((diff%3600000)/60000);
+    return lang==="de"?`in ${h}h ${min}min (Mitternacht)`:lang==="fr"?`dans ${h}h ${min}min (minuit)`:lang==="it"?`tra ${h}h ${min}min (mezzanotte)`:`in ${h}h ${min}min (midnight)`;
+  };
 
   const curDoc=()=>docType==="beide"?(tab===0?results.motivation:results.lebenslauf):results[docType];
   const setCurDoc=v=>{ if(docType==="beide") setResults(r=>tab===0?{...r,motivation:v}:{...r,lebenslauf:v}); else setResults(r=>({...r,[docType]:v})); };
@@ -2439,20 +3901,47 @@ export default function App() {
     setPage(p);
   };
 
+  const handleGoogleLogin = () => {
+    const clientId = "370460173343-bnc71e8tib764unofcd6sqf7slesehih.apps.googleusercontent.com";
+    const redirect = encodeURIComponent(window.location.origin + "/api/auth/google");
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirect}&response_type=code&scope=email%20profile&prompt=select_account`;
+  };
+
   useEffect(()=>{
-    // Initialen History-Eintrag setzen
     const hash = window.location.hash.replace("#","") || "landing";
     window.history.replaceState({page:hash},"",window.location.href);
     const onPop = (e) => setPage(e.state?.page || "landing");
     window.addEventListener("popstate", onPop);
+    // Google OAuth Session
+    const params = new URLSearchParams(window.location.search);
+    const gs = params.get("google_session");
+    if (gs) {
+      try {
+        const sd = JSON.parse(atob(decodeURIComponent(gs)));
+        const users = authGetUsers();
+        if (!users.find(u=>u.email===sd.email)) authRegister(sd.email,"google-"+Date.now(),"free");
+        const sess = {email:sd.email, plan:authGetUser(sd.email)?.plan||"free", name:sd.name||""};
+        authSetSession(sess); setAuthSession(sess);
+        if(sess.plan==="pro"||sess.plan==="ultimate") setPro(true);
+      } catch(e) { console.error(e); }
+      window.history.replaceState({},"",window.location.pathname);
+    }
     return ()=>window.removeEventListener("popstate", onPop);
   },[]);
 
   useEffect(()=>{
     window.scrollTo(0,0);
     const p=new URLSearchParams(window.location.search);
-    if(p.get("pro")==="activated"){actPro();setPro(true);window.history.replaceState({},"",window.location.pathname);}
-    setUsage(getU().count); setProUsage(getProCount()); setPro(isPro());
+    if(p.get("pro")==="activated"){
+      actPro();setPro(true);window.history.replaceState({},"",window.location.pathname);
+      // Upgrade session if logged in
+      const sess = authGetSession();
+      if(sess) { authUpgradePlan(sess.email,"pro"); setAuthSession({...sess,plan:"pro"}); }
+    }
+    setUsage(getU().count); setProUsage(getProCount());
+    const sess = authGetSession();
+    if(sess) { setAuthSession(sess); if(sess.plan==="pro"||sess.plan==="ultimate") setPro(true); else setPro(isPro()); }
+    else setPro(isPro());
   },[page]);
   useEffect(()=>{if(chatRef.current)chatRef.current.scrollTop=chatRef.current.scrollHeight;},[icMsgs]);
   useEffect(()=>{if(job.title&&prof.name)setESub(`Bewerbung als ${job.title} – ${prof.name}`);},[job.title,prof.name]);
@@ -2542,59 +4031,74 @@ Antworte NUR mit JSON:
 
   // ── SHARED COMPONENTS ──
   const LangSw=()=><div className="ls">{LANGS.map(l=><button key={l} className={`lb ${lang===l?"on":""}`} onClick={()=>setLang(l)}>{FLAGS[l]}</button>)}</div>;
-
+  // ── NAV (innerhalb App) ──────────────────────────────
   const Nav=({dark})=>{
     const [mOpen,setMOpen]=useState(false);
     const lc=dark?"rgba(255,255,255,.38)":"var(--mu)";
     return(
-    <nav style={dark?{background:"rgba(7,7,14,.95)",borderColor:"rgba(255,255,255,.07)"}:{}}>
+    <nav style={dark?{background:"rgba(7,7,14,.82)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",borderColor:"rgba(255,255,255,.07)"}:{}}>
       <div className="ni">
         <div className="logo" onClick={()=>{navTo("landing");setMOpen(false);}} style={dark?{color:"white"}:{}}>{C.name}<div className="logo-dot"/>{pro&&<span className="pb">PRO</span>}</div>
-        {/* Desktop nav */}
         <div className="nl nl-desk">
           <LangSw/>
           <button className="nlk" style={{color:lc}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("tools")?.scrollIntoView({behavior:"smooth"}),100)}}>{t.nav.tools}</button>
           <button className="nlk" style={{color:lc}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"}),100)}}>{t.nav.prices}</button>
-          {pro&&<button className="nlk" style={{color:lc}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("faq")?.scrollIntoView({behavior:"smooth"}),100)}}>FAQ</button>}
           <button className="nlk" style={{color:"var(--em)",fontWeight:700}} onClick={()=>navTo("chat")}>💬 Stella</button>
+          <button onClick={()=>setShowProfiles(true)} style={{display:"flex",alignItems:"center",gap:6,background:activeProfile?"rgba(16,185,129,.12)":"rgba(11,11,18,.06)",border:"1.5px solid",borderColor:activeProfile?"rgba(16,185,129,.25)":"var(--bo)",borderRadius:20,padding:"5px 12px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:600,color:activeProfile?"var(--em2)":dark?"rgba(255,255,255,.5)":"var(--mu)",transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="var(--em)"} onMouseLeave={e=>e.currentTarget.style.borderColor=activeProfile?"rgba(16,185,129,.25)":"var(--bo)"}>
+            <span style={{fontSize:14}}>{activeProfile?.emoji||"👤"}</span>
+            <span style={{maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeProfile?.name||(lang==="de"?"Profil":"Profile")}</span>
+            <span style={{fontSize:10,opacity:.6}}>▾</span>
+          </button>
+          {authSession ? (
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              {authSession.isAdmin&&<button onClick={()=>setShowAdmin(true)} style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(245,158,11,.3)",background:"rgba(245,158,11,.1)",color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer"}}>🛡️ Admin</button>}
+              {authSession&&<button onClick={()=>setShowReferral(true)} style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(245,158,11,.3)",background:"rgba(245,158,11,.06)",color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer"}}>🎁 {lang==="de"?"Freunde":"Refer"}</button>}
+              <button onClick={()=>{if(window.confirm(lang==="de"?`Abmelden?`:`Sign out?`)){authClearSession();setAuthSession(null);if(!isPro())setPro(false);}}} style={{display:"flex",alignItems:"center",gap:7,background:"linear-gradient(135deg,rgba(16,185,129,.18),rgba(16,185,129,.06))",border:"1.5px solid rgba(16,185,129,.35)",borderRadius:24,padding:"5px 14px 5px 5px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:700,color:"var(--em2)"}}>
+                <div style={{width:24,height:24,borderRadius:"50%",background:"linear-gradient(135deg,var(--em),#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"white"}}>{authSession.email[0].toUpperCase()}</div>
+                <span style={{maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{authSession.email.split("@")[0]}</span>
+              </button>
+            </div>
+          ) : (
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>handleGoogleLogin()} style={{display:"flex",alignItems:"center",gap:6,background:"white",border:"1.5px solid #dadce0",borderRadius:24,padding:"5px 12px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:600,color:"#3c4043",boxShadow:"0 1px 3px rgba(0,0,0,.08)"}}>
+                <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Google
+              </button>
+              <button onClick={()=>{setAuthMode("login");setShowAuth(true);}} style={{display:"flex",alignItems:"center",gap:7,background:"linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05))",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:24,padding:"6px 14px 6px 6px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:700,color:"var(--em2)"}}>
+                <div style={{width:24,height:24,borderRadius:"50%",background:"rgba(16,185,129,.2)",border:"1px solid rgba(16,185,129,.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>👤</div>
+                {lang==="de"?"E-Mail":"Email"}
+              </button>
+            </div>
+          )}
           <button className="nc" onClick={()=>navTo("app")}>{lang==="de"?"Kostenlos starten":lang==="fr"?"Commencer":lang==="it"?"Inizia":"Start free"} →</button>
         </div>
-        {/* Mobile hamburger */}
         <button className="ham" onClick={()=>setMOpen(v=>!v)} style={{background:"none",border:"none",cursor:"pointer",display:"none",flexDirection:"column",gap:4,padding:4,color:dark?"white":"var(--ink)"}}>
           <div style={{width:22,height:2,background:"currentColor",borderRadius:2,transition:"all .2s",transform:mOpen?"rotate(45deg) translate(4px,4px)":"none"}}/>
           <div style={{width:22,height:2,background:"currentColor",borderRadius:2,transition:"all .2s",opacity:mOpen?0:1}}/>
           <div style={{width:22,height:2,background:"currentColor",borderRadius:2,transition:"all .2s",transform:mOpen?"rotate(-45deg) translate(4px,-4px)":"none"}}/>
         </button>
       </div>
-      {/* Mobile menu */}
       {mOpen&&<div style={{background:dark?"#0f0f1a":"white",borderTop:"1px solid",borderColor:dark?"rgba(255,255,255,.08)":"var(--bo)",padding:"12px 20px 16px",display:"flex",flexDirection:"column",gap:2}}>
         <LangSw/>
         <div style={{height:10}}/>
-        {[[()=>navTo("app"),lang==="de"?"✍️ Bewerbung schreiben":lang==="fr"?"✍️ Rédiger une candidature":lang==="it"?"✍️ Scrivere candidatura":"✍️ Write application"],
-          [()=>{navTo("landing");setTimeout(()=>document.getElementById("tools")?.scrollIntoView({behavior:"smooth"}),100);setMOpen(false);},lang==="de"?"🔧 Alle Tools":lang==="fr"?"🔧 Tous les outils":lang==="it"?"🔧 Tutti gli strumenti":"🔧 All tools"],
-          [()=>{navTo("landing");setTimeout(()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"}),100);setMOpen(false);},lang==="de"?"💶 Preise":lang==="fr"?"💶 Tarifs":lang==="it"?"💶 Prezzi":"💶 Pricing"],
-          [()=>{navTo("landing");setTimeout(()=>document.getElementById("faq")?.scrollIntoView({behavior:"smooth"}),100);setMOpen(false);},"❓ FAQ"],
-        ].map(([fn,lbl],i)=>(
-          <button key={i} onClick={()=>{fn();setMOpen(false);}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"var(--bd)",fontSize:14,fontWeight:500,color:dark?"rgba(255,255,255,.7)":"var(--ink)",textAlign:"left",padding:"10px 0",borderBottom:i<3?"1px solid":"none",borderColor:dark?"rgba(255,255,255,.07)":"var(--bo)"}}>{lbl}</button>
+        {[[()=>navTo("app"),lang==="de"?"✍️ Bewerbung":"✍️ Application"],[()=>{navTo("landing");setTimeout(()=>document.getElementById("tools")?.scrollIntoView({behavior:"smooth"}),100);setMOpen(false);},lang==="de"?"🔧 Alle Tools":"🔧 All tools"],[()=>{navTo("landing");setTimeout(()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"}),100);setMOpen(false);},lang==="de"?"💶 Preise":"💶 Pricing"]].map(([fn,lbl],i)=>(
+          <button key={i} onClick={()=>{fn();setMOpen(false);}} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"var(--bd)",fontSize:14,fontWeight:500,color:dark?"rgba(255,255,255,.7)":"var(--ink)",textAlign:"left",padding:"10px 0",borderBottom:i<2?"1px solid":"none",borderColor:dark?"rgba(255,255,255,.07)":"var(--bo)"}}>{lbl}</button>
         ))}
-        <button className="btn b-em" style={{marginTop:10,justifyContent:"center"}} onClick={()=>{navTo("app");setMOpen(false);}}>{lang==="de"?"Kostenlos starten →":lang==="fr"?"Commencer →":lang==="it"?"Inizia →":"Start free →"}</button>
+        <button className="btn b-em" style={{marginTop:10,justifyContent:"center"}} onClick={()=>{navTo("app");setMOpen(false);}}>{lang==="de"?"Kostenlos starten →":"Start free →"}</button>
       </div>}
-    </nav>
-    );
+    </nav>);
   };
 
+  // ── FOOTER (innerhalb App) ────────────────────────────
   const Footer=()=>(
     <footer>
-      {/* Trust bar above footer */}
-      <div style={{borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:28,marginBottom:36,maxWidth:1200,margin:"0 auto 0",padding:"0 0 24px"}}>
-        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:"10px 32px"}}>
-          {[
-            {ico:"🔒",txt:lang==="de"?"Keine Datenspeicherung":lang==="fr"?"Aucun stockage de données":lang==="it"?"Nessuna memorizzazione":"No data storage"},
-            {ico:"🇨🇭",txt:lang==="de"?"Schweizer Unternehmen, Zug":lang==="fr"?"Société suisse, Zoug":lang==="it"?"Azienda svizzera, Zugo":"Swiss company, Zug"},
-            {ico:"⚡",txt:lang==="de"?"Powered by Claude AI":lang==="fr"?"Propulsé par Claude AI":lang==="it"?"Alimentato da Claude AI":"Powered by Claude AI"},
-            {ico:"💳",txt:lang==="de"?"Sichere Zahlung via Stripe":lang==="fr"?"Paiement sécurisé via Stripe":lang==="it"?"Pagamento sicuro via Stripe":"Secure payment via Stripe"},
+      <div style={{borderBottom:"1px solid rgba(255,255,255,.05)",padding:"12px 24px",marginBottom:40}}>
+        <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:"8px 36px",maxWidth:900,margin:"0 auto"}}>
+          {[{ico:"🔒",txt:lang==="de"?"Keine Datenspeicherung":"No data storage"},
+            {ico:"🇨🇭",txt:lang==="de"?"Schweizer Unternehmen · Zug":"Swiss company · Zug"},
+            {ico:"🔐",txt:lang==="de"?"Sichere Zahlung via Stripe":"Secure payment via Stripe"},
           ].map((tr,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:7,fontSize:12,color:"rgba(255,255,255,.3)",fontWeight:500}}>
+            <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"rgba(255,255,255,.32)",fontWeight:500}}>
               <span>{tr.ico}</span><span>{tr.txt}</span>
             </div>
           ))}
@@ -2607,35 +4111,29 @@ Antworte NUR mit JSON:
           <div style={{fontSize:12,color:"rgba(255,255,255,.2)",marginBottom:4}}>📍 {C.address}</div>
           <div style={{fontSize:12,color:"rgba(255,255,255,.2)",marginBottom:12}}>✉️ <a href={`mailto:${C.email}`} style={{color:"rgba(255,255,255,.25)",textDecoration:"none"}}>{C.email}</a></div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:14}}>
-            {["Twint","Visa","Mastercard","PayPal","Apple Pay"].map(p=>(
+            {["Twint","Visa","Mastercard","Apple Pay","Google Pay","PostFinance"].map(p=>(
               <div key={p} style={{fontSize:10,fontWeight:700,background:"rgba(255,255,255,.07)",color:"rgba(255,255,255,.35)",padding:"3px 8px",borderRadius:5,border:"1px solid rgba(255,255,255,.08)"}}>{p}</div>
             ))}
           </div>
         </div>
         <div className="fcol"><h5>{t.legal.product}</h5>
-          <button onClick={()=>navTo("app")}>{lang==="de"?"✍️ Bewerbung":lang==="en"?"✍️ Application":lang==="fr"?"✍️ Candidature":"✍️ Candidatura"}</button>
+          <button onClick={()=>navTo("app")}>{lang==="de"?"✍️ Bewerbung":"✍️ Application"}</button>
           <button onClick={()=>navTo("linkedin")}>💼 LinkedIn</button>
-          <button onClick={()=>navTo("ats")}>🤖 {t.nav.ats}</button>
-          <button onClick={()=>navTo("zeugnis")}>📜 {t.nav.zeugnis}</button>
-          <button onClick={()=>navTo("jobmatch")}>🎯 {t.nav.jobs}</button>
-          <button onClick={()=>navTo("excel")}>📊 {t.nav.excel}</button>
-          <button onClick={()=>navTo("pptx")}>📽️ {t.nav.pptx}</button>
-          <button onClick={()=>navTo("coach")}>🎤 {t.nav.coach}</button>
+          <button onClick={()=>navTo("ats")}>🤖 ATS-Check</button>
+          <button onClick={()=>navTo("zeugnis")}>📜 {lang==="de"?"Zeugnis-Analyse":"Reference"}</button>
+          <button onClick={()=>navTo("jobmatch")}>🎯 Job-Matching</button>
+          <button onClick={()=>navTo("coach")}>🎤 Interview-Coach</button>
+          <button onClick={()=>navTo("gehaltsrechner")}>💰 {lang==="de"?"Gehaltsrechner":"Salary"}</button>
+          <button onClick={()=>navTo("tracker")}>📋 {lang==="de"?"Bewerbungs-Tracker":"Tracker"}</button>
         </div>
         <div className="fcol">
-          <h5>{lang==="de"?"Schule & Produktivität":lang==="fr"?"École & Productivité":lang==="it"?"Scuola & Produttività":"School & Productivity"}</h5>
+          <h5>{lang==="de"?"Schule & Produktivität":"School & Productivity"}</h5>
           {GENERIC_TOOLS.map(g=><button key={g.id} onClick={()=>navTo(g.id)}>{g.ico} {g.t[lang]}</button>)}
         </div>
         <div className="fcol"><h5>{t.legal.legalL}</h5>
           <button onClick={()=>navTo("agb")}>{t.legal.agb}</button>
           <button onClick={()=>navTo("datenschutz")}>{t.legal.privacy}</button>
           <button onClick={()=>navTo("impressum")}>{t.legal.imprint}</button>
-          <div style={{marginTop:16,fontSize:12,color:"rgba(255,255,255,.18)",lineHeight:1.6}}>
-            {lang==="de"?"Stellify ist kein Rechts- oder Karriereberater. Alle Angaben ohne Gewähr.":
-             lang==="fr"?"Stellify n'est pas un conseiller juridique ou de carrière.":
-             lang==="it"?"Stellify non è un consulente legale o di carriera.":
-             "Stellify is not a legal or career advisor. All information without guarantee."}
-          </div>
         </div>
       </div>
       <div className="fbot">
@@ -2644,6 +4142,9 @@ Antworte NUR mit JSON:
       </div>
     </footer>
   );
+
+
+  // Nav & Footer defined above App
 
   const PW=()=>(
     <div className="mbg" onClick={e=>e.target===e.currentTarget&&setPw(false)}>
@@ -2668,15 +4169,37 @@ Antworte NUR mit JSON:
       </div>
     </div>
   ):proUsage>=C.PRO_LIMIT?(
-    <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.25)",borderRadius:10,padding:"10px 16px",fontSize:13,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
-      <span>⏳ {L("Monatliches Kontingent aufgebraucht","Monthly quota used up","Quota mensuel épuisé","Monthly quota used up")} · {L("Reset am","Reset on","Réinitialisation le","Reset on")} <strong>{nextReset()}</strong></span>
+    <div style={{background:"linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06))",border:"1.5px solid rgba(245,158,11,.3)",borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+      <div>
+        <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:800,color:"#f59e0b",marginBottom:3}}>
+          ⚡ {L("Tageslimit erreicht – bereit für mehr?","Daily limit reached – ready for more?","Limite quotidien atteint – prêt pour plus?","Limite giornaliero raggiunto?")}
+        </div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,.5)",lineHeight:1.5}}>
+          {L("Du hast heute alle 20 Generierungen genutzt. Ultimate gibt dir unbegrenzte Nutzung – ohne Reset, ohne Warten.",
+             "You've used all 20 generations today. Ultimate gives you unlimited use – no reset, no waiting.",
+             "Vous avez utilisé les 20 générations aujourd'hui. Ultimate offre une utilisation illimitée.",
+             "Hai usato tutte le 20 generazioni oggi. Ultimate offre utilizzo illimitato.")}
+        </div>
+        <div style={{fontSize:11,color:"rgba(245,158,11,.6)",marginTop:4}}>
+          🔄 {L("Pro-Limit erneuert sich morgen früh um 00:00 Uhr","Pro limit resets tomorrow at midnight","Le quota Pro se renouvelle demain à minuit","Il limite Pro si rinnova domani a mezzanotte")}
+        </div>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
+        <button onClick={()=>window.open(C.stripeUltimate,"_blank")} className="btn" style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",border:"none",padding:"10px 20px",fontSize:13,fontWeight:700,borderRadius:10,cursor:"pointer",boxShadow:"0 4px 14px rgba(245,158,11,.4)"}}>
+          ♾️ {L("Ultimate holen →","Get Ultimate →","Obtenir Ultimate →","Ottieni Ultimate →")}
+        </button>
+        <div style={{fontSize:10,color:"rgba(255,255,255,.25)",textAlign:"center"}}>CHF 39.90/Mo. · {L("2 Monate gratis","2 months free","2 mois offerts","2 mesi gratis")}</div>
+      </div>
     </div>
   ):(
     <div className="ubar">
-      <span style={{color:"var(--em)",fontWeight:600}}>✦ Pro · <strong>{C.PRO_LIMIT-proUsage}</strong> {L("von","of","de","of")} {C.PRO_LIMIT} {L("Generierungen übrig","generations left","générations restantes","generations left")}</span>
+      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+        <span style={{color:"var(--em)",fontWeight:700,fontSize:13}}>✦ Pro · <strong>{C.PRO_LIMIT-proUsage}</strong>/{C.PRO_LIMIT} {L("heute noch verfügbar","remaining today","restants aujourd'hui","rimasti oggi")}</span>
+        <span style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>🔄 {L("Reset täglich um 00:00","Resets daily at midnight","Renouvellement quotidien à minuit","Rinnovo quotidiano a mezzanotte")}</span>
+      </div>
       <div style={{display:"flex",alignItems:"center",gap:9}}>
-        <div className="u-tr"><div className="u-fi" style={{width:`${(proUsage/C.PRO_LIMIT)*100}%`,background:"var(--em)"}}/></div>
-        <span style={{fontSize:11,color:"var(--mu)",whiteSpace:"nowrap"}}>↻ {nextReset()}</span>
+        <div className="u-tr"><div className="u-fi" style={{width:`${(proUsage/C.PRO_LIMIT)*100}%`,background:proUsage/C.PRO_LIMIT>0.8?"#f59e0b":"var(--em)"}}/></div>
+        {proUsage/C.PRO_LIMIT>0.6&&<button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{background:"rgba(245,158,11,.15)",border:"1px solid rgba(245,158,11,.3)",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#f59e0b",cursor:"pointer",whiteSpace:"nowrap"}}>♾️ Ultimate</button>}
       </div>
     </div>
   );
@@ -3106,6 +4629,320 @@ DIAPOSITIVA 2 – Punti salienti:
   • Nuovi clienti: 127 (+34%) ✅
 
 NOTE: Incluse in tutte le diapositive`),
+
+    plan306090: `🗓️ 30-60-90-TAGE-PLAN
+
+Stelle: Senior Marketing Manager · Swisscom Bern | Start: 1. April 2026
+
+📅 ERSTE 30 TAGE – «Verstehen»
+Woche 1-2: Onboarding, alle Stakeholder kennenlernen, Prozesse verstehen
+Woche 3-4: KPIs analysieren, bestehende Kampagnen bewerten
+→ Ziel: 20 Key-Personen kennen, vollständiges KPI-Briefing
+
+📅 TAGE 31-60 – «Beitragen»
+Social-Media-Audit durchführen und präsentieren
+Ersten Quick Win liefern: +10% Engagement
+→ Ziel: Als Experte sichtbar werden
+
+📅 TAGE 61-90 – «Führen»
+Q3-Marketingstrategie präsentieren und Budget-Proposal einreichen
+→ Ziel: Strategieplan genehmigt, als «Go-To-Person» positioniert
+
+🎯 KPIs: Tag 30: Feedback positiv | Tag 60: Projekt live | Tag 90: Strategie approved`,
+
+    referenz: `🏆 REFERENZSCHREIBEN
+
+Für: Thomas Keller, Senior Developer
+Von: Dr. Maria Suter, CTO · ABC Tech AG Zürich
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sehr geehrte Damen und Herren,
+
+ich empfehle Herrn Thomas Keller ohne Einschränkung für eine Führungsposition.
+
+In 3 Jahren bei ABC Tech AG hat Herr Keller die Migration unserer Plattform auf Microservices geleitet – CHF 2.5M Projekt, 3 Wochen vor Plan abgeschlossen. Er führte ein 5-köpfiges Team mit hoher Eigenverantwortung.
+
+Besonders beeindruckend: Seine Fähigkeit, komplexe Technik verständlich zu kommunizieren.
+
+Dr. Maria Suter, CTO | abc-tech.ch | +41 44 123 45 67
+
+✅ Professioneller Ton · Konkrete Zahlen · Persönlicher Kontakt`,
+
+
+    networking: L(
+`🤝 NETWORKING-NACHRICHT – LinkedIn
+
+An: Sarah Müller, HR-Leiterin, Google Zürich
+Von: Marco Berger, Senior Developer, 6 Jahre Erfahrung
+
+──────────────────────────────────────
+KONTAKTANFRAGE (LinkedIn):
+"Guten Tag Frau Müller,
+
+Ihr Beitrag über Engineering-Kultur bei Google hat mich sehr angesprochen – besonders Ihr Punkt über psychologische Sicherheit im Team.
+
+Als Senior Developer mit 6 Jahren Erfahrung in Python und Cloud-Architekturen interessiere ich mich für die Möglichkeiten bei Google Zürich. Ich würde mich freuen, Sie in meinem Netzwerk zu haben.
+
+Mit freundlichen Grüssen
+Marco Berger"
+
+WARUM ES FUNKTIONIERT:
+✓ Konkreter Anlass (ihr Beitrag)
+✓ Kurz und respektvoll
+✓ Keine direkte Bitte um Job
+✓ Mehrwert für sie erkennbar`,
+`🤝 NETWORKING MESSAGE
+
+To: Sarah Miller, HR Lead, Google Zurich
+From: Marco Berger, Senior Developer, 6 years experience
+
+CONNECTION REQUEST:
+"Hello Sarah,
+
+Your post about engineering culture at Google really resonated with me – especially your point about psychological safety in teams.
+
+As a Senior Developer with 6 years of experience in Python and Cloud architecture, I'm very interested in opportunities at Google Zurich. I'd be happy to connect.
+
+Best regards, Marco Berger"
+
+WHY IT WORKS: ✓ Specific hook ✓ Brief & respectful ✓ No direct ask ✓ Value clear`,
+`🤝 MESSAGE DE NETWORKING
+
+À: Sarah Müller, DRH, Google Zurich
+
+DEMANDE DE CONNEXION:
+"Bonjour Madame Müller,
+
+Votre article sur la culture d'ingénierie chez Google m'a beaucoup inspiré.
+
+En tant que développeur senior avec 6 ans d'expérience, je suis intéressé par les opportunités chez Google Zurich. Ce serait un plaisir de vous avoir dans mon réseau.
+
+Cordialement, Marco Berger"`,
+`🤝 MESSAGGIO DI NETWORKING
+
+A: Sarah Müller, HR Lead, Google Zurigo
+
+RICHIESTA CONNESSIONE:
+"Buongiorno Sig.ra Müller,
+
+Il suo articolo sulla cultura ingegneristica di Google mi ha ispirato molto.
+
+Come sviluppatore senior con 6 anni di esperienza, sono interessato alle opportunità presso Google Zurigo.
+
+Cordiali saluti, Marco Berger"`),
+
+    lehrstelle: L(
+`🎓 LEHRSTELLEN-BEWERBUNG
+
+Lehrberuf: Kaufmann/-frau EFZ | Firma: UBS AG, Zürich | Name: Lena Müller, 15 J.
+
+──────────────────────────────────────
+Lena Müller
+Musterstrasse 12, 8001 Zürich
+lena.mueller@gmail.com | 079 123 45 67
+
+UBS AG
+Human Resources
+Bahnhofstrasse 45
+8001 Zürich
+
+Zürich, März 2026
+
+Bewerbung als Kauffrau EFZ – Lehrstelle 2026
+
+Sehr geehrte Damen und Herren,
+
+seit ich in der Schule bei einem Betriebsbesuch bei der UBS die Welt der Finanzen kennenlernen durfte, weiss ich: Ich möchte Kauffrau werden – und zwar bei der UBS.
+
+Ich bin Lena, 15 Jahre alt und besuche die 3. Sekundarschule in Zürich. In Mathematik und Wirtschaft gehöre ich zu den Besten meiner Klasse. Zahlen faszinieren mich – ob beim Nachhilfe-Geben für Mitschüler oder beim Verwalten der Klassenkasse, die ich seit zwei Jahren führe.
+
+Was mich besonders an der UBS begeistert: Ihre globale Präsenz und das Engagement für Nachhaltigkeit. In meiner Berufsmaturität möchte ich diese Werte mitgestalten.
+
+Ich freue mich sehr auf ein Schnupperpraktikum und ein persönliches Gespräch.
+
+Mit freundlichen Grüssen
+Lena Müller
+
+Beilagen: Lebenslauf, letzte Schulzeugnisse, Motivationsbrief`,
+`🎓 APPRENTICESHIP APPLICATION
+
+Trade: Commercial employee EFZ | Company: UBS AG, Zurich | Name: Lena Müller, 15
+
+Lena Müller | Zurich | lena.mueller@gmail.com
+
+Dear UBS Team,
+
+Ever since I visited UBS during a school trip and discovered the world of finance, I knew: I want to become a commercial employee – at UBS.
+
+I'm Lena, 15 years old, in my final year of secondary school. In maths and economics I'm among the top students. I've been managing our class fund for two years.
+
+What excites me about UBS: your global presence and commitment to sustainability.
+
+I look forward to a trial work placement and a personal interview.
+
+Kind regards, Lena Müller`,
+`🎓 CANDIDATURE APPRENTISSAGE
+
+Métier: Employée de commerce AFC | Entreprise: UBS SA, Zurich
+
+Chère équipe UBS,
+
+Depuis ma visite scolaire chez UBS, je sais que je veux devenir employée de commerce – chez vous.
+
+Je m'appelle Lena, 15 ans, en 3e secondaire à Zurich. Je suis parmi les meilleurs élèves en mathématiques et économie. Je gère la caisse de classe depuis deux ans.
+
+Dans l'attente d'un entretien,
+Lena Müller`,
+`🎓 CANDIDATURA APPRENDISTATO
+
+Mestiere: Impiegata di commercio AFC | Azienda: UBS SA, Zurigo
+
+Gentile team UBS,
+
+Da quando ho visitato UBS durante una gita scolastica, so che voglio diventare impiegata di commercio – da voi.
+
+Mi chiamo Lena, 15 anni. In matematica ed economia sono tra i migliori della classe.
+
+Distinti saluti, Lena Müller`),
+
+    kuendigung: L(
+`📤 KÜNDIGUNG – MUSTER
+
+Name: Thomas Keller | Firma: Musterfirma AG, Zürich
+
+──────────────────────────────────────
+Thomas Keller
+Beispielstrasse 5
+8001 Zürich
+thomas.keller@email.ch
+
+Musterfirma AG
+z.H. HR-Abteilung / Frau Sabine Huber
+Industriestrasse 10
+8001 Zürich
+
+Zürich, 18. März 2026
+
+KÜNDIGUNG DES ARBEITSVERHÄLTNISSES
+
+Sehr geehrte Frau Huber,
+
+hiermit kündige ich mein Arbeitsverhältnis als Senior Accountant ordentlich und fristgerecht per 31. Mai 2026 (3 Monate Kündigungsfrist gemäss Arbeitsvertrag).
+
+Ich bedanke mich herzlich für die gute Zusammenarbeit und die wertvollen Erfahrungen der vergangenen vier Jahre. Ich werde bis zum letzten Arbeitstag meine Aufgaben gewissenhaft erfüllen und stehe für eine Übergabe vollumfänglich zur Verfügung.
+
+Ich bitte Sie, mir ein wohlwollendes Arbeitszeugnis auszustellen.
+
+Mit freundlichen Grüssen
+
+Thomas Keller
+
+──────────────────────────────────────
+✓ Schriftform eingehalten (OR Art. 335)
+✓ Kündigungsfrist korrekt (3 Monate = letzter Tag des Monats)
+✓ Kein Kündigungsgrund angegeben (nicht nötig)
+✓ Zeugnis-Bitte enthalten (wichtig für gutes Zeugnis)`,
+`📤 RESIGNATION LETTER
+
+Thomas Keller | Zurich | March 18, 2026
+
+Dear Ms Huber,
+
+I hereby resign from my position as Senior Accountant with the contractual notice period of 3 months, effective May 31, 2026.
+
+I sincerely thank you for the excellent collaboration over the past four years. I will fulfill my duties diligently until my last working day and am fully available for a handover.
+
+I kindly request a positive work reference letter.
+
+Kind regards, Thomas Keller
+
+✓ Written form observed ✓ Notice period correct ✓ No reason required ✓ Reference request included`,
+`📤 LETTRE DE DÉMISSION
+
+Thomas Keller | Zurich | 18 mars 2026
+
+Madame Huber,
+
+Je résilie mon contrat de travail en tant que Senior Accountant avec un préavis de 3 mois, au 31 mai 2026.
+
+Je vous remercie chaleureusement pour notre excellente collaboration. Je reste disponible pour une transition complète.
+
+Je vous prie de bien vouloir m'établir un certificat de travail élogieux.
+
+Cordialement, Thomas Keller`,
+`📤 LETTERA DI DIMISSIONI
+
+Thomas Keller | Zurigo | 18 marzo 2026
+
+Gentile Sig.ra Huber,
+
+Mi dimetto dal mio incarico di Senior Accountant con preavviso di 3 mesi, con effetto dal 31 maggio 2026.
+
+La ringrazio per la piacevole collaborazione. Sono disponibile per un passaggio di consegne completo.
+
+La prego di rilasciarmi un certificato di lavoro favorevole.
+
+Distinti saluti, Thomas Keller`),
+
+    gehalt: L(
+`💰 GEHALTSVERHANDLUNGS-LEITFADEN
+
+Deine Situation: Senior Developer · Aktuell CHF 105'000 · Ziel CHF 125'000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EINSTIEGSSATZ:
+"Ich schätze unsere Zusammenarbeit sehr und möchte offen über meine Vergütung sprechen, 
+da ich den Markt beobachte und meine Leistungen einschätzen kann."
+
+TOP 5 ARGUMENTE:
+① Marktdaten: Salarium.ch Median für Senior Developer Zürich: CHF 118'000–132'000
+② Performance: 3 Kritische Projekte pünktlich geliefert, CHF 2.4M Umsatz mitgeneriert
+③ Skills-Premium: Python + Cloud-Expertise = 22% über Marktdurchschnitt
+④ Fluktuationskosten: Neueinstieg kostet 150-200% eines Jahresgehalts
+⑤ Inflations-Ausgleich: 3 Jahre ohne Erhöhung = 9% realer Kaufkraftverlust
+
+ANTWORT AUF "Budget ist leider voll":
+"Ich verstehe das. Wäre eine Einmalprämie von CHF 15'000 oder 
+mehr Home-Office-Tage denkbar als Alternative?"
+
+ANTWORT AUF "Wir müssen das intern besprechen":
+"Das verstehe ich. Bis wann darf ich mit einer Rückmeldung rechnen? 
+Ich würde mich gerne am [Datum] nochmals melden."
+
+ABSCHLUSSSATZ: "Ich freue mich auf eine faire Lösung, die unsere 
+langfristige Zusammenarbeit stärkt."
+
+DO's ✓: Schweigen nach deiner Zahl · Erst höher ansetzen · Schriftlich festhalten
+DON'Ts ✗: Gehalt mit privatem Bedarf begründen · Erste Zahl sofort akzeptieren`,
+`💰 SALARY NEGOTIATION GUIDE
+
+Your situation: Senior Developer | Current CHF 105'000 | Target CHF 125'000
+
+OPENING: "I value our collaboration and would like to openly discuss compensation."
+
+TOP 5 ARGUMENTS:
+① Market: Salarium.ch median for Senior Developer Zurich: CHF 118k–132k
+② Performance: 3 critical projects delivered on time
+③ Skills premium: Python/Cloud = 22% above market average
+④ Retention: New hire costs 150-200% annual salary
+⑤ Inflation: 3 years = 9% real salary loss
+
+RESPONSE TO "Budget is full": "Could we discuss a CHF 15k bonus or extra home office?"
+CLOSING: "I look forward to a fair solution strengthening our long-term collaboration."`,
+`💰 NÉGOCIATION SALARIALE
+
+Situation: CHF 105'000 → CHF 125'000
+
+OUVERTURE: "Je valorise notre collaboration et souhaite discuter de ma rémunération."
+CLÉ: Salarium.ch médiane CHF 118k–132k pour Zurich
+RÉPONSE: "Une prime de CHF 15k serait-elle possible si le budget est limité?"`,
+`💰 NEGOZIAZIONE STIPENDIO
+
+Situazione: CHF 105'000 → CHF 125'000
+
+APERTURA: "Apprezzo la nostra collaborazione e vorrei discutere della retribuzione."
+ARGOMENTO: Salarium.ch mediana CHF 118k–132k per Zurigo
+RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
   };
 
   const Li2jobDemo=()=>(
@@ -3458,13 +5295,42 @@ NOTE: Incluse in tutte le diapositive`),
   );};
 
   // ══════════════════ LANDING PAGE ══════════════════
-  if(page==="landing") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+  const authModals = <>
+    {showAuth&&<AuthModal lang={lang} onClose={()=>setShowAuth(false)} defaultMode={authMode}
+      onSuccess={(user)=>{
+        setAuthSession({email:user.email,plan:user.plan,isAdmin:user.isAdmin});
+        if(user.plan==="pro"||user.plan==="ultimate"||user.isAdmin){actPro();setPro(true);}
+        setShowAuth(false);
+      }}/>}
+    {showAdmin&&<AdminDashboard lang={lang} onClose={()=>setShowAdmin(false)}/>}
+    {showReferral&&<ReferralPanel lang={lang} session={authSession} onClose={()=>setShowReferral(false)}/>}
+    {showMembers&&<MemberPanel lang={lang} session={authSession} onClose={()=>setShowMembers(false)}/>}
+  </>;
+
+  // ── Shared overlays (appear on every page) ──────────────
+  // PromoModal ist oben definiert
+
+  const sharedOverlays = <>
+      {showPromo && page==="landing" && <PromoBanner lang={lang} navTo={navTo} setPw={setPw} onClose={closePromo}/>}
+    {splash&&<SplashScreen onDone={()=>{setSplash(false);try{sessionStorage.setItem("stf_splashed","1");}catch{}}}/>}
+    <OfflineBanner lang={lang}/>
+    {showReferral&&<ReferralPanel lang={lang} session={authSession} onClose={()=>setShowReferral(false)}/>}
+    {showPromo&&!authSession&&<PromoModal/>}
+  </>;
+
+  if(page==="landing") return(<>{<style>{FONTS+CSS}</style>}{sharedOverlays}{pw&&<PW/>}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    {authModals}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     {cookieBanner&&<CookieBanner lang={lang} onAccept={acceptCookie}/>}
     <div>
       <Nav/>
       {/* HERO */}
-      <section className="hero"><div className="hbg"/><div className="hdots"/>
+      <section className="hero" style={{position:"relative",overflow:"hidden"}}>
+        <div className="orb" style={{width:600,height:600,background:"radial-gradient(circle,rgba(16,185,129,.28),transparent)",top:"-200px",left:"-180px",animationDelay:"0s"}}/>
+        <div className="orb" style={{width:500,height:500,background:"radial-gradient(circle,rgba(99,102,241,.2),transparent)",top:"80px",right:"-120px",animationDelay:"-4s"}}/>
+        <div className="orb" style={{width:380,height:380,background:"radial-gradient(circle,rgba(245,158,11,.15),transparent)",bottom:"-100px",left:"38%",animationDelay:"-7s"}}/>
+        <div className="hbg"/><div className="hdots"/>
         <div className="con">
           <div className="eyebrow">{t.hero.eye}</div>
           <h1 className="hh">{t.hero.h1a}<br/>{t.hero.h1b} <em>{t.hero.h1c}</em></h1>
@@ -3496,6 +5362,24 @@ NOTE: Incluse in tutte le diapositive`),
             ))}
           </div>
           <div className="hstats">{t.hero.stats.map((s,i)=><div key={i}><div className="stat-n">{s.n}</div><div className="stat-l">{s.l}</div></div>)}</div>
+
+          {/* ── SLOGAN STRIP ── */}
+          <div style={{marginTop:48,padding:"18px 24px",background:"linear-gradient(135deg,rgba(16,185,129,.08),rgba(16,185,129,.03))",border:"1px solid rgba(16,185,129,.2)",borderRadius:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <div style={{fontSize:28}}>🚀</div>
+              <div>
+                <div style={{fontFamily:"var(--hd)",fontSize:18,fontWeight:800,color:"white",letterSpacing:"-0.5px"}}>
+                  {lang==="de"?"Dein nächster Job. KI-schnell.":lang==="fr"?"Votre prochain emploi. Vitesse IA.":lang==="it"?"Il tuo prossimo lavoro. Velocità IA.":"Your next job. AI-fast."}
+                </div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>
+                  {lang==="de"?"Bewerbung in 60 Sek. · ATS-optimiert · Schweizer Standard":lang==="fr"?"Candidature en 60s · Optimisé ATS · Standard suisse":lang==="it"?"Candidatura in 60s · ATS-ottimizzato · Standard svizzero":"Application in 60s · ATS-optimized · Swiss standard"}
+                </div>
+              </div>
+            </div>
+            <button className="btn b-em" onClick={()=>navTo("app")} style={{flexShrink:0}}>
+              {lang==="de"?"Jetzt starten →":lang==="fr"?"Commencer →":lang==="it"?"Inizia →":"Start now →"}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -3503,7 +5387,7 @@ NOTE: Incluse in tutte le diapositive`),
       <section style={{padding:"72px 0 48px",background:"var(--bg)"}} id="tools">
         <div className="con">
           <div className="sh shc">
-            <div className="seye">{lang==="de"?"✦ 18+ Tools – ein Abo":lang==="en"?"✦ 18+ Tools – one subscription":lang==="fr"?"✦ 18+ outils – un abonnement":"✦ 18+ strumenti – un abbonamento"}</div>
+            <div className="seye">{lang==="de"?"✦ 20+ Tools – ein Abo":lang==="en"?"✦ 20+ Tools – one subscription":lang==="fr"?"✦ 20+ outils – un abonnement":"✦ 20+ strumenti – un abbonamento"}</div>
             <h2 className="st">{lang==="de"?"Nicht nur für Jobsuchende.":lang==="en"?"Not just for job seekers.":lang==="fr"?"Pas seulement pour les chercheurs d'emploi.":"Non solo per chi cerca lavoro."}</h2>
             <p className="ss" style={{margin:"0 auto"}}>{lang==="de"?"Karriere, Schule, Produktivität – alles in einem Abo für CHF 19.90/Monat.":lang==="en"?"Career, school, productivity – all in one subscription for CHF 19.90/month.":lang==="fr"?"Carrière, école, productivité – tout pour CHF 19.90/mois.":"Carriera, scuola, produttività – tutto per CHF 19.90/mese."}</p>
             {/* Category pills */}
@@ -3526,6 +5410,7 @@ NOTE: Incluse in tutte le diapositive`),
                   {lang==="de"?"Ab":lang==="fr"?"Dès":lang==="it"?"Da":"From"}{" "}
                   <span style={{fontFamily:"var(--hd)",fontSize:17,fontWeight:800,color:"var(--ink)"}}>CHF {C.priceY}</span>
                   <span style={{fontSize:12,color:"var(--mu)"}}>/Mo.</span>
+                  <span style={{fontSize:10,color:"var(--mu)",fontStyle:"italic",marginLeft:2}}>{lang==="de"?"(jährlich)":lang==="fr"?"(annuel)":lang==="it"?"(annuale)":"(annual)"}</span>
                   <span style={{marginLeft:8,fontSize:11,background:"rgba(16,185,129,.1)",color:"var(--em2)",borderRadius:20,padding:"2px 9px",fontWeight:700}}>🔥 –25%</span>
                 </div>
                 <button onClick={()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"})} style={{background:"var(--em)",color:"white",border:"none",borderRadius:25,padding:"9px 18px",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
@@ -3550,39 +5435,133 @@ NOTE: Incluse in tutte le diapositive`),
           </div>
 
           {/* ✦ LI2JOB HERO CARD – Alleinstellungsmerkmal */}
-          <div onClick={()=>navTo("li2job")} style={{cursor:"pointer",background:"linear-gradient(135deg,#0a66c2,#004182)",border:"2px solid rgba(10,102,194,.6)",borderRadius:22,padding:"28px 30px",marginBottom:16,position:"relative",overflow:"hidden",transition:"all .25s"}}
-            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";e.currentTarget.style.boxShadow="0 24px 56px rgba(10,102,194,.35)";}}
-            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="none";}}>
-            <div style={{position:"absolute",top:-30,right:-30,width:160,height:160,background:"radial-gradient(circle,rgba(255,255,255,.07),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
-            <div style={{position:"absolute",bottom:-20,left:"40%",width:120,height:120,background:"radial-gradient(circle,rgba(255,255,255,.04),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:16,flexWrap:"wrap"}}>
-              <div style={{flex:1,minWidth:220}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-                  <span style={{fontSize:11,fontWeight:800,background:"#fff",color:"#0a66c2",padding:"3px 11px",borderRadius:20,letterSpacing:"1px",textTransform:"uppercase"}}>✦ {lang==="de"?"NEU & EINZIGARTIG":lang==="en"?"NEW & UNIQUE":lang==="fr"?"NOUVEAU & UNIQUE":"NUOVO & UNICO"}</span>
-                  <span style={{fontSize:11,fontWeight:700,background:"rgba(255,255,255,.15)",color:"rgba(255,255,255,.8)",padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,.2)"}}>PRO</span>
+          <div onClick={()=>navTo("li2job")} style={{cursor:"pointer",background:"linear-gradient(135deg,#0a66c2 0%,#004182 55%,#003068 100%)",border:"none",borderRadius:24,padding:"0",marginBottom:20,position:"relative",overflow:"hidden",transition:"all .28s",boxShadow:"0 8px 40px rgba(10,102,194,.25)"}}
+            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-5px)";e.currentTarget.style.boxShadow="0 28px 64px rgba(10,102,194,.45)";}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 8px 40px rgba(10,102,194,.25)";}}>
+            {/* Background design elements */}
+            <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(rgba(255,255,255,.04) 1px,transparent 1px)",backgroundSize:"22px 22px",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",top:-60,right:-20,width:280,height:280,background:"radial-gradient(circle,rgba(255,255,255,.08),transparent 70%)",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",bottom:-40,left:-20,width:200,height:200,background:"radial-gradient(circle,rgba(10,102,194,.4),transparent 70%)",pointerEvents:"none"}}/>
+            {/* Content */}
+            <div style={{display:"flex",alignItems:"stretch",position:"relative"}}>
+              {/* Left: Main content */}
+              <div style={{flex:1,padding:"28px 30px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                  <span style={{fontSize:10,fontWeight:800,background:"white",color:"#0a66c2",padding:"4px 12px",borderRadius:20,letterSpacing:"1.5px",textTransform:"uppercase"}}>✦ {lang==="de"?"NEU & EINZIGARTIG":lang==="en"?"NEW & UNIQUE":lang==="fr"?"NOUVEAU":"UNICO"}</span>
+                  <span style={{fontSize:10,fontWeight:700,background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.85)",padding:"4px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,.2)",letterSpacing:"1px"}}>PRO</span>
                 </div>
-                <div style={{fontFamily:"var(--hd)",fontSize:24,fontWeight:800,color:"white",letterSpacing:"-.5px",marginBottom:8,lineHeight:1.1}}>
-                  🔗 {lang==="de"?"LinkedIn → Bewerbung":lang==="en"?"LinkedIn → Application":lang==="fr"?"LinkedIn → Candidature":"LinkedIn → Candidatura"}
+                <div style={{fontFamily:"var(--hd)",fontSize:"clamp(20px,2.5vw,28px)",fontWeight:900,color:"white",letterSpacing:"-1px",marginBottom:10,lineHeight:1.05}}>
+                  LinkedIn → {lang==="de"?"Bewerbung":lang==="en"?"Application":lang==="fr"?"Candidature":"Candidatura"}
                 </div>
-                <p style={{fontSize:14,color:"rgba(255,255,255,.65)",lineHeight:1.7,marginBottom:16,maxWidth:560}}>
-                  {lang==="de"?"Kopiere dein LinkedIn-Profil + das Stelleninserat – die KI erstellt automatisch Motivationsschreiben, Lebenslauf-Highlights und deine stärksten Argumente. In 30 Sekunden. Nirgendwo sonst.":
-                   lang==="en"?"Copy your LinkedIn profile + the job posting – AI automatically creates a cover letter, CV highlights and your strongest arguments. In 30 seconds. Nowhere else.":
-                   lang==="fr"?"Copiez votre profil LinkedIn + l'offre d'emploi – l'IA crée automatiquement lettre de motivation, points forts CV et vos meilleurs arguments. En 30 secondes.":
-                   "Copia il tuo profilo LinkedIn + l'offerta di lavoro – l'IA crea automaticamente lettera di motivazione, punti di forza CV e i tuoi argomenti più forti. In 30 secondi."}
+                <p style={{fontSize:13,color:"rgba(255,255,255,.62)",lineHeight:1.75,marginBottom:18,maxWidth:500}}>
+                  {lang==="de"?"Profil + Stelleninserat → KI erstellt Motivationsschreiben, CV-Highlights & Top-Argumente. In 30 Sekunden.":
+                   lang==="en"?"Profile + job posting → AI creates cover letter, CV highlights & top arguments. In 30 seconds.":
+                   lang==="fr"?"Profil + offre → l'IA crée lettre, points forts CV & arguments. En 30 secondes.":
+                   "Profilo + offerta → l'IA crea lettera, punti CV & argomenti. In 30 secondi."}
                 </p>
-                <div style={{display:"flex",flexWrap:"wrap",gap:7,marginBottom:18}}>
-                  {(lang==="de"?["✓ Motivationsschreiben","✓ Lebenslauf-Highlights","✓ 3 Killer-Argumente","✓ Auf Stelle zugeschnitten"]:
-                    lang==="en"?["✓ Cover letter","✓ CV highlights","✓ 3 killer arguments","✓ Tailored to position"]:
-                    lang==="fr"?["✓ Lettre de motivation","✓ Points forts CV","✓ 3 arguments clés","✓ Adapté au poste"]:
-                    ["✓ Lettera di motivazione","✓ Punti di forza CV","✓ 3 argomenti chiave","✓ Su misura"]).map((tag,j)=>(
-                    <span key={j} style={{fontSize:12,fontWeight:600,background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.8)",padding:"4px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,.15)"}}>{tag}</span>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:20}}>
+                  {(lang==="de"?["✓ Motivationsschreiben","✓ CV-Highlights","✓ 3 Killer-Argumente","✓ Auf Stelle zugeschnitten"]:
+                    lang==="en"?["✓ Cover letter","✓ CV highlights","✓ 3 killer arguments","✓ Job-tailored"]:
+                    lang==="fr"?["✓ Lettre de motivation","✓ Points forts CV","✓ 3 arguments","✓ Adapté"]:
+                    ["✓ Lettera","✓ Punti CV","✓ 3 argomenti","✓ Su misura"]).map((tag,j)=>(
+                    <span key={j} style={{fontSize:11,fontWeight:600,background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.78)",padding:"4px 12px",borderRadius:20,border:"1px solid rgba(255,255,255,.12)",backdropFilter:"blur(4px)"}}>{tag}</span>
                   ))}
                 </div>
-                <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"white",color:"#0a66c2",padding:"11px 22px",borderRadius:11,fontSize:13,fontWeight:800}}>
-                  {lang==="de"?"Jetzt ausprobieren →":lang==="en"?"Try it now →":lang==="fr"?"Essayer maintenant →":"Prova ora →"}
+                <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"white",color:"#0a66c2",padding:"11px 24px",borderRadius:12,fontSize:13,fontWeight:800,boxShadow:"0 4px 16px rgba(0,0,0,.2)",letterSpacing:"-.2px"}}>
+                  {lang==="de"?"Jetzt ausprobieren →":lang==="en"?"Try it now →":lang==="fr"?"Essayer →":"Prova ora →"}
                 </div>
               </div>
-              <div style={{fontSize:72,opacity:.15,flexShrink:0,alignSelf:"center",display:"flex"}}>in</div>
+              {/* Right: LinkedIn "in" logo as bold design element */}
+              <div style={{width:140,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",borderLeft:"1px solid rgba(255,255,255,.08)",background:"rgba(0,0,0,.12)",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",inset:0,background:"linear-gradient(135deg,transparent,rgba(0,0,0,.15))"}}/>
+                <div style={{fontFamily:"Georgia,serif",fontSize:96,fontWeight:900,color:"white",opacity:.18,lineHeight:1,letterSpacing:"-6px",userSelect:"none",transform:"rotate(-5deg)"}}>in</div>
+                <div style={{position:"absolute",bottom:16,right:16,width:36,height:36,background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontFamily:"Georgia,serif",fontWeight:900,color:"white"}}>in</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ✦ LIPOST HERO CARD – LinkedIn-Post Generator */}
+          <div onClick={()=>navTo("lipost")} style={{cursor:"pointer",background:"linear-gradient(135deg,#001f3f 0%,#003d7a 50%,#0a66c2 100%)",border:"none",borderRadius:20,padding:"0",marginBottom:12,position:"relative",overflow:"hidden",transition:"all .25s",boxShadow:"0 4px 24px rgba(10,102,194,.18)"}}
+            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-4px)";e.currentTarget.style.boxShadow="0 20px 48px rgba(10,102,194,.35)";}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 4px 24px rgba(10,102,194,.18)";}}>
+            <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(rgba(255,255,255,.03) 1px,transparent 1px)",backgroundSize:"18px 18px",pointerEvents:"none"}}/>
+            <div style={{display:"flex",alignItems:"center",position:"relative"}}>
+              <div style={{flex:1,padding:"22px 26px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <span style={{fontSize:10,fontWeight:800,background:"linear-gradient(90deg,#0a66c2,#005fa3)",color:"white",padding:"3px 11px",borderRadius:20,letterSpacing:"1.5px",textTransform:"uppercase",border:"1px solid rgba(255,255,255,.2)"}}>✍️ {lang==="de"?"LINKEDIN POSTS":lang==="en"?"LINKEDIN POSTS":lang==="fr"?"POSTS LINKEDIN":"POSTS LINKEDIN"}</span>
+                  <span style={{fontSize:10,fontWeight:700,background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.75)",padding:"3px 9px",borderRadius:20,border:"1px solid rgba(255,255,255,.15)"}}>PRO</span>
+                </div>
+                <div style={{fontFamily:"var(--hd)",fontSize:"clamp(16px,2vw,21px)",fontWeight:800,color:"white",letterSpacing:"-.5px",marginBottom:7,lineHeight:1.1}}>
+                  {lang==="de"?"Automatische LinkedIn-Posts – Swiss-Style":lang==="en"?"Auto LinkedIn Posts – Swiss Style":lang==="fr"?"Posts LinkedIn automatiques":"Post LinkedIn automatici"}
+                </div>
+                <p style={{fontSize:12.5,color:"rgba(255,255,255,.55)",lineHeight:1.65,marginBottom:14,maxWidth:480}}>
+                  {lang==="de"?"3 massgeschneiderte Posts in Sekunden – keine Corporate-Floskeln, kein «Freue mich riesig». Sofort kopieren.":
+                   lang==="en"?"3 tailored posts in seconds – no corporate clichés. Copy immediately.":
+                   lang==="fr"?"3 posts sur mesure en secondes – pas de clichés. Copiez immédiatement.":
+                   "3 post su misura in secondi – niente cliché. Copia subito."}
+                </p>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
+                  {(lang==="de"?["✓ 3 Post-Varianten","✓ Neuer Job · Zertifikat · Insight","✓ Schweizer Stil","✓ Sofort kopierbar"]:
+                    lang==="en"?["✓ 3 post variants","✓ New job · Certificate · Insight","✓ Swiss style","✓ Copy instantly"]:
+                    lang==="fr"?["✓ 3 variantes","✓ Nouveau poste · Certificat","✓ Style suisse","✓ Prêt à copier"]:
+                    ["✓ 3 varianti","✓ Nuovo posto · Certificato","✓ Stile svizzero","✓ Copia subito"]).map((tag,j)=>(
+                    <span key={j} style={{fontSize:11,fontWeight:600,background:"rgba(255,255,255,.08)",color:"rgba(255,255,255,.7)",padding:"3px 10px",borderRadius:20,border:"1px solid rgba(255,255,255,.1)"}}>{tag}</span>
+                  ))}
+                </div>
+                <div style={{display:"inline-flex",alignItems:"center",gap:7,background:"rgba(255,255,255,.12)",color:"white",padding:"9px 20px",borderRadius:10,fontSize:12,fontWeight:700,border:"1px solid rgba(255,255,255,.18)"}}>
+                  {lang==="de"?"Post generieren →":lang==="en"?"Generate post →":lang==="fr"?"Générer post →":"Genera post →"}
+                </div>
+              </div>
+              {/* Right visual */}
+              <div style={{width:120,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,padding:"20px 16px",borderLeft:"1px solid rgba(255,255,255,.06)"}}>
+                {["Post 1","Post 2","Post 3"].map((p,i)=>(
+                  <div key={i} style={{width:"100%",background:"rgba(255,255,255,.07)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8,padding:"7px 10px",fontSize:10,color:"rgba(255,255,255,.5)",fontFamily:"var(--hd)",fontWeight:600}}>{p} ✨</div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ✦ 2-Column: Gehaltsrechner + Tracker */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+            {/* Gehaltsrechner */}
+            <div onClick={()=>navTo("gehaltsrechner")} style={{cursor:"pointer",background:"linear-gradient(135deg,rgba(5,150,105,.14),rgba(5,150,105,.04))",border:"1.5px solid rgba(5,150,105,.3)",borderRadius:18,padding:"20px 22px",position:"relative",overflow:"hidden",transition:"all .22s"}}
+              onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.borderColor="rgba(5,150,105,.55)";e.currentTarget.style.boxShadow="0 12px 36px rgba(5,150,105,.14)";}}
+              onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.borderColor="rgba(5,150,105,.3)";e.currentTarget.style.boxShadow="none";}}>
+              <div style={{position:"absolute",top:-16,right:-16,width:80,height:80,background:"radial-gradient(circle,rgba(16,185,129,.12),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <div style={{width:36,height:36,background:"rgba(16,185,129,.15)",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>💰</div>
+                <div>
+                  <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:800,color:"white",letterSpacing:"-.3px",lineHeight:1.2}}>{lang==="de"?"KI-Gehaltsrechner Schweiz":lang==="en"?"AI Salary Calculator CH":lang==="fr"?"Calculateur salaire IA CH":"Calcolatore stipendio CH"}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:"var(--em)",letterSpacing:"1px",textTransform:"uppercase",marginTop:2}}>PRO</div>
+                </div>
+              </div>
+              <p style={{fontSize:12,color:"rgba(255,255,255,.45)",lineHeight:1.6,marginBottom:14}}>
+                {lang==="de"?"Branche, Erfahrung, Kanton → KI analysiert Marktlöhne & gibt dir deine Verhandlungsbasis.":
+                 lang==="en"?"Industry, experience, canton → AI analyses market salaries & gives your negotiation base.":
+                 lang==="fr"?"Secteur, expérience, canton → analyse des salaires du marché.":
+                 "Settore, esperienza, cantone → analisi salari di mercato."}
+              </p>
+              <div style={{fontSize:12,color:"var(--em)",fontWeight:700}}>Gehalt berechnen →</div>
+            </div>
+            {/* Bewerbungs-Tracker */}
+            <div onClick={()=>navTo("tracker")} style={{cursor:"pointer",background:"linear-gradient(135deg,rgba(139,92,246,.12),rgba(139,92,246,.04))",border:"1.5px solid rgba(139,92,246,.3)",borderRadius:18,padding:"20px 22px",position:"relative",overflow:"hidden",transition:"all .22s"}}
+              onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.borderColor="rgba(139,92,246,.55)";e.currentTarget.style.boxShadow="0 12px 36px rgba(139,92,246,.14)";}}
+              onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.borderColor="rgba(139,92,246,.3)";e.currentTarget.style.boxShadow="none";}}>
+              <div style={{position:"absolute",top:-16,right:-16,width:80,height:80,background:"radial-gradient(circle,rgba(139,92,246,.14),transparent)",borderRadius:"50%",pointerEvents:"none"}}/>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <div style={{width:36,height:36,background:"rgba(139,92,246,.15)",border:"1.5px solid rgba(139,92,246,.3)",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>📋</div>
+                <div>
+                  <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:800,color:"white",letterSpacing:"-.3px",lineHeight:1.2}}>{lang==="de"?"Bewerbungs-Tracker":lang==="en"?"Application Tracker":lang==="fr"?"Suivi candidatures":"Tracker candidature"}</div>
+                  <div style={{fontSize:10,fontWeight:700,color:"#a78bfa",letterSpacing:"1px",textTransform:"uppercase",marginTop:2}}>PRO</div>
+                </div>
+              </div>
+              <p style={{fontSize:12,color:"rgba(255,255,255,.45)",lineHeight:1.6,marginBottom:14}}>
+                {lang==="de"?"Status-Board für alle Bewerbungen – Kanban, Prioritäten, Notizen. Immer den Überblick.":
+                 lang==="en"?"Status board for all applications – Kanban, priorities, notes. Always stay on top.":
+                 lang==="fr"?"Tableau de bord pour toutes vos candidatures – Kanban, priorités, notes.":
+                 "Bacheca candidature – Kanban, priorità, note. Sempre aggiornato."}
+              </p>
+              <div style={{fontSize:12,color:"#a78bfa",fontWeight:700}}>Status-Board öffnen →</div>
             </div>
           </div>
 
@@ -3647,6 +5626,7 @@ NOTE: Incluse in tutte le diapositive`),
           <div style={{fontSize:11,fontWeight:700,letterSpacing:"2px",textTransform:"uppercase",color:"rgba(255,255,255,.18)",marginBottom:10}}>
             {lang==="de"?"Weitere Karriere-Tools":lang==="en"?"More career tools":lang==="fr"?"Plus d'outils":"Altri strumenti"}
           </div>
+
           <div className="mini-g">
             {GENERIC_TOOLS.filter(g=>g.cat==="karriere" && g.id!=="li2job").map(g=>(
               <div key={g.id} onClick={()=>navTo(g.id)} style={{cursor:"pointer",background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.07)",borderRadius:13,padding:"14px 16px",transition:"all .2s",display:"flex",flexDirection:"column",gap:7}}
@@ -3780,7 +5760,9 @@ NOTE: Incluse in tutte le diapositive`),
       </section>
 
       {/* PRICING */}
-      <section className="sec sec-dk" id="preise">
+      <section className="sec sec-dk" id="preise" style={{position:"relative",overflow:"hidden"}}>
+          <div className="orb" style={{width:500,height:500,background:"radial-gradient(circle,rgba(16,185,129,.15),transparent)",top:"-120px",right:"-100px",animationDelay:"-2s",opacity:.4}}/>
+          <div className="orb" style={{width:400,height:400,background:"radial-gradient(circle,rgba(99,102,241,.1),transparent)",bottom:"-80px",left:"-80px",animationDelay:"-6s",opacity:.3}}/>
         <div className="con">
           <div className="sh shc"><div className="seye">{t.price.label}</div><h2 className="st">{t.price.title}</h2><p className="ss">{t.price.sub}</p></div>
           <div className="btog">
@@ -3791,30 +5773,34 @@ NOTE: Incluse in tutte le diapositive`),
           </div>
           <div className="pgrid">
             {t.price.tiers.map(tier=>(
-              <div key={tier.id} className={`pc ${tier.best?"hl":""} ${tier.id==="team"?"hl2":""}`}>
+              <div key={tier.id} className={`pc ${tier.best?"hl":""} ${tier.id==="ultimate"?"hl2":""}`}>
                 {tier.best&&<div className="bst">{t.price.recom}</div>}
-                <div className={`ppl ${tier.best?"em":tier.id==="team"?"am":""}`}>{tier.name}</div>
+                <div className={`ppl ${tier.best?"em":tier.id==="ultimate"?"am":""}`}>{tier.name}</div>
                 {tier.price===0&&<><div className="ppr">CHF 0<span> / {lang==="en"?"mo":"Mo."}</span></div><div className="pper">{tier.note}</div></>}
                 {tier.priceM&&<>
                   <div className="ppr">CHF {yearly ? Number(tier.priceY).toFixed(2) : Number(tier.priceM).toFixed(2)}<span> / {lang==="en"?"mo":"Mo."}</span></div>
                   <div className="pper">
                     {yearly
-                      ? `CHF ${(tier.priceY*12).toFixed(2)} / ${lang==="en"?"year":"Jahr"} · ${lang==="de"?"jährlich abgerechnet":lang==="en"?"billed once yearly":lang==="fr"?"facturé annuellement":"fatturato annualmente"}`
-                      : (lang==="de"?`Spare 25% – nur CHF ${Number(tier.priceY).toFixed(2)}/Mo. bei Jahresabo`:
-                         lang==="en"?`Save 25% – only CHF ${Number(tier.priceY).toFixed(2)}/mo with annual plan`:
-                         lang==="fr"?`Économisez 25% – CHF ${Number(tier.priceY).toFixed(2)}/mois en annuel`:
-                         `Risparmia 25% – CHF ${Number(tier.priceY).toFixed(2)}/mese annuale`)
+                      ? (lang==="de"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/Mo. · spare ${Math.round((1-(tier.priceY/tier.priceM))*100)}% · CHF ${(tier.priceY*12).toFixed(2)}/Jahr`:
+                         lang==="en"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/mo · save ${Math.round((1-(tier.priceY/tier.priceM))*100)}% · CHF ${(tier.priceY*12).toFixed(2)}/year`:
+                         lang==="fr"?`🔥 CHF ${Number(tier.priceY).toFixed(2)}/mois · économisez ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
+                         `🔥 CHF ${Number(tier.priceY).toFixed(2)}/mese · risparmia ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`)
+                      : (lang==="de"?`Jährlich nur CHF ${Number(tier.priceY).toFixed(2)}/Mo. → ${Math.round((1-(tier.priceY/tier.priceM))*100)}% sparen`:
+                         lang==="en"?`Annual plan: CHF ${Number(tier.priceY).toFixed(2)}/mo → save ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
+                         lang==="fr"?`Annuel: CHF ${Number(tier.priceY).toFixed(2)}/mois → économisez ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`:
+                         `Annuale: CHF ${Number(tier.priceY).toFixed(2)}/mese → risparmia ${Math.round((1-(tier.priceY/tier.priceM))*100)}%`)
                     }
                   </div>
                 </>}
                 {tier.price===null&&<><div className="ppr" style={{fontSize:26,letterSpacing:0}}>{lang==="de"?"Auf Anfrage":lang==="fr"?"Sur demande":lang==="it"?"Su richiesta":"On request"}</div><div className="pper">{tier.note}</div></>}
+                {tier.desc&&<p style={{fontSize:13,color:"rgba(255,255,255,.45)",lineHeight:1.65,margin:"0 0 20px",fontWeight:300,borderTop:"1px solid rgba(255,255,255,.07)",paddingTop:14,fontStyle:"italic"}}>{tier.desc}</p>}
                 <ul className="pfl">
                   {tier.list.map(f=><li key={f}><span className="pck">✓</span>{f}</li>)}
                   {(tier.no||[]).map(f=><li key={f} className="off"><span className="pcx">×</span>{f}</li>)}
                 </ul>
                 {tier.id==="free"&&<button className="btn b-out b-w" style={{borderColor:"rgba(255,255,255,.18)",color:"white"}} onClick={()=>navTo("app")}>{tier.btn}</button>}
                 {tier.id==="pro"&&<button className={`btn ${tier.btnS} b-w`} onClick={()=>window.open(stripeLink(),"_blank")}>{tier.btn}</button>}
-                {tier.id==="team"&&<button className={`btn b-out b-w`} style={{borderColor:"rgba(245,158,11,.3)",color:"rgba(245,158,11,.8)"}} onClick={()=>window.open(`mailto:${C.email}`)}>{tier.btn}</button>}
+                {tier.id==="ultimate"&&<button className={`btn b-out b-w`} style={{borderColor:"rgba(245,158,11,.4)",color:"rgba(245,158,11,.85)"}} onClick={()=>window.open(C.stripeUltimate,"_blank")}>{tier.btn}</button>}
               </div>
             ))}
           </div>
@@ -3847,8 +5833,10 @@ NOTE: Incluse in tutte le diapositive`),
   </>);
 
   // ══════════════════ APPLICATION TOOL ══════════════════
-  if(page==="app") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+  if(page==="app") return(<>{<style>{FONTS+CSS}</style>}{sharedOverlays}{pw&&<PW/>}
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr dk">
       <h1>{t.app.title}</h1><p>{t.app.sub}</p>
@@ -3898,7 +5886,7 @@ NOTE: Incluse in tutte le diapositive`),
         <div className="ct">{lang==="de"?"Dokument wählen":lang==="fr"?"Choisir le document":lang==="it"?"Scegli il documento":"Choose document"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
           {[{k:"motivation",ico:"✍️",t:lang==="de"?"Motivationsschreiben":lang==="fr"?"Lettre de motivation":lang==="it"?"Lettera di motivazione":"Cover letter",d:lang==="de"?"Persönlich, überzeugend.":lang==="fr"?"Personnelle, convaincante.":lang==="it"?"Personale, convincente.":"Personal, convincing."},
-            {k:"lebenslauf",ico:"📋",t:"Curriculum Vitae",d:lang==="de"?"Schweizer Format.":lang==="fr"?"Format suisse.":lang==="it"?"Formato svizzero.":"Swiss format."},
+            {k:"lebenslauf",ico:"📄",t:"Curriculum Vitae",d:lang==="de"?"Schweizer Format.":lang==="fr"?"Format suisse.":lang==="it"?"Formato svizzero.":"Swiss format."},
             {k:"beide",ico:"🚀",t:lang==="de"?"Beides":lang==="fr"?"Les deux":lang==="it"?"Entrambi":"Both",d:lang==="de"?"Vollständiges Dossier.":lang==="fr"?"Dossier complet.":lang==="it"?"Dossier completo.":"Complete dossier.",full:true}
           ].map(d=><button key={d.k} className={`tool-card ${docType===d.k?"":""}`} style={{cursor:"pointer",border:`1.5px solid ${docType===d.k?"var(--em)":"var(--bo)"}`,background:docType===d.k?"var(--em3)":"white",gridColumn:d.full?"1/-1":"auto"}} onClick={()=>setDocType(d.k)}>
             <div style={{fontSize:22,marginBottom:6}}>{d.ico}</div>
@@ -3925,7 +5913,7 @@ NOTE: Incluse in tutte le diapositive`),
                   <button className="btn b-outd b-sm" onClick={()=>navTo("checklist")}>✅ {lang==="de"?"Checkliste":lang==="en"?"Checklist":lang==="fr"?"Checklist":"Checklist"}</button>
           <button className="btn b-outd b-sm" onClick={()=>{setStep(2);setResults({motivation:"",lebenslauf:""});setEditing(false);}}>🔄 {t.app.regen}</button>
         </div>}
-        {editing&&!streaming?<textarea className="r-edit" value={curDoc()} onChange={e=>setCurDoc(e.target.value)}/>:<div className="r-doc">{curDoc()}{streaming&&<span className="cursor"/>}</div>}
+        {editing&&!streaming?<textarea className="r-edit" value={curDoc()} onChange={e=>setCurDoc(e.target.value)}/>:<div className="r-doc">{curDoc()||(!streaming&&<span style={{color:"rgba(11,11,18,.25)",fontSize:13,fontStyle:"italic"}}>{lang==="de"?"Noch kein Inhalt – bitte erneut generieren.":lang==="fr"?"Pas encore de contenu – veuillez regénérer.":"No content yet – please generate again."}</span>)}{streaming&&<span className="cursor"/>}</div>}
       </div>}
 
       {step===3&&!streaming&&<>
@@ -3961,7 +5949,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ ATS CHECK ══════════════════
   if(page==="ats") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr dk"><h1>{t.ats.title}</h1><p>{t.ats.sub}</p></div>
     <div className="abody">
@@ -4033,7 +6023,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ ZEUGNIS ANALYSE ══════════════════
   if(page==="zeugnis") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr am"><h1>{t.zeugnis.title}</h1><p>{t.zeugnis.sub}</p></div>
     <div className="abody">
@@ -4096,7 +6088,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ JOB MATCHING ══════════════════
   if(page==="jobmatch") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr vi"><h1>{t.jobmatch.title}</h1><p>{t.jobmatch.sub}</p></div>
     <div className="abody">
@@ -4148,7 +6142,9 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ LINKEDIN ══════════════════
   if(page==="linkedin") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr bl"><h1>{t.linkedin.title}</h1><p>{t.linkedin.sub}</p></div>
     <div className="abody">
@@ -4188,6 +6184,8 @@ NOTE: Incluse in tutte le diapositive`),
 
   // ══════════════════ CHECKLIST ══════════════════
   if(page==="checklist") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
     <Nav dark/>
     <div className="page-hdr dk"><h1>{t.checklist.title}</h1><p>{t.checklist.sub}</p></div>
     <div className="abody">
@@ -4215,8 +6213,10 @@ NOTE: Incluse in tutte le diapositive`),
   </>);
 
   // ══════════════════ INTERVIEW COACH ══════════════════
-  if(page==="coach") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+  if(page==="coach") return(<>{<style>{FONTS+CSS}</style>}{sharedOverlays}{pw&&<PW/>}
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr dk"><h1>{t.coach.title}</h1><p>{t.coach.sub}</p></div>
     <div className="abody">
@@ -4270,8 +6270,10 @@ NOTE: Incluse in tutte le diapositive`),
   </>);
 
   // ══════════════════ EXCEL GENERATOR ══════════════════
-  if(page==="excel") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+  if(page==="excel") return(<>{<style>{FONTS+CSS}</style>}{sharedOverlays}{pw&&<PW/>}
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr" style={{background:"linear-gradient(135deg,#166534,#15803d)",padding:"48px 28px 0",textAlign:"center"}}>
       <h1 style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>📊 {t.nav.excel}</h1>
@@ -4385,8 +6387,10 @@ NOTE: Incluse in tutte le diapositive`),
   </>);
 
   // ══════════════════ POWERPOINT MAKER ══════════════════
-  if(page==="pptx") return(<>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
-    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+  if(page==="pptx") return(<>{<style>{FONTS+CSS}</style>}{sharedOverlays}{pw&&<PW/>}
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
     <Nav dark/>
     <div className="page-hdr" style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",padding:"48px 28px 0",textAlign:"center"}}>
       <h1 style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>📽️ {t.nav.pptx}</h1>
@@ -4506,7 +6510,8 @@ NOTE: Incluse in tutte le diapositive`),
   // ══════════════════ STELLA VOLLBILD-CHAT ══════════════════
   if(page==="chat") {
     const chatUsage2 = getChatCount();
-    const canChat2   = pro || chatUsage2 < C.CHAT_FREE_LIMIT;
+    const isLoggedIn2 = !!authSession;
+    const canChat2   = isLoggedIn2 && (pro || chatUsage2 < C.CHAT_FREE_LIMIT);
     const remaining2 = pro ? "∞" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage2);
     const L2 = (d,e,f,i) => ({de:d,en:e,fr:f,it:i}[lang]||d);
 
@@ -4577,6 +6582,9 @@ VERHALTEN:
       "networking":["networking"],"kündigung":["kuendigung"],"30-60-90":["plan306090"],
       "referenz":["referenz"],"lernplan":["lernplan"],"lehrstelle":["lehrstelle"],
       "e-mail":["email"],"protokoll":["protokoll"],"übersetzer":["uebersetzer"],
+      "gehaltsrechner":["gehaltsrechner"],"lohn":["gehaltsrechner"],"salary":["gehaltsrechner"],
+      "tracker":["tracker"],"tracking":["tracker"],"verfolgen":["tracker"],
+      "lipost":["lipost"],"linkedin post":["lipost"],"post":["lipost"],
     };
 
     function ChatPage() {
@@ -4726,10 +6734,10 @@ VERHALTEN:
   if(page==="agb") return <LS ch={<>
     <h1>AGB / CGV / CGC / T&C</h1><div className="legal-d">Stand: {LD()} · {C.domain}</div>
     <h2>1. Geltungsbereich</h2><p>{C.name} ({C.domain}) wird betrieben von {C.owner}, {C.address}. Mit der Nutzung akzeptierst du diese AGB.</p>
-    <h2>2. Leistungen</h2><p>{C.name} ist ein KI-gestützter All-in-One Career & Produktivitäts-Copilot mit 18+ Tools, u.a.: Bewerbungsgenerator, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker, Gehaltsverhandlungs-Coach, Networking-Nachrichten, Kündigung, 30-60-90-Tage-Plan, Referenzschreiben, Lehrstellen-Bewerbung, Lernplan, Zusammenfassung, E-Mail-Assistent, Meeting-Protokoll, Übersetzer. Es wird kein Erfolg garantiert.</p>
-    <h2>3. Abonnement & Zahlung</h2><p>Gratis: 1 Bewerbungsgenerierung/Monat. Pro: CHF 19.90/Monat (monatlich kündbar) oder CHF 14.90/Monat (jährlich = CHF 178.80/Jahr). Pro enthält: Unbegrenzte Bewerbungen, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker. Zahlung via Stripe (Twint, Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay, SEPA, Klarna). Automatische Verlängerung. Kündigung jederzeit per E-Mail.</p>
+    <h2>2. Leistungen</h2><p>{C.name} ist ein KI-gestützter All-in-One Career & Produktivitäts-Copilot mit 20+ Tools, u.a.: Bewerbungsgenerator, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker, Gehaltsverhandlungs-Coach, Networking-Nachrichten, Kündigung, 30-60-90-Tage-Plan, Referenzschreiben, Lehrstellen-Bewerbung, Lernplan, Zusammenfassung, E-Mail-Assistent, Meeting-Protokoll, Übersetzer. Es wird kein Erfolg garantiert.</p>
+    <h2>3. Abonnement & Zahlung</h2><p>Gratis: 1 Bewerbungsgenerierung/Monat. Pro: CHF 19.90/Monat (monatlich kündbar) oder CHF 14.90/Monat (jährlich = CHF 178.80/Jahr). Ultimate: CHF 49.90/Monat oder CHF 39.90/Monat (jährlich = CHF 478.80/Jahr). Pro enthält: Unbegrenzte Bewerbungen, LinkedIn-Optimierung, ATS-Simulation, Zeugnis-Analyse, Job-Matching, Interview-Coach, Excel-Generator, PowerPoint-Maker. Zahlung via Stripe (Twint, Visa, Mastercard, Amex, PayPal, Apple Pay, Google Pay, SEPA, Klarna). Automatische Verlängerung. Kündigung jederzeit per E-Mail.</p>
     <h2>4. Haftung</h2><p>Keine Haftung für Qualität generierter Inhalte, Vollständigkeit der KI-Analysen oder indirekte Schäden.</p>
-    <h2>5. Recht & Gerichtsstand</h2><p>Schweizer Recht. Gerichtsstand: Zürich. Kontakt: <a href={`mailto:${C.email}`}>{C.email}</a></p>
+    <h2>5. Haftung für KI-generierte Inhalte</h2><p>Stellify ist kein Rechts-, Karriere- oder Finanzberater. Alle KI-generierten Inhalte sind unverbindliche Entwürfe ohne Rechtsverbindlichkeit. Nutzung auf eigene Verantwortung.</p><h2>6. Recht & Gerichtsstand</h2><p>Schweizer Recht (OR/DSG). Gerichtsstand: Zürich. Kontakt: <a href={`mailto:${C.email}`}>{C.email}</a></p>
   </>}/>;
   if(page==="datenschutz") return <LS ch={<>
     <h1>Datenschutz / Privacy</h1><div className="legal-d">DSG (CH) · DSGVO (EU) · Stand: {LD()}</div>
@@ -4750,10 +6758,20 @@ VERHALTEN:
     <p>Bei Datenschutzanfragen: <a href={`mailto:${C.email}`}>{C.email}</a></p>
     <h2>Haftungsausschluss</h2><p>Schweizer Recht · Gerichtsstand: Zürich</p>
   </>}/>;
+  // ══════════════════ BEWERBUNGS-TRACKER ══════════════════
+  if(page==="tracker") return(<>{<style>{FONTS+CSS}</style>}{sharedOverlays}{pw&&<PW/>}
+    {authModals}
+    {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
+    <ChatBot lang={lang} pro={pro} setPw={setPw} navTo={navTo} authSession={authSession} onAuthOpen={()=>{setAuthMode("login");setShowAuth(true);}}/>
+    <Nav dark/>
+    <BewerbungsTracker lang={lang} pro={pro} setPw={setPw} navTo={navTo}/>
+    <Footer/>
+  </>);
+
   // ══════════════════ GENERIC TOOLS ROUTING ══════════════════
   const activeTool = GENERIC_TOOLS.find(g => g.id === page);
   if (activeTool) return (
-    <>{<style>{FONTS+CSS}</style>}{pw&&<PW/>}
+    <>{<style>{FONTS+CSS}</style>}{sharedOverlays}{pw&&<PW/>}
       <Nav dark/>
       <GenericToolPage tool={activeTool} lang={lang} pro={pro} setPw={setPw} setPage={setPage} yearly={yearly} C={C} proUsage={proUsage} setProUsage={setProUsage}/>
       <Footer/>
@@ -4765,3 +6783,7 @@ VERHALTEN:
     {/* Render der aktuellen Seite wird oben zurückgegeben – dieser Code ist nie erreichbar */}
   </>);
 }
+
+import { createRoot } from "react-dom/client";
+const _root = document.getElementById("root");
+if (_root) createRoot(_root).render(<App />);
