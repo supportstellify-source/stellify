@@ -462,10 +462,13 @@ h1.hh em{font-style:normal;color:var(--em)}
 .r-bar{display:flex;gap:7px;justify-content:flex-end;margin-bottom:10px;flex-wrap:wrap}
 .r-tabs{display:flex;border-bottom:2px solid var(--bo);margin-bottom:16px}
 .r-tab{padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:var(--bd);color:var(--mu);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .18s}.r-tab.on{color:var(--em);border-bottom-color:var(--em)}
-/* STATUS BARS */
-.ubar{background:var(--em3);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:10px 15px;margin-bottom:15px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px}
-.u-tr{flex:1;min-width:60px;height:5px;background:rgba(11,11,18,.1);border-radius:10px;overflow:hidden}
-.u-fi{height:100%;background:var(--em);border-radius:10px;transition:width .4s}
+/* STATUS BARS – Glassmorphism Progress Tracker */
+.ubar{background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.18);border-radius:14px;padding:12px 16px;margin-bottom:15px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:13px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 4px 24px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.04)}
+.u-tr{position:relative;flex:1;min-width:80px;height:7px;background:rgba(255,255,255,.06);border-radius:99px;overflow:visible;cursor:pointer}
+.u-tr::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1a1a2e;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);font-size:10px;font-weight:600;padding:5px 10px;border-radius:8px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s;z-index:9999}
+.u-tr:hover::after{opacity:1}
+.u-fi{height:100%;border-radius:99px;transition:width .5s ease-in-out;box-shadow:0 0 8px currentColor}
+@keyframes barPulse{0%,100%{opacity:1}50%{opacity:.55}}
 .ok{background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 15px;font-size:13px;color:#15803d;margin-bottom:15px}
 .err{background:#fff1f1;border:1px solid #fca5a5;border-radius:10px;padding:10px 15px;font-size:13px;color:#dc2626;margin-bottom:14px}
 /* Free badge pill */
@@ -3383,6 +3386,7 @@ function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
   const [loading, setLoading] = useState(false);
   const [gLoading, setGLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const [agbChecked, setAgbChecked] = useState(false);
 
   const GOOGLE_CLIENT_ID = "370460173343-bnc71e8tib764unofcd6sqf7slesehih.apps.googleusercontent.com";
 
@@ -3436,6 +3440,7 @@ function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
     if(!email.includes("@")) return setErr(L("Ungültige E-Mail.","Invalid email.","E-mail invalide.","E-mail non valida."));
     if(pw.length<6) return setErr(L("Passwort mind. 6 Zeichen.","Password min. 6 chars.","Min. 6 caractères.","Min. 6 caratteri."));
     if(pw!==pw2) return setErr(L("Passwörter stimmen nicht überein.","Passwords don't match.","Mots de passe différents.","Password diverse."));
+    if(!agbChecked) return setErr(L("Bitte AGB und Datenschutzerklärung akzeptieren.","Please accept the Terms and Privacy Policy.","Veuillez accepter les CGU et la politique de confidentialité.","Accetta i Termini e la Privacy Policy."));
     setLoading(true);
     setTimeout(()=>{
       const r = authRegister(email, pw, "free");
@@ -3564,16 +3569,27 @@ function AuthModal({ lang, onClose, onSuccess, defaultMode="login" }) {
               <button type="button" onClick={()=>setShowPw(v=>!v)} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"rgba(255,255,255,.25)",fontSize:15,padding:4,lineHeight:1}}>{showPw?"◉":"○"}</button>
             </div>
             <input type="password" placeholder={L("Passwort wiederholen","Repeat password","Répétez","Ripeti")} value={pw2} onChange={e=>setPw2(e.target.value)} required style={inp} onFocus={inpFocus} onBlur={inpBlur} autoComplete="new-password"/>
+            {/* AGB Pflicht-Checkbox */}
+            <label style={{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",padding:"10px 12px",borderRadius:10,border:`1.5px solid ${agbChecked?"rgba(16,185,129,.35)":"rgba(255,255,255,.1)"}`,background:agbChecked?"rgba(16,185,129,.06)":"transparent",transition:"all .2s"}}>
+              <div style={{position:"relative",flexShrink:0,marginTop:1}}>
+                <input type="checkbox" checked={agbChecked} onChange={e=>setAgbChecked(e.target.checked)} style={{opacity:0,position:"absolute",width:18,height:18,cursor:"pointer",margin:0}}/>
+                <div style={{width:18,height:18,borderRadius:5,border:`2px solid ${agbChecked?"#10b981":"rgba(255,255,255,.25)"}`,background:agbChecked?"#10b981":"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s",flexShrink:0}}>
+                  {agbChecked&&<span style={{color:"white",fontSize:11,fontWeight:800,lineHeight:1}}>✓</span>}
+                </div>
+              </div>
+              <span style={{fontSize:11,color:"rgba(255,255,255,.45)",lineHeight:1.6}}>
+                {L("Ich akzeptiere die ","I accept the ","J'accepte les ","Accetto i ")}
+                <span onClick={e=>{e.preventDefault();e.stopPropagation();}} style={{color:"var(--em)",textDecoration:"underline",cursor:"pointer"}} onClickCapture={()=>window.open("#agb","_blank")}>{L("AGB","Terms","CGU","Termini")}</span>
+                {L(" und die "," and the "," et la "," e la ")}
+                <span style={{color:"var(--em)",textDecoration:"underline",cursor:"pointer"}} onClickCapture={()=>window.open("#datenschutz","_blank")}>{L("Datenschutzerklärung","Privacy Policy","Politique de confidentialité","Privacy Policy")}</span>
+                {L(" von Stellify."," of Stellify."," de Stellify."," di Stellify.")}
+              </span>
+            </label>
             <ErrBox msg={err}/>
-            <button type="submit" disabled={loading} style={{marginTop:2,padding:"14px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontFamily:"var(--bd)",fontSize:15,fontWeight:700,cursor:loading?"default":"pointer",boxShadow:"0 4px 16px rgba(16,185,129,.3)",transition:"all .2s",opacity:loading?.7:1}}>
+            <button type="submit" disabled={loading||!agbChecked} style={{marginTop:2,padding:"14px",borderRadius:14,border:"none",background:agbChecked?"linear-gradient(135deg,#10b981,#059669)":"rgba(255,255,255,.08)",color:agbChecked?"white":"rgba(255,255,255,.3)",fontFamily:"var(--bd)",fontSize:15,fontWeight:700,cursor:(loading||!agbChecked)?"not-allowed":"pointer",boxShadow:agbChecked?"0 4px 16px rgba(16,185,129,.3)":"none",transition:"all .2s"}}>
               {loading ? L("Erstelle Konto…","Creating account…","Création…","Creazione…") : L("Konto erstellen","Create account","Créer mon compte","Crea account")}
             </button>
           </form>
-          <div style={{textAlign:"center",marginTop:14,fontSize:11,color:"rgba(255,255,255,.18)",lineHeight:1.7}}>
-            {L("Mit der Registrierung stimmst du den","By signing up you agree to our")}{" "}
-            <span style={{color:"rgba(255,255,255,.35)",textDecoration:"underline",cursor:"pointer"}}>{L("AGB","Terms")}</span> {L("und der","and")}{" "}
-            <span style={{color:"rgba(255,255,255,.35)",textDecoration:"underline",cursor:"pointer"}}>{L("Datenschutzerklärung","Privacy Policy")}</span> {L("zu.","")}
-          </div>
           <div style={{textAlign:"center",marginTop:20,paddingTop:20,borderTop:"1px solid rgba(255,255,255,.06)",fontSize:13,color:"rgba(255,255,255,.3)"}}>
             {L("Bereits ein Konto?","Already have an account?","Déjà un compte?","Hai già un account?")}
             {" "}<button onClick={()=>{setMode("login");setErr("");}} style={{background:"none",border:"none",color:"var(--em)",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>
@@ -4460,14 +4476,21 @@ Antworte NUR mit JSON:
       </div>
     </div>
   ):(
-    <div className="ubar">
+    <div className="ubar" style={{borderColor:proUsage/C.PRO_LIMIT>=0.85?"rgba(239,68,68,.3)":proUsage/C.PRO_LIMIT>=0.6?"rgba(245,158,11,.25)":"rgba(16,185,129,.18)"}}>
       <div style={{display:"flex",flexDirection:"column",gap:2}}>
-        <span style={{color:"var(--em)",fontWeight:700,fontSize:13}}>✦ Pro · <strong>{C.PRO_LIMIT-proUsage}</strong>/{C.PRO_LIMIT} {L("diese Woche noch verfügbar","remaining this week","restants cette semaine","rimasti questa settimana")}</span>
-        <span style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>🔄 {L("Reset jeden Montag 07:00 Uhr","Resets every Monday 07:00","Remise à zéro lundi 07h","Reset ogni lunedì 07:00")}</span>
+        <span style={{color:proUsage/C.PRO_LIMIT>=0.85?"#ef4444":proUsage/C.PRO_LIMIT>=0.6?"#f59e0b":"var(--em)",fontWeight:700,fontSize:13}}>✦ Pro · <strong>{C.PRO_LIMIT-proUsage}</strong>/{C.PRO_LIMIT} {L("diese Woche","this week","cette semaine","questa settimana")}</span>
+        <span style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>🔄 {L("Reset Montag 07:00","Resets Mon 07:00","Lundi 07h","Lunedì 07:00")}</span>
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:9}}>
-        <div className="u-tr"><div className="u-fi" style={{width:`${(proUsage/C.PRO_LIMIT)*100}%`,background:proUsage/C.PRO_LIMIT>0.8?"#f59e0b":"var(--em)"}}/></div>
-        {proUsage/C.PRO_LIMIT>=0.8&&<button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{background:"rgba(245,158,11,.15)",border:"1px solid rgba(245,158,11,.3)",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#f59e0b",cursor:"pointer",whiteSpace:"nowrap"}}>♾️ Upgrade to Ultimate</button>}
+      <div style={{display:"flex",alignItems:"center",gap:9,flex:1,maxWidth:200}}>
+        {(()=>{
+          const pct = proUsage/C.PRO_LIMIT;
+          const barColor = pct>=0.85?"#ef4444":pct>=0.6?"#f59e0b":"#10b981";
+          const tooltip = L(`Noch ${C.PRO_LIMIT-proUsage} Erstellungen bis Montag 07:00 Uhr`,`${C.PRO_LIMIT-proUsage} creations left until Monday 07:00`,`${C.PRO_LIMIT-proUsage} créations restantes`,`${C.PRO_LIMIT-proUsage} creazioni rimanenti`);
+          return <div className="u-tr" data-tip={tooltip}>
+            <div className="u-fi" style={{width:`${pct*100}%`,background:barColor,color:barColor,animation:pct>=0.85?"barPulse 1.4s ease-in-out infinite":"none"}}/>
+          </div>;
+        })()}
+        {proUsage/C.PRO_LIMIT>=0.8&&<button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{background:"rgba(245,158,11,.15)",border:"1px solid rgba(245,158,11,.3)",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#f59e0b",cursor:"pointer",whiteSpace:"nowrap"}}>♾️ Ultimate</button>}
       </div>
     </div>
   );
@@ -6291,6 +6314,83 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
         </div>
       </section>
 
+      {/* ═══ WERBE-SPOT ═══ */}
+      <section style={{padding:"100px 0",background:"linear-gradient(180deg,#020209 0%,#060614 50%,#020209 100%)",position:"relative",overflow:"hidden"}}>
+        {/* Ambient glow */}
+        <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:800,height:400,background:"radial-gradient(ellipse,rgba(16,185,129,.07) 0%,transparent 70%)",pointerEvents:"none"}}/>
+        <div className="con" style={{position:"relative",zIndex:1}}>
+          <div style={{textAlign:"center",marginBottom:64}}>
+            <div className="seye" style={{color:"var(--em)",letterSpacing:3,marginBottom:16}}>▶ STELLIFY – DER SPOT</div>
+            <h2 className="st" style={{fontSize:"clamp(32px,5vw,58px)",lineHeight:1.06,marginBottom:0}}>
+              {lang==="de"?"Dein nächster Job.":lang==="en"?"Your next job.":lang==="fr"?"Ton prochain emploi.":"Il tuo prossimo lavoro."}{" "}
+              <span style={{color:"var(--em)"}}>{lang==="de"?"KI-schnell.":lang==="en"?"AI-fast.":lang==="fr"?"Ultra-rapide.":"Veloce come l'IA."}</span>
+            </h2>
+          </div>
+
+          {/* Video Placeholder / Teaser Card */}
+          <div className="reveal" style={{maxWidth:820,margin:"0 auto 64px",background:"rgba(255,255,255,.02)",border:"1px solid rgba(16,185,129,.15)",borderRadius:28,overflow:"hidden",boxShadow:"0 40px 100px rgba(0,0,0,.6)"}}>
+            <div style={{aspectRatio:"16/9",background:"linear-gradient(135deg,#0a0a1a 0%,#0d1a14 50%,#0a0a1a 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden",cursor:"pointer"}}
+              onClick={()=>{}}>
+              {/* Animated grid bg */}
+              <div style={{position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(16,185,129,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,.04) 1px,transparent 1px)",backgroundSize:"60px 60px",pointerEvents:"none"}}/>
+              {/* Play button */}
+              <div style={{width:80,height:80,borderRadius:"50%",background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,boxShadow:"0 0 60px rgba(16,185,129,.5)",marginBottom:24,position:"relative",zIndex:1,cursor:"pointer",transition:"transform .2s"}}
+                onMouseEnter={e=>e.currentTarget.style.transform="scale(1.1)"}
+                onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                ▶
+              </div>
+              <div style={{textAlign:"center",position:"relative",zIndex:1,padding:"0 40px"}}>
+                <div style={{fontFamily:"var(--hd)",fontSize:"clamp(20px,3vw,32px)",fontWeight:800,color:"white",letterSpacing:"-1px",lineHeight:1.2,marginBottom:12}}>
+                  {lang==="de"?"30 Sekunden. Ein perfektes Motivationsschreiben.":lang==="en"?"30 seconds. One perfect cover letter.":lang==="fr"?"30 secondes. Une lettre de motivation parfaite.":"30 secondi. Una lettera di motivazione perfetta."}
+                </div>
+                <div style={{fontSize:14,color:"rgba(255,255,255,.4)",lineHeight:1.7}}>
+                  {lang==="de"?"Kein Stress. Kein Blankes Blatt. Nur Resultate.":lang==="en"?"No stress. No blank page. Just results.":lang==="fr"?"Pas de stress. Pas de page blanche. Que des résultats.":"Nessuno stress. Nessuna pagina bianca. Solo risultati."}
+                </div>
+              </div>
+              <div style={{position:"absolute",bottom:24,right:24,fontSize:11,fontWeight:700,color:"rgba(255,255,255,.2)",letterSpacing:2,textTransform:"uppercase"}}>
+                Stellify · Swiss AI Career Copilot
+              </div>
+            </div>
+            {/* Spot tagline strip */}
+            <div style={{padding:"20px 32px",borderTop:"1px solid rgba(255,255,255,.05)",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+              <div>
+                <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,color:"white",marginBottom:4}}>
+                  {lang==="de"?"Stellify – Dein Schweizer KI-Karriere-Copilot":lang==="en"?"Stellify – Your Swiss AI Career Copilot":lang==="fr"?"Stellify – Votre copilote carrière IA suisse":"Stellify – Il tuo copilota carriera IA svizzero"}
+                </div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,.35)"}}>
+                  {lang==="de"?"20+ Tools · Gratis starten · Kein Abo nötig":lang==="en"?"20+ Tools · Free start · No subscription needed":lang==="fr"?"20+ outils · Démarrage gratuit":"20+ strumenti · Inizia gratis"}
+                </div>
+              </div>
+              <button className="btn b-em" onClick={()=>navTo("app")} style={{flexShrink:0}}>
+                {lang==="de"?"Jetzt gratis testen →":lang==="en"?"Try free now →":lang==="fr"?"Essayer gratuitement →":"Prova gratis ora →"}
+              </button>
+            </div>
+          </div>
+
+          {/* 3 Spot-Szenen als Teaser-Karten */}
+          {(()=>{
+            const LL=(d,e,f,it)=>({de:d,en:e,fr:f,it}[lang]||d);
+            const scenes=[
+              {n:"01",ico:"🔍",t:LL("Du siehst eine Stelle","You see a job listing","Tu vois une offre","Vedi un annuncio"),d:LL("Du kopierst die Stellenbeschreibung – das war schon alles.","You copy the job description – that's all.","Tu copies l'offre – c'est tout.","Copi l'annuncio – è tutto.")},
+              {n:"02",ico:"⚡",t:LL("Stella analysiert","Stella analyses","Stella analyse","Stella analizza"),d:LL("KI liest dein Profil, die Stelle, den Markt. In Sekunden.","AI reads your profile, the role, the market. In seconds.","L'IA lit ton profil et le poste. En secondes.","L'IA legge il tuo profilo. In secondi.")},
+              {n:"03",ico:"✅",t:LL("Du bewirbst dich","You apply","Tu postules","Ti candidi"),d:LL("Perfektes Motivationsschreiben. Perfekter Lebenslauf. Jetzt.","Perfect cover letter. Perfect CV. Right now.","Lettre et CV parfaits. Maintenant.","Lettera e CV perfetti. Adesso.")},
+            ];
+            return <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20,maxWidth:820,margin:"0 auto"}} className="reveal">
+            {scenes.map((scene,i)=>(
+              <div key={i} className="reveal" style={{background:"rgba(255,255,255,.02)",border:"1px solid rgba(255,255,255,.07)",borderRadius:16,padding:"22px 20px",transition:"all .22s",transitionDelay:`${i*0.1}s`}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(16,185,129,.25)";e.currentTarget.style.background="rgba(16,185,129,.04)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.07)";e.currentTarget.style.background="rgba(255,255,255,.02)";}}>
+                <div style={{fontSize:28,marginBottom:12}}>{scene.ico}</div>
+                <div style={{fontSize:11,fontWeight:700,color:"var(--em)",letterSpacing:2,marginBottom:6}}>{scene.n}</div>
+                <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,color:"white",marginBottom:8}}>{scene.t}</div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,.38)",lineHeight:1.65}}>{scene.d}</div>
+              </div>
+            ))}
+          </div>;
+          })()}
+        </div>
+      </section>
+
       <section className="cta-sec">
         <div className="csm">
           <h2 style={{fontFamily:"var(--hd)",fontSize:"clamp(36px,5vw,60px)",fontWeight:800,color:"white",letterSpacing:"-2px",lineHeight:1.05,marginBottom:16}}>
@@ -6337,21 +6437,44 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
       </div>}
 
       {step===1&&<div className="card">
-        <div className="ct">{lang==="de"?"Dein Profil":lang==="fr"?"Votre profil":lang==="it"?"Il tuo profilo":"Your profile"}</div>
-        <div className="cs">{lang==="de"?"Die KI erstellt massgeschneiderte Unterlagen.":lang==="fr"?"L'IA créera des documents sur mesure.":lang==="it"?"L'IA creerà documenti su misura.":"The AI will create tailored documents."}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:4}}>
+          <div>
+            <div className="ct" style={{margin:0}}>{lang==="de"?"Dein Profil":lang==="fr"?"Votre profil":lang==="it"?"Il tuo profilo":"Your profile"}</div>
+            <div className="cs">{lang==="de"?"Die KI erstellt massgeschneiderte Unterlagen.":lang==="fr"?"L'IA créera des documents sur mesure.":lang==="it"?"L'IA creerà documenti su misura.":"The AI will create tailored documents."}</div>
+          </div>
+          {activeProfile&&(activeProfile.name||activeProfile.beruf)&&<button type="button" onClick={()=>{
+            setProf({
+              name:activeProfile.name||prof.name,
+              beruf:activeProfile.beruf||prof.beruf,
+              erfahrung:activeProfile.erfahrung||prof.erfahrung,
+              skills:activeProfile.skills||prof.skills,
+              sprachen:activeProfile.sprachen||prof.sprachen,
+              ausbildung:activeProfile.ausbildung||prof.ausbildung
+            });
+          }} style={{display:"flex",alignItems:"center",gap:6,background:"rgba(16,185,129,.1)",border:"1.5px solid rgba(16,185,129,.3)",borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:700,color:"var(--em)",cursor:"pointer",flexShrink:0,transition:"all .2s"}}
+            onMouseEnter={e=>e.currentTarget.style.background="rgba(16,185,129,.18)"}
+            onMouseLeave={e=>e.currentTarget.style.background="rgba(16,185,129,.1)"}>
+            ⚡ {lang==="de"?`Auto-Fill: ${activeProfile.name||activeProfile.beruf}`:lang==="en"?`Auto-Fill: ${activeProfile.name||activeProfile.beruf}`:lang==="fr"?`Remplir: ${activeProfile.name||activeProfile.beruf}`:`Auto-riempi: ${activeProfile.name||activeProfile.beruf}`}
+          </button>}
+        </div>
         <DocUpload lang={lang} file={appDoc}
           onFile={f=>setAppDoc({name:f.name,raw:f,extracted:false})}
           onText={(t,n)=>{ setAppDoc({name:n,text:t,extracted:true}); if(t.length>20){ const lines=t.split("\n"); const nm=lines.find(l=>l.trim().length>2&&l.trim().length<40); if(nm&&!prof.name)setProf(p=>({...p,name:nm.trim()})); } }}
           onClear={()=>setAppDoc(null)}/>
         <div className="fg2">
-          <div className="field"><label>{lang==="de"?"Name *":lang==="fr"?"Nom *":lang==="it"?"Nome *":"Name *"}</label><input value={prof.name} onChange={e=>up("name",e.target.value)}/></div>
-          <div className="field"><label>{lang==="de"?"Beruf *":lang==="fr"?"Métier *":lang==="it"?"Lavoro *":"Job *"}</label><input value={prof.beruf} onChange={e=>up("beruf",e.target.value)}/></div>
+          <div className="field"><label style={{color:!prof.name?"#ef4444":"inherit"}}>{lang==="de"?"Name *":lang==="fr"?"Nom *":lang==="it"?"Nome *":"Name *"}{!prof.name&&<span style={{fontSize:10,color:"#ef4444",marginLeft:4}}>{lang==="de"?"Pflichtfeld":"required"}</span>}</label><input value={prof.name} onChange={e=>up("name",e.target.value)} style={{borderColor:!prof.name?"rgba(239,68,68,.4)":""}}/></div>
+          <div className="field"><label style={{color:!prof.beruf?"#ef4444":"inherit"}}>{lang==="de"?"Beruf *":lang==="fr"?"Métier *":lang==="it"?"Lavoro *":"Job *"}{!prof.beruf&&<span style={{fontSize:10,color:"#ef4444",marginLeft:4}}>{lang==="de"?"Pflichtfeld":"required"}</span>}</label><input value={prof.beruf} onChange={e=>up("beruf",e.target.value)} style={{borderColor:!prof.beruf?"rgba(239,68,68,.4)":""}}/></div>
           <div className="field"><label>{lang==="de"?"Erfahrung (Jahre)":lang==="fr"?"Expérience (ans)":lang==="it"?"Esperienza (anni)":"Experience (years)"}</label><input type="number" min="0" max="50" value={prof.erfahrung} onChange={e=>up("erfahrung",e.target.value)}/></div>
           <div className="field"><label>{lang==="de"?"Sprachen":lang==="fr"?"Langues":lang==="it"?"Lingue":"Languages"}</label><input value={prof.sprachen} onChange={e=>up("sprachen",e.target.value)} placeholder="Deutsch, English, Français"/></div>
         </div>
-        <div className="field"><label>{lang==="de"?"Skills & Stärken":lang==="fr"?"Compétences":lang==="it"?"Competenze":"Skills"}</label><textarea value={prof.skills} onChange={e=>up("skills",e.target.value)}/></div>
-        <div className="field"><label>{lang==="de"?"Ausbildung":lang==="fr"?"Formation":lang==="it"?"Formazione":"Education"}</label><textarea value={prof.ausbildung} onChange={e=>up("ausbildung",e.target.value)} style={{minHeight:64}}/></div>
-        <div className="frow"><button className="btn b-outd" onClick={()=>setStep(0)}>{t.app.back}</button><button className="btn b-dk" disabled={!prof.name||!prof.beruf} onClick={()=>setStep(2)}>{t.app.next}</button></div>
+        <div className="field"><label>{lang==="de"?"Skills & Stärken":lang==="fr"?"Compétences":lang==="it"?"Competenze":"Skills"}</label><textarea value={prof.skills} onChange={e=>up("skills",e.target.value)} placeholder={lang==="de"?"z.B. Projektmanagement, MS Office, Kommunikation…":lang==="en"?"e.g. Project management, MS Office, Communication…":"e.g. Gestion de projet, MS Office, Communication…"}/></div>
+        <div className="field"><label>{lang==="de"?"Ausbildung":lang==="fr"?"Formation":lang==="it"?"Formazione":"Education"}</label><textarea value={prof.ausbildung} onChange={e=>up("ausbildung",e.target.value)} style={{minHeight:64}} placeholder={lang==="de"?"z.B. Bachelor Wirtschaft ZHAW, KV-Abschluss…":"e.g. Bachelor Business ZHAW, Commercial diploma…"}/></div>
+        <div className="frow">
+          <button className="btn b-outd" onClick={()=>setStep(0)}>{t.app.back}</button>
+          <button className="btn b-dk" disabled={!prof.name||!prof.beruf} onClick={()=>setStep(2)} style={{opacity:(!prof.name||!prof.beruf)?.5:1}} title={(!prof.name||!prof.beruf)?(lang==="de"?"Name und Beruf sind Pflichtfelder":"Name and Job are required"):""}>
+            {t.app.next}
+          </button>
+        </div>
       </div>}
 
       {step===2&&<div className="card">
