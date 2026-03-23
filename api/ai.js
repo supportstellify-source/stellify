@@ -1,7 +1,7 @@
 // api/ai.js – Sicherer Groq API-Proxy für Stellify
 // Der Key liegt NUR hier auf dem Server – niemals im Frontend-Code!
 
-const GROQ_KEY_FALLBACK = "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";
+const GROQ_KEY_FALLBACK = process.env.GROQ_KEY_BACKUP || "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";
 
 export default async function handler(req, res) {
   // CORS preflight

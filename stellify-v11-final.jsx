@@ -4306,7 +4306,6 @@ Antworte NUR mit JSON:
           {authSession ? (
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               {authSession.isAdmin&&<button onClick={()=>setShowAdmin(true)} style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(245,158,11,.3)",background:"rgba(245,158,11,.1)",color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer"}}>🛡️ Admin</button>}
-              {authSession&&<button onClick={()=>setShowReferral(true)} style={{padding:"5px 10px",borderRadius:8,border:"1px solid rgba(245,158,11,.3)",background:"rgba(245,158,11,.06)",color:"#f59e0b",fontSize:11,fontWeight:700,cursor:"pointer"}}>🎁 {lang==="de"?"Freunde":"Refer"}</button>}
               <button onClick={()=>{if(window.confirm(lang==="de"?`Abmelden?`:`Sign out?`)){authClearSession();setAuthSession(null);if(!isPro())setPro(false);}}} style={{display:"flex",alignItems:"center",gap:7,background:"linear-gradient(135deg,rgba(16,185,129,.18),rgba(16,185,129,.06))",border:"1.5px solid rgba(16,185,129,.35)",borderRadius:24,padding:"5px 14px 5px 5px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:700,color:"var(--em2)"}}>
                 <div style={{width:24,height:24,borderRadius:"50%",background:"linear-gradient(135deg,var(--em),#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"white"}}>{authSession.email[0].toUpperCase()}</div>
                 <span style={{maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{authSession.email.split("@")[0]}</span>
@@ -7112,6 +7111,8 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     const canChat2   = isLoggedIn2 && (isUltimate2 || isPro2 ? chatUsage2 < C.CHAT_FREE_LIMIT : true);
     const remaining2 = isUltimate2 ? "∞" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage2);
     const L2 = (d,e,f,i) => ({de:d,en:e,fr:f,it:i}[lang]||d);
+    // suppress unused var warning
+    void canChat2; void remaining2;
 
     const SYSTEM2 = `Du bist Stella, die KI-Karriere-Assistentin von Stellify – dem Schweizer AI Career Copilot. Du hast tiefes Wissen über alle Aspekte der Karriere, Bewerbung, Arbeitsmarkt Schweiz und Produktivität.
 
@@ -7198,139 +7199,289 @@ Bleibe freundlich, motivierend und konsequent. Beantworte keine konkreten Karrie
     };
 
     function ChatPage() {
-      const [chatMsgs, setChatMsgs] = useState([{r:"ai",t:L2(
-        "Hallo! Ich bin Stella 👋 Deine KI-Karriere-Assistentin von Stellify. Wie kann ich dir heute helfen?",
-        "Hello! I'm Stella 👋 Your AI career assistant from Stellify. How can I help you today?",
-        "Bonjour! Je suis Stella 👋 Comment puis-je vous aider aujourd'hui?",
-        "Ciao! Sono Stella 👋 Come posso aiutarti oggi?"
-      )}]);
-      const [chatIn, setChatIn]       = useState("");
-      const [chatLoad, setChatLoad]   = useState(false);
+      // ── Persistent chat state (same localStorage as ChatBot overlay) ──
+      const [cp2Chats, setCp2Chats] = useState(()=>loadChats());
+      const [cp2ActiveId, setCp2ActiveId] = useState(()=>loadActiveChatId());
+      const [chatIn, setChatIn]     = useState("");
+      const [chatLoad, setChatLoad] = useState(false);
       const [localUsage, setLocalUsage] = useState(chatUsage2);
+      const [sidebarOpen, setSidebarOpen] = useState(true);
       const endRef = useRef(null);
-      useEffect(()=>{ endRef.current?.scrollIntoView({behavior:"smooth"}); },[chatMsgs]);
+
+      // Get active chat messages
+      const activeMsgs = (() => {
+        if(!cp2ActiveId) return [];
+        const c = cp2Chats.find(c=>c.id===cp2ActiveId);
+        return c ? c.msgs : [];
+      })();
+
+      useEffect(()=>{ endRef.current?.scrollIntoView({behavior:"smooth"}); },[cp2Chats, cp2ActiveId]);
 
       const localCanChat = pro || localUsage < C.CHAT_FREE_LIMIT;
 
+      // Helpers
+      function cp2SaveChats(chats){ setCp2Chats(chats); saveChats(chats); }
+      function cp2SetMsgs(updater){
+        const current = (() => {
+          if(!cp2ActiveId) return [];
+          const c = cp2Chats.find(c=>c.id===cp2ActiveId);
+          return c ? c.msgs : [];
+        })();
+        const updated = typeof updater === "function" ? updater(current) : updater;
+        let newChats;
+        if(!cp2ActiveId){
+          const id = makeChatId();
+          setCp2ActiveId(id); saveActiveChatId(id);
+          newChats = [{id, title:makeChatTitle(updated), msgs:updated, ts:Date.now()}, ...cp2Chats];
+        } else {
+          const exists = cp2Chats.find(c=>c.id===cp2ActiveId);
+          if(exists){
+            newChats = cp2Chats.map(c=>c.id===cp2ActiveId ? {...c, msgs:updated, title:makeChatTitle(updated), ts:Date.now()} : c);
+          } else {
+            newChats = [{id:cp2ActiveId, title:makeChatTitle(updated), msgs:updated, ts:Date.now()}, ...cp2Chats];
+          }
+        }
+        cp2SaveChats(newChats);
+      }
+
+      function cp2NewChat(){
+        const id = makeChatId();
+        const planLabel = authSession?.plan==="ultimate"?"Ultimate":authSession?.plan==="pro"?"Pro":"Free";
+        const welcome = {r:"ai", t:L2(
+          `Hallo! Ich bin **Stella** ✦ – deine persönliche KI-Karriere-Assistentin von Stellify.\n\nDein Plan: **${planLabel}**\n\nWie kann ich dir heute helfen? 🚀`,
+          `Hello! I'm **Stella** ✦ – your personal AI career assistant from Stellify.\n\nYour plan: **${planLabel}**\n\nHow can I help you today? 🚀`,
+          `Bonjour! Je suis **Stella** ✦ – ton assistante carrière IA de Stellify.\n\nTon plan: **${planLabel}**\n\nComment puis-je t'aider aujourd'hui? 🚀`,
+          `Ciao! Sono **Stella** ✦ – la tua assistente carriera IA di Stellify.\n\nIl tuo piano: **${planLabel}**\n\nCome posso aiutarti oggi? 🚀`
+        )};
+        const newChats = [{id, title:L2("Neuer Chat","New Chat","Nouveau chat","Nuova chat"), msgs:[welcome], ts:Date.now()}, ...cp2Chats];
+        cp2SaveChats(newChats);
+        setCp2ActiveId(id); saveActiveChatId(id);
+        setChatIn("");
+      }
+
+      function cp2DeleteChat(id, e){
+        e.stopPropagation();
+        const newChats = cp2Chats.filter(c=>c.id!==id);
+        cp2SaveChats(newChats);
+        if(cp2ActiveId===id){
+          const next = newChats[0];
+          setCp2ActiveId(next?next.id:null);
+          saveActiveChatId(next?next.id:"");
+        }
+      }
+
+      function cp2SwitchChat(id){ setCp2ActiveId(id); saveActiveChatId(id); }
+
+      useEffect(()=>{
+        if(cp2Chats.length===0){ cp2NewChat(); }
+        else if(!cp2ActiveId && cp2Chats.length>0){ cp2SwitchChat(cp2Chats[0].id); }
+      },[]); // eslint-disable-line
+
       const renderMsg2 = (text) => {
-        let remaining = text;
-        Object.keys(TOOL_MAP2).forEach(key=>{
-          remaining = remaining.replace(new RegExp(key,"gi"),`<TOOL:${TOOL_MAP2[key][0]}:${key}>`);
+        if(!text) return null;
+        return text.split("\n").map((line,li)=>{
+          const parts = line.split(/(\*\*[^*]+\*\*)/).map((seg,si)=>{
+            if(seg.startsWith("**")&&seg.endsWith("**"))
+              return <strong key={si} style={{color:"white",fontWeight:700}}>{seg.slice(2,-2)}</strong>;
+            // inline tool links
+            const spans = []; let last=0;
+            Object.keys(TOOL_MAP2).forEach(key=>{
+              const re=new RegExp(`\\b${key}\\b`,"gi"); let m2;
+              while((m2=re.exec(seg))!==null){
+                if(m2.index>last) spans.push(seg.slice(last,m2.index));
+                spans.push(<button key={`${si}-${m2.index}`} onClick={()=>navTo(TOOL_MAP2[key][0])}
+                  style={{display:"inline-flex",alignItems:"center",gap:3,background:"rgba(16,185,129,.15)",border:"1px solid rgba(16,185,129,.3)",borderRadius:7,padding:"1px 9px",fontSize:12,fontWeight:700,color:"var(--em)",cursor:"pointer",margin:"1px 2px"}}>
+                  {m2[0]} →</button>);
+                last=m2.index+m2[0].length;
+              }
+            });
+            if(spans.length===0) return <span key={si}>{seg}</span>;
+            spans.push(seg.slice(last));
+            return <span key={si}>{spans}</span>;
+          });
+          return <span key={li}>{li>0&&<br/>}{parts}</span>;
         });
-        return remaining.split(/(<TOOL:[^>]+>)/).map((seg,i)=>{
-          const m=seg.match(/^<TOOL:([^:]+):(.+)>$/);
-          if(m) return <button key={i} onClick={()=>navTo(m[1])}
-            style={{display:"inline-flex",alignItems:"center",gap:4,background:"rgba(16,185,129,.15)",border:"1px solid rgba(16,185,129,.3)",borderRadius:8,padding:"2px 10px",fontSize:13,fontWeight:700,color:"var(--em)",cursor:"pointer",margin:"2px 3px"}}>
-            {m[2]} →</button>;
-          return <span key={i}>{seg}</span>;
-        });
+      };
+
+      const fmtDate = (ts) => {
+        const d=new Date(ts), now=new Date(), diff=now-d;
+        if(diff<86400000) return d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+        if(diff<604800000) return d.toLocaleDateString([],{weekday:"short"});
+        return d.toLocaleDateString([],{day:"2-digit",month:"2-digit"});
       };
 
       const send2 = async (msg) => {
         const txt = (msg||chatIn).trim();
         if(!txt||chatLoad||!localCanChat) return;
         setChatIn("");
-        const newMsgs = [...chatMsgs, {r:"u", t:txt}];
-        setChatMsgs(newMsgs);
+        const prevMsgs = activeMsgs;
+        const newMsgs = [...prevMsgs, {r:"u", t:txt}];
+        cp2SetMsgs(newMsgs);
         setChatLoad(true);
         if(!pro){ incChat(); setLocalUsage(u=>u+1); }
         try {
           const apiMsgs = [];
-          for(const m of newMsgs) {
-            const role = m.r==="u" ? "user" : "assistant";
-            if(apiMsgs.length > 0 && apiMsgs[apiMsgs.length-1].role === role) continue;
-            apiMsgs.push({role, content: m.t});
+          for(const m of newMsgs){
+            const role = m.r==="u"?"user":"assistant";
+            if(apiMsgs.length>0&&apiMsgs[apiMsgs.length-1].role===role) continue;
+            apiMsgs.push({role, content:typeof m.t==="string"?m.t:String(m.t||"")});
           }
-          while(apiMsgs.length && apiMsgs[0].role !== "user") apiMsgs.shift();
-          const finalMsgs = apiMsgs.slice(-10);
-          const msgsWithSystem = [{role:"system", content:ACTIVE_SYSTEM2}, ...finalMsgs];
-
-          const res = await fetch(GROQ_URL, {
-            method: "POST",
-            headers: groqHeaders(),
-            body: JSON.stringify({
-              model: C.MODEL_FAST,
-              max_tokens: 600,
-              messages: msgsWithSystem
-            })
-          });
+          while(apiMsgs.length&&apiMsgs[0].role!=="user") apiMsgs.shift();
+          const msgsWithSystem = [{role:"system",content:ACTIVE_SYSTEM2}, ...apiMsgs.slice(-10)];
+          const res = await fetch(GROQ_URL,{method:"POST",headers:groqHeaders(),body:JSON.stringify({model:C.MODEL_FAST,max_tokens:700,messages:msgsWithSystem})});
           const data = await res.json();
-          if(!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
-          const reply = data.choices?.[0]?.message?.content || "Bitte nochmals versuchen.";
-          setChatMsgs(m=>[...m, {r:"ai", t:reply}]);
-        } catch(e) {
-          setChatMsgs(m=>[...m, {r:"ai", t:`⚠️ ${e.message}`}]);
-        } finally {
-          setChatLoad(false);
-        }
+          if(res.status===401) throw new Error(L2("Stella ist kurz offline. Der Admin muss den API-Schlüssel erneuern.","Stella is briefly offline. Please try again later.","Stella est brièvement hors ligne. Réessayez.","Stella è offline. Riprova più tardi."));
+          if(!res.ok) throw new Error(data?.error?.message||L2(`Verbindungsfehler (${res.status}) – bitte nochmals versuchen.`,`Connection error (${res.status}).`,`Erreur (${res.status}).`,`Errore (${res.status}).`));
+          const reply = data.choices?.[0]?.message?.content||L2("Bitte nochmals versuchen.","Please try again.","Veuillez réessayer.","Riprova.");
+          cp2SetMsgs(m=>[...m,{r:"ai",t:reply}]);
+        } catch(e){
+          cp2SetMsgs(m=>[...m,{r:"ai",t:`⚠️ ${e.message}`}]);
+        } finally { setChatLoad(false); }
       };
 
-      return (<>{<style>{FONTS+CSS}</style>}
-        <div style={{height:"100dvh",display:"flex",flexDirection:"column",background:"var(--dk)",overflow:"hidden"}}>
-          {/* Top Nav */}
-          <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",borderBottom:"1px solid rgba(255,255,255,.07)",background:"var(--dk2)",flexShrink:0}}>
-            <button onClick={()=>navTo("landing")} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:10,padding:"7px 14px",fontSize:13,color:"rgba(255,255,255,.6)",cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
-              ← {L2("Zurück","Back","Retour","Indietro")}
-            </button>
-            <div style={{flex:1,display:"flex",alignItems:"center",gap:10,justifyContent:"center"}}>
-              <div style={{width:32,height:32,background:"var(--em)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🤖</div>
-              <div>
-                <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:800,color:"white"}}>Stella</div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,.35)"}}>{L2("KI-Karriere-Assistentin","AI Career Assistant","Assistante carrière IA","Assistente carriera IA")} · <span style={{color:"#22c55e"}}>●</span> Online</div>
-              </div>
-            </div>
-            {pro&&<div style={{fontSize:11,color:"var(--em)",fontWeight:700,background:"rgba(16,185,129,.12)",border:"1px solid rgba(16,185,129,.2)",borderRadius:99,padding:"3px 10px"}}>Pro</div>}
-          </div>
+      return (<>{<style>{FONTS+CSS+`
+@keyframes pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.3);opacity:1}}
+.cp2-ci{background:transparent;border:none;border-radius:10px;padding:10px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;text-align:left;transition:background .15s;color:rgba(255,255,255,.65);font-size:12.5px;}
+.cp2-ci:hover,.cp2-ci.act{background:rgba(255,255,255,.08);}
+.cp2-ci.act{color:white;}
+.cp2-db{opacity:0;transition:opacity .15s;margin-left:auto;flex-shrink:0;background:none;border:none;cursor:pointer;color:rgba(255,255,255,.35);font-size:13px;padding:2px 5px;border-radius:4px;}
+.cp2-ci:hover .cp2-db{opacity:1;}
+.cp2-db:hover{color:#ef4444;background:rgba(239,68,68,.1);}
+.cp2-qb{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:99px;padding:7px 14px;font-size:12px;color:rgba(255,255,255,.45);cursor:pointer;transition:all .2s;font-family:inherit;}
+.cp2-qb:hover{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.25);color:var(--em);}
+@media(max-width:680px){.cp2-sb{position:fixed!important;z-index:200;left:0;top:0;height:100%;transform:translateX(-100%);transition:transform .25s ease;}
+.cp2-sb.open{transform:translateX(0);}
+.cp2-mob{display:flex!important;}}
+      `}</style>}
+        <div style={{height:"100dvh",display:"flex",flexDirection:"row",background:"#08081a",overflow:"hidden"}}>
 
-          {/* Messages Area */}
-          <div style={{flex:1,overflowY:"auto",padding:"24px 16px",display:"flex",flexDirection:"column",gap:20,maxWidth:780,width:"100%",margin:"0 auto",boxSizing:"border-box"}}>
-            {chatMsgs.map((m,i)=>(
-              <div key={i} style={{display:"flex",gap:12,flexDirection:m.r==="u"?"row-reverse":"row",alignItems:"flex-end"}}>
-                <div style={{width:34,height:34,borderRadius:"50%",background:m.r==="u"?"rgba(16,185,129,.25)":"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
-                  {m.r==="u"?"👤":"🤖"}
-                </div>
-                <div style={{maxWidth:"72%",background:m.r==="u"?"rgba(16,185,129,.18)":"rgba(255,255,255,.05)",border:`1px solid ${m.r==="u"?"rgba(16,185,129,.3)":"rgba(255,255,255,.08)"}`,borderRadius:m.r==="u"?"20px 20px 4px 20px":"20px 20px 20px 4px",padding:"12px 16px",fontSize:14,color:m.r==="u"?"rgba(255,255,255,.9)":"rgba(255,255,255,.82)",lineHeight:1.7}}>
-                  {m.r==="ai"?renderMsg2(m.t):m.t}
-                </div>
+          {/* ══ LEFT SIDEBAR ══ */}
+          <div className={`cp2-sb${sidebarOpen?" open":""}`} style={{width:262,minWidth:262,background:"#0c0c1e",borderRight:"1px solid rgba(255,255,255,.05)",display:"flex",flexDirection:"column",height:"100dvh",overflow:"hidden",flexShrink:0}}>
+            {/* Brand */}
+            <div style={{padding:"16px 14px 10px",borderBottom:"1px solid rgba(255,255,255,.05)",flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
+                <span style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:900,color:"var(--em)",letterSpacing:"-0.5px"}}>✦ Stellify</span>
+                <span style={{fontSize:10,color:"rgba(255,255,255,.2)",marginLeft:"auto",fontStyle:"italic"}}>AI Chat</span>
               </div>
-            ))}
-            {chatLoad&&<div style={{display:"flex",gap:12,alignItems:"flex-end"}}>
-              <div style={{width:34,height:34,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>🤖</div>
-              <div style={{background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.08)",borderRadius:"20px 20px 20px 4px",padding:"14px 18px",display:"flex",gap:5,alignItems:"center"}}>
-                {[0,1,2].map(j=><div key={j} style={{width:7,height:7,borderRadius:"50%",background:"var(--em)",animation:`pulse 1.2s ease-in-out ${j*0.2}s infinite`}}/>)}
-              </div>
-            </div>}
-            <div ref={endRef}/>
-          </div>
-
-          {/* Limit Banner */}
-          {!localCanChat&&<div style={{background:"rgba(245,158,11,.1)",borderTop:"1px solid rgba(245,158,11,.2)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexShrink:0}}>
-            <div style={{fontSize:13,color:"rgba(245,158,11,.8)"}}>{L2("Für fachliche Fragen Pro freischalten","Unlock Pro for expert questions","Activer Pro pour des questions expertes","Sblocca Pro per domande specialistiche")}</div>
-            <button onClick={()=>setPw(true)} style={{background:"var(--am)",color:"white",border:"none",borderRadius:10,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-              {L2("Pro freischalten →","Unlock Pro →","Activer Pro →","Sblocca Pro →")}
-            </button>
-          </div>}
-
-          {/* Input Area */}
-          <div style={{borderTop:"1px solid rgba(255,255,255,.07)",padding:"16px 20px",background:"var(--dk2)",flexShrink:0}}>
-            <div style={{maxWidth:780,margin:"0 auto",display:"flex",gap:10,alignItems:"flex-end"}}>
-              <div style={{flex:1,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"flex-end",gap:10}}>
-                <textarea value={chatIn} onChange={e=>setChatIn(e.target.value)}
-                  onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!chatLoad&&localCanChat){e.preventDefault();send2();}}}
-                  placeholder={localCanChat ? L2("Schreib eine Nachricht…","Write a message…","Écrire un message…","Scrivi un messaggio…") : L2("Pro freischalten für mehr Nachrichten…","Unlock Pro for more messages…","Activer Pro pour plus…","Sblocca Pro per di più…")}
-                  disabled={!localCanChat||chatLoad}
-                  style={{flex:1,background:"none",border:"none",color:"white",fontSize:14,resize:"none",outline:"none",minHeight:24,maxHeight:120,lineHeight:1.6}}
-                  rows={1}/>
-              </div>
-              <button onClick={()=>send2()} disabled={!chatIn.trim()||chatLoad||!localCanChat}
-                style={{width:46,height:46,borderRadius:14,background:chatIn.trim()&&localCanChat?"var(--em)":"rgba(255,255,255,.08)",border:"none",cursor:chatIn.trim()&&localCanChat?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,transition:"all .2s"}}>
-                {chatLoad?"⏳":"➤"}
+              <button onClick={cp2NewChat} style={{width:"100%",background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.22)",borderRadius:10,padding:"9px 12px",color:"var(--em)",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8,transition:"background .2s"}}>
+                <span>✦</span>{L2("Neuer Chat","New Chat","Nouveau chat","Nuova chat")}
               </button>
             </div>
-            <div style={{textAlign:"center",fontSize:11,color:"rgba(255,255,255,.18)",marginTop:8}}>{L2("Stella kann Fehler machen. Wichtige Entscheidungen bitte selbst prüfen.","Stella can make mistakes. Please verify important decisions yourself.","Stella peut faire des erreurs. Vérifiez les décisions importantes.","Stella può fare errori. Verifica le decisioni importanti.")}</div>
+            {/* Chat list */}
+            <div style={{flex:1,overflowY:"auto",padding:"6px 5px"}}>
+              {cp2Chats.length===0&&<div style={{padding:"24px 12px",fontSize:12,color:"rgba(255,255,255,.2)",textAlign:"center"}}>{L2("Noch keine Chats","No chats yet","Pas encore de conversations","Nessuna chat ancora")}</div>}
+              {cp2Chats.map(c=>(
+                <button key={c.id} className={`cp2-ci${cp2ActiveId===c.id?" act":""}`} onClick={()=>cp2SwitchChat(c.id)}>
+                  <span style={{fontSize:11,flexShrink:0,opacity:.4}}>💬</span>
+                  <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.title||L2("Chat","Chat","Chat","Chat")}</span>
+                  <span style={{fontSize:10,color:"rgba(255,255,255,.22)",flexShrink:0,marginRight:2}}>{fmtDate(c.ts)}</span>
+                  <button className="cp2-db" onClick={(e)=>cp2DeleteChat(c.id,e)} title={L2("Löschen","Delete","Supprimer","Elimina")}>✕</button>
+                </button>
+              ))}
+            </div>
+            {/* Footer */}
+            <div style={{borderTop:"1px solid rgba(255,255,255,.05)",padding:"10px 8px",flexShrink:0,display:"flex",flexDirection:"column",gap:5}}>
+              {authSession&&<div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",borderRadius:8,background:"rgba(255,255,255,.03)"}}>
+                <div style={{width:26,height:26,borderRadius:"50%",background:"rgba(16,185,129,.18)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,flexShrink:0,fontWeight:700,color:"var(--em)"}}>
+                  {authSession.name?authSession.name[0].toUpperCase():"U"}
+                </div>
+                <div style={{flex:1,overflow:"hidden"}}>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,.55)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{authSession.name||authSession.email||"User"}</div>
+                  <div style={{fontSize:10,color:isUltimate2?"#f59e0b":isPro2?"var(--em)":"rgba(255,255,255,.28)"}}>{isUltimate2?"✦ Ultimate":isPro2?"✦ Pro":"Free"}</div>
+                </div>
+              </div>}
+              <button onClick={()=>navTo("landing")} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.06)",borderRadius:8,padding:"7px 10px",color:"rgba(255,255,255,.4)",fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:6,transition:"all .15s"}}>
+                ← {L2("Zurück zu Stellify","Back to Stellify","Retour à Stellify","Torna a Stellify")}
+              </button>
+            </div>
+          </div>
+
+          {/* ══ RIGHT CHAT AREA ══ */}
+          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
+            {/* Chat Header */}
+            <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",borderBottom:"1px solid rgba(255,255,255,.06)",background:"rgba(0,0,0,.18)",flexShrink:0}}>
+              <button onClick={()=>setSidebarOpen(o=>!o)} className="cp2-mob" style={{display:"none",background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.09)",borderRadius:8,padding:"6px 10px",color:"rgba(255,255,255,.45)",cursor:"pointer",fontSize:15}}>☰</button>
+              <div style={{width:36,height:36,background:"linear-gradient(135deg,var(--em),#0ea5e9)",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,color:"white",fontWeight:700,flexShrink:0}}>✦</div>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:800,color:"white"}}>Stella</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,.32)"}}>{L2("KI-Karriere-Assistentin","AI Career Assistant","Assistante carrière IA","Assistente carriera IA")} · <span style={{color:"#22c55e",fontSize:10}}>●</span> Online</div>
+              </div>
+              {isUltimate2&&<div style={{fontSize:11,color:"#f59e0b",fontWeight:700,background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.2)",borderRadius:99,padding:"3px 10px"}}>✦ Ultimate</div>}
+              {isPro2&&!isUltimate2&&<div style={{fontSize:11,color:"var(--em)",fontWeight:700,background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.2)",borderRadius:99,padding:"3px 10px"}}>✦ Pro</div>}
+              {isFree2&&<button onClick={()=>setPw(true)} style={{fontSize:11,color:"#f59e0b",fontWeight:700,background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.18)",borderRadius:99,padding:"4px 12px",cursor:"pointer"}}>
+                {L2("Pro freischalten ✦","Unlock Pro ✦","Activer Pro ✦","Sblocca Pro ✦")}
+              </button>}
+              {!isLoggedIn2&&<button onClick={()=>setShowAuth(true)} style={{fontSize:11,color:"var(--em)",fontWeight:700,background:"rgba(16,185,129,.08)",border:"1px solid rgba(16,185,129,.18)",borderRadius:99,padding:"4px 12px",cursor:"pointer"}}>
+                {L2("Anmelden","Log in","Connexion","Accedi")}
+              </button>}
+            </div>
+
+            {/* Messages */}
+            <div style={{flex:1,overflowY:"auto",padding:"24px 20px",display:"flex",flexDirection:"column",gap:0,boxSizing:"border-box"}}>
+              <div style={{maxWidth:760,width:"100%",margin:"0 auto",display:"flex",flexDirection:"column",gap:18}}>
+                {activeMsgs.length===0&&<div style={{textAlign:"center",padding:"64px 20px",color:"rgba(255,255,255,.2)"}}>
+                  <div style={{fontSize:44,marginBottom:10}}>✦</div>
+                  <div style={{fontFamily:"var(--hd)",fontSize:22,fontWeight:800,color:"rgba(255,255,255,.25)",marginBottom:6}}>Stella</div>
+                  <div style={{fontSize:13}}>{L2("Deine KI-Karriere-Assistentin. Stell mir eine Frage!","Your AI career assistant. Ask me anything!","Ton assistante carrière IA. Pose-moi une question!","La tua assistente. Fammi una domanda!")}</div>
+                </div>}
+                {activeMsgs.map((m,i)=>(
+                  <div key={i} style={{display:"flex",gap:12,flexDirection:m.r==="u"?"row-reverse":"row",alignItems:"flex-end"}}>
+                    <div style={{width:33,height:33,borderRadius:"50%",background:m.r==="u"?"rgba(16,185,129,.2)":"linear-gradient(135deg,var(--em),#0ea5e9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:m.r==="u"?13:15,flexShrink:0,fontWeight:700,color:"white"}}>
+                      {m.r==="u"?(authSession?.name?authSession.name[0].toUpperCase():"U"):"✦"}
+                    </div>
+                    <div style={{maxWidth:"73%",background:m.r==="u"?"rgba(16,185,129,.12)":"rgba(255,255,255,.04)",border:`1px solid ${m.r==="u"?"rgba(16,185,129,.22)":"rgba(255,255,255,.06)"}`,borderRadius:m.r==="u"?"18px 18px 4px 18px":"18px 18px 18px 4px",padding:"11px 15px",fontSize:14,color:m.r==="u"?"rgba(255,255,255,.9)":"rgba(255,255,255,.82)",lineHeight:1.75}}>
+                      {m.r==="ai"?renderMsg2(m.t):m.t}
+                    </div>
+                  </div>
+                ))}
+                {chatLoad&&<div style={{display:"flex",gap:12,alignItems:"flex-end"}}>
+                  <div style={{width:33,height:33,borderRadius:"50%",background:"linear-gradient(135deg,var(--em),#0ea5e9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,color:"white",fontWeight:700}}>✦</div>
+                  <div style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.06)",borderRadius:"18px 18px 18px 4px",padding:"13px 17px",display:"flex",gap:5,alignItems:"center"}}>
+                    {[0,1,2].map(j=><div key={j} style={{width:7,height:7,borderRadius:"50%",background:"var(--em)",animation:`pulse 1.2s ease-in-out ${j*0.2}s infinite`}}/>)}
+                  </div>
+                </div>}
+                <div ref={endRef}/>
+              </div>
+            </div>
+
+            {/* Upgrade banner */}
+            {!localCanChat&&<div style={{background:"rgba(245,158,11,.07)",borderTop:"1px solid rgba(245,158,11,.15)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexShrink:0}}>
+              <div style={{fontSize:13,color:"rgba(245,158,11,.75)"}}>{L2("Chat-Limit erreicht – Pro für unlimitierte Gespräche freischalten","Chat limit reached – unlock Pro for unlimited chats","Limite atteint – activer Pro","Limite raggiunto – sblocca Pro")}</div>
+              <button onClick={()=>setPw(true)} style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",border:"none",borderRadius:10,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer"}}>Pro ✦ →</button>
+            </div>}
+
+            {/* Quick prompts */}
+            {activeMsgs.length<=1&&!chatLoad&&<div style={{padding:"0 20px 10px",display:"flex",gap:7,flexWrap:"wrap",justifyContent:"center",flexShrink:0}}>
+              {[
+                L2("✍️ Motivationsschreiben","✍️ Cover letter","✍️ Lettre de motivation","✍️ Lettera motivazione"),
+                L2("💰 Gehalt verhandeln","💰 Salary negotiation","💰 Salaire","💰 Stipendio"),
+                L2("💼 LinkedIn optimieren","💼 LinkedIn","💼 LinkedIn","💼 LinkedIn"),
+                L2("🎤 Interview vorbereiten","🎤 Interview tips","🎤 Entretien","🎤 Colloquio"),
+              ].map((q,qi)=>(
+                <button key={qi} className="cp2-qb" onClick={()=>send2(q.replace(/^[^\s]+\s/,""))}>{q}</button>
+              ))}
+            </div>}
+
+            {/* Input */}
+            <div style={{borderTop:"1px solid rgba(255,255,255,.06)",padding:"14px 20px 16px",background:"rgba(0,0,0,.12)",flexShrink:0}}>
+              <div style={{maxWidth:760,margin:"0 auto",display:"flex",gap:10,alignItems:"flex-end"}}>
+                <div style={{flex:1,background:"rgba(255,255,255,.05)",border:`1px solid ${localCanChat?"rgba(255,255,255,.09)":"rgba(245,158,11,.18)"}`,borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"flex-end",gap:10,transition:"border-color .2s"}}>
+                  <textarea value={chatIn} onChange={e=>setChatIn(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey&&!chatLoad&&localCanChat){e.preventDefault();send2();}}}
+                    placeholder={localCanChat?L2("Frag Stella etwas…","Ask Stella anything…","Pose une question…","Chiedi a Stella…"):L2("Chat-Limit erreicht","Chat limit reached","Limite atteint","Limite raggiunto")}
+                    disabled={!localCanChat||chatLoad}
+                    style={{flex:1,background:"none",border:"none",color:"white",fontSize:14,resize:"none",outline:"none",minHeight:24,maxHeight:140,lineHeight:1.65,fontFamily:"inherit"}}
+                    rows={1}/>
+                </div>
+                <button onClick={()=>send2()} disabled={!chatIn.trim()||chatLoad||!localCanChat}
+                  style={{width:46,height:46,borderRadius:14,background:chatIn.trim()&&localCanChat?"var(--em)":"rgba(255,255,255,.05)",border:`1px solid ${chatIn.trim()&&localCanChat?"var(--em)":"rgba(255,255,255,.07)"}`,cursor:chatIn.trim()&&localCanChat?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,transition:"all .2s",color:"white"}}>
+                  {chatLoad?"⏳":"➤"}
+                </button>
+              </div>
+              <div style={{textAlign:"center",fontSize:11,color:"rgba(255,255,255,.13)",marginTop:7}}>{L2("Stella kann Fehler machen – wichtige Entscheidungen bitte selbst prüfen.","Stella can make mistakes – please verify important decisions.","Stella peut faire des erreurs – vérifiez les décisions importantes.","Stella può sbagliare – verifica le decisioni importanti.")}</div>
+            </div>
           </div>
         </div>
-        <style>{`@keyframes pulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.3);opacity:1}}`}</style>
       </>);
     }
     return <ChatPage/>;
