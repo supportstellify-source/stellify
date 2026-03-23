@@ -1996,13 +1996,32 @@ function AppDemo({lang}) {
   const [open,setOpen] = useState(false);
   const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
   const example = L(
-`Sehr geehrte Damen und Herren
+`Anna Müller · Seestrasse 44 · 8002 Zürich · anna.mueller@email.ch
 
-Mit grossem Interesse habe ich Ihre Ausschreibung für die Position als Product Manager bei Migros Zürich gelesen. Als erfahrener Produktmanager mit fünf Jahren FMCG-Erfahrung bringe ich strategisches Denken und operative Stärke mit.
+                                                    Zürich, 23. März 2026
+Migros-Genossenschafts-Bund
+Limmatstrasse 152, 8031 Zürich
+z. Hd. Personalmanagement
 
-Meine Mehrsprachigkeit (DE/EN/FR) ermöglicht reibungslose Zusammenarbeit in der ganzen Schweiz. Besonders reizt mich Ihr Engagement für Nachhaltigkeit.
+**Bewerbung als Product Manager Digital (80–100%)**
 
-Freundliche Grüsse, [Ihr Name]`,
+Sehr geehrte Damen und Herren
+
+Als jemand, der täglich Migros-Apps nutzt und die digitale Transformation im Retail aus erster Hand kennt, war Ihre Stellenausschreibung sofort ein Muss für mich.
+
+In meinen fünf Jahren als Product Manager bei Coop Digital habe ich drei mobile Apps von 0 auf 4.8 Sterne gebracht und den digitalen Umsatz um CHF 2,4 Mio. jährlich gesteigert. Mit meiner Mehrsprachigkeit (DE/EN/FR) überbrücke ich Deutschschweizer Pragmatismus mit romandischer Kundenorientierung – ein Plus, das im Schweizer Retail oft unterschätzt wird.
+
+Besonders schätze ich Ihre «Nachhaltigkeit 2030»-Initiative: In meiner letzten Rolle habe ich eine CO₂-Tracking-Funktion für 800'000 User entwickelt, die nun schweizweit ausgezeichnet wird.
+
+Ich freue mich auf ein persönliches Gespräch und stehe ab sofort zur Verfügung.
+
+Freundliche Grüsse
+Anna Müller
+
+Beilagen: Lebenslauf mit Foto, Arbeitszeugnisse (UBS, Coop Digital), Diplome
+
+─────────────────────────────
+✅ ATS-Score: 91/100 · ✅ Schweizer Format · ✅ Keywords aus Inserat ✓`,
 `Dear Sir or Madam,
 
 I read your advertisement for the Product Manager position at Migros Zürich with great interest. With five years of FMCG experience I bring strategic thinking and operational strength.
@@ -2419,10 +2438,9 @@ Next step: Apply for Nestlé →`,
 ✗ Schwach:
   Zu vage – kein Bezug zur Stelle
   Kein konkreter Plan genannt
-  Klingt nach jedem Bewerber
 
-💡 Bessere Antwort:
-«In 5 Jahren sehe ich mich in einer Führungsrolle im Marketing bei einem FMCG-Unternehmen. Bei Migros möchte ich zuerst die Marke XY mit aufbauen, dann ein Team von 3–5 Personen leiten. Das deckt sich mit Ihrer Wachstumsstrategie Schweiz 2028.»
+💡 Bessere Antwort (STAR-Methode):
+«In 5 Jahren sehe ich mich in einer Führungsrolle im Marketing. Bei Migros möchte ich zunächst die Digitalstrategie für Marke XY mitgestalten, dann ein Team von 3–5 Personen leiten.»
 
 → Score mit verbesserter Antwort: 89/100 ✅`,
 `📊 Score: 61/100 – Needs improvement
@@ -2466,16 +2484,90 @@ Next step: Apply for Nestlé →`,
 
 → Punteggio migliorato: 89/100 ✅`)
     },
+    {
+      id:"lehrstelle", ico:"🎓",
+      label:L("Lehrstellen-Bewerbung 🇨🇭","Apprenticeship 🇨🇭","Apprentissage 🇨🇭","Apprendistato 🇨🇭"),
+      badge:L("Swiss USP","Swiss USP","Swiss USP","Swiss USP"), badgeCol:"#ef4444",
+      input:[{l:L("Lehrberuf + Firma","Trade + Company","Métier + Entreprise","Mestiere + Azienda"),v:"Kauffrau EFZ · UBS AG Zürich"},{l:L("🔑 Schnupperlehre","🔑 Trial placement","🔑 Stage orientation","🔑 Stage orientamento"),v:L("3 Tage bei UBS Jan. 2026, Kundenberatung","3 days UBS Jan 2026, client advisory","3 jours UBS jan. 2026, conseil client","3 giorni UBS gen. 2026, consulenza")}],
+      output:L(
+`Lena Müller · Seestrasse 4 · 8002 Zürich
+lena.mueller@gmail.com · 079 123 45 67
+
+                              Zürich, 23. März 2026
+UBS AG – Personalmanagement
+Bahnhofstrasse 45, 8001 Zürich
+
+**Bewerbung als Lernende Kauffrau EFZ**
+
+Sehr geehrte Damen und Herren
+
+An der Berufsmesse Zürich besuchte ich Ihren Stand – seitdem ist UBS mein absoluter Wunsch-Lehrort.
+
+Ich bringe ausgezeichnete Noten mit: Mathe 5.5, Deutsch 5. Strukturiertes Arbeiten und echte Begeisterung für die Finanzbranche sind meine Stärken.
+
+Während meiner 3-tägigen Schnupperlehre vom 14.–16. Januar 2026 begleitete ich Kundenberater Thomas Huber. Besonders beeindruckt hat mich das lösungsorientierte Arbeiten im Team. Dieser Einblick hat meinen Berufswunsch endgültig bestätigt.
+
+Ich freue mich sehr auf ein persönliches Gespräch.
+
+Freundliche Grüsse · Lena Müller
+Beilagen: Lebenslauf mit Foto, Schulzeugnis, Schnupperlehrbestätigung UBS
+
+──────────────────────────────────────
+✅ Kein «ß» · ✅ Schnupperlehre HT3 · ✅ Noten 5.5/5
+✅ Datum rechtsbündig · ✅ Betreff fett + EFZ · ✅ Swiss-Format`,
+`Lena Müller · Seestrasse 4 · 8002 Zürich
+
+                              Zurich, 23 March 2026
+UBS AG – HR Department
+Bahnhofstrasse 45, 8001 Zurich
+
+**Application as Apprentice Commercial Employee EFZ**
+
+Dear Sir or Madam,
+
+At the Berufsmesse Zürich I visited your stand – since then UBS has been my absolute top-choice employer for my apprenticeship.
+
+I bring excellent grades: Maths 5.5, German 5. Structured working and genuine enthusiasm for finance are my strengths.
+
+During my 3-day trial placement (14–16 Jan 2026) I shadowed client advisor Thomas Huber. His solution-oriented approach deeply impressed me and confirmed my career choice.
+
+Kind regards · Lena Müller
+
+──────────────────────────────────────
+✅ Swiss format · ✅ Trial placement in main body · ✅ Grades listed`,
+`Lena Müller · Seestrasse 4 · 8002 Zürich
+
+**Candidature comme Apprentie employée de commerce AFC**
+
+À la Berufsmesse Zürich j'ai visité votre stand – depuis, UBS est mon premier choix.
+
+Notes: Maths 5.5, Allemand 5. Durant mon stage du 14–16 janv. 2026 j'ai accompagné le conseiller Thomas Huber – son approche orientée solutions m'a profondément marquée.
+
+Cordialement · Lena Müller
+
+✅ Format suisse · ✅ Stage mentionné · ✅ Notes indiquées`,
+`Lena Müller · Seestrasse 4 · 8002 Zurigo
+
+**Candidatura Apprendista impiegata di commercio AFC**
+
+Alla Berufsmesse Zürich ho visitato il vostro stand – da allora UBS è la mia prima scelta.
+
+Voti: Matematica 5.5, Tedesco 5. Durante il mio stage 14–16 gen. 2026 ho affiancato Thomas Huber – il suo approccio mi ha profondamente impressionata.
+
+Cordiali saluti · Lena Müller
+
+✅ Formato svizzero · ✅ Stage menzionato · ✅ Voti indicati`)
+    },
   ];
   const demo = demos[demoTab];
   return (
     <div>
       {/* Tool Tabs */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:20}}>
         {demos.map((d,i)=>(
-          <button key={i} onClick={()=>setDemoTab(i)} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${i===demoTab?"rgba(16,185,129,.5)":"rgba(255,255,255,.08)"}`,background:i===demoTab?"rgba(16,185,129,.12)":"rgba(255,255,255,.03)",color:i===demoTab?"var(--em)":"rgba(255,255,255,.35)",fontFamily:"var(--hd)",fontWeight:700,fontSize:12,cursor:"pointer",transition:"all .18s",display:"flex",alignItems:"center",gap:6,gridColumn:(i===demos.length-1&&demos.length%2!==0)?"span 2":"span 1",justifyContent:"flex-start"}}>
-            <span>{d.ico}</span><span style={{flex:1,textAlign:"left"}}>{d.label}</span>
-            <span style={{fontSize:10,background:d.badgeCol+"33",color:d.badgeCol,padding:"1px 7px",borderRadius:20,fontWeight:700,flexShrink:0}}>{d.badge}</span>
+          <button key={i} onClick={()=>setDemoTab(i)} style={{padding:"8px 12px",borderRadius:10,border:`1.5px solid ${i===demoTab?(d.badgeCol||"rgba(16,185,129,.5)")+"66":"rgba(255,255,255,.07)"}`,background:i===demoTab?(d.badgeCol||"rgba(16,185,129,.1)")+"1a":"rgba(255,255,255,.03)",color:i===demoTab?"white":"rgba(255,255,255,.35)",fontFamily:"var(--hd)",fontWeight:700,fontSize:12,cursor:"pointer",transition:"all .18s",display:"flex",alignItems:"center",gap:6,justifyContent:"flex-start"}}>
+            <span style={{fontSize:15}}>{d.ico}</span>
+            <span style={{flex:1,textAlign:"left",fontSize:11,lineHeight:1.2}}>{d.label}</span>
           </button>
         ))}
       </div>
@@ -2685,24 +2777,85 @@ function DocUpload({lang, onFile, onText, file, onClear}) {
 // SPLASH SCREEN
 // ══════════════════════════════════════════════════════════
 function SplashScreen({ onDone }) {
-  useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, []);
+  const [phase, setPhase] = React.useState(0);
+  useEffect(() => {
+    const t1 = setTimeout(()=>setPhase(1), 400);
+    const t2 = setTimeout(()=>setPhase(2), 900);
+    const t3 = setTimeout(()=>setPhase(3), 1400);
+    const t4 = setTimeout(onDone, 3000);
+    return () => { clearTimeout(t1);clearTimeout(t2);clearTimeout(t3);clearTimeout(t4); };
+  }, []);
+  const PARTICLES = Array.from({length:22},(_,i)=>({
+    x:Math.sin(i*2.85)*42+50, y:Math.cos(i*1.67)*38+50,
+    s:3+((i*7)%8), d:0.6+((i*0.31)%1.8), del:(i*0.08)
+  }));
   return (
-    <div style={{position:"fixed",inset:0,background:"linear-gradient(135deg,#07070e 0%,#0f1a12 100%)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:9999,animation:"splashOut 0.5s ease 1.8s forwards"}}>
+    <div style={{position:"fixed",inset:0,zIndex:9999,overflow:"hidden",
+      background:"radial-gradient(ellipse 120% 80% at 50% 40%, #060d1a 0%, #020508 60%, #000 100%)",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      transition:"opacity .6s ease",opacity:phase===3?0:1,pointerEvents:phase===3?"none":"auto"}}>
       <style>{`
-        @keyframes splashOut { to { opacity:0; pointer-events:none; } }
-        @keyframes logoIn { from { opacity:0; transform:translate3d(0,20px,0) scale(.7); } to { opacity:1; transform:translate3d(0,0,0) scale(1); } }
-        @keyframes tagIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+        @keyframes sp-orb{0%{transform:scale(1) translate(0,0);opacity:.55}50%{transform:scale(1.25) translate(8px,-12px);opacity:.85}100%{transform:scale(1) translate(0,0);opacity:.55}}
+        @keyframes sp-ring{0%{transform:scale(.1);opacity:1}100%{transform:scale(3.5);opacity:0}}
+        @keyframes sp-float{0%{transform:translateY(0) scale(1);opacity:.7}50%{transform:translateY(-18px) scale(1.1);opacity:1}100%{transform:translateY(0) scale(1);opacity:.7}}
+        @keyframes sp-in{from{opacity:0;transform:translateY(22px) scale(.8)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes sp-shine{0%{background-position:200% center}100%{background-position:-200% center}}
+        @keyframes sp-bar{from{width:0}to{width:100%}}
+        @keyframes sp-pt{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-80px);opacity:0}}
       `}</style>
-      <div style={{animation:"logoIn .7s cubic-bezier(.34,1.56,.64,1) .2s both"}}>
-        <div style={{width:88,height:88,borderRadius:24,background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:42,marginBottom:20,boxShadow:"0 0 60px rgba(16,185,129,.4)",animation:"pulse 2s ease 0.8s infinite"}}>✦</div>
+
+      {/* Deep orbs */}
+      <div style={{position:"absolute",width:700,height:700,borderRadius:"50%",background:"radial-gradient(circle,rgba(16,185,129,.18) 0%,transparent 70%)",top:"50%",left:"50%",transform:"translate(-50%,-50%)",animation:"sp-orb 6s ease infinite",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",background:"radial-gradient(circle,rgba(99,102,241,.2) 0%,transparent 70%)",top:"30%",right:"15%",animation:"sp-orb 8s ease 2s infinite",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",width:300,height:300,borderRadius:"50%",background:"radial-gradient(circle,rgba(245,158,11,.12) 0%,transparent 70%)",bottom:"20%",left:"10%",animation:"sp-orb 7s ease 1s infinite",pointerEvents:"none"}}/>
+
+      {/* Floating particles */}
+      {PARTICLES.map((p,i)=>(
+        <div key={i} style={{position:"absolute",left:`${p.x}%`,top:`${p.y}%`,
+          width:p.s,height:p.s,borderRadius:"50%",
+          background:i%3===0?"rgba(16,185,129,.8)":i%3===1?"rgba(99,102,241,.7)":"rgba(245,158,11,.6)",
+          animation:`sp-pt ${p.d+2}s ease ${p.del}s infinite`,
+          boxShadow:`0 0 ${p.s*2}px currentColor`}}/>
+      ))}
+
+      {/* Expanding rings */}
+      {phase>=1&&[0,1,2].map(i=>(
+        <div key={i} style={{position:"absolute",width:140,height:140,borderRadius:"50%",
+          border:"1.5px solid rgba(16,185,129,.5)",
+          animation:`sp-ring ${1.4+i*.35}s cubic-bezier(.2,.6,.4,1) ${i*0.22}s forwards`}}/>
+      ))}
+
+      {/* Central logo */}
+      <div style={{animation:`sp-float 3s ease 1s infinite`,position:"relative",zIndex:2}}>
+        {/* Glow */}
+        <div style={{position:"absolute",inset:-20,borderRadius:"50%",background:"radial-gradient(circle,rgba(16,185,129,.35),transparent 70%)",animation:`sp-orb 2s ease infinite`}}/>
+        <div style={{width:100,height:100,borderRadius:28,
+          background:"linear-gradient(135deg,#10b981 0%,#059669 50%,#0d9e6e 100%)",
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize:48,
+          boxShadow:"0 0 0 2px rgba(16,185,129,.3),0 0 40px rgba(16,185,129,.6),0 0 80px rgba(16,185,129,.3),0 20px 40px rgba(0,0,0,.5)",
+          position:"relative",zIndex:1}}>✦</div>
       </div>
-      <div style={{fontFamily:"'Bricolage Grotesque',system-ui",fontSize:34,fontWeight:800,color:"white",letterSpacing:"-1.5px",animation:"logoIn .7s ease .4s both"}}>Stellify</div>
-      <div style={{fontSize:13,color:"rgba(255,255,255,.35)",marginTop:8,animation:"tagIn .6s ease .8s both"}}>AI Career Copilot Schweiz</div>
-      <div style={{position:"absolute",bottom:48,display:"flex",gap:6}}>
-        {[0,1,2].map(i=>(
-          <div key={i} style={{width:6,height:6,borderRadius:"50%",background:"rgba(16,185,129,.6)",animation:`pulse 1s ease ${.2+i*.15}s infinite`}}/>
+
+      {/* Brand text */}
+      {phase>=1&&<div style={{marginTop:28,textAlign:"center",animation:"sp-in .6s cubic-bezier(.34,1.56,.64,1) both"}}>
+        <div style={{
+          fontFamily:"'Bricolage Grotesque',system-ui",fontSize:44,fontWeight:900,letterSpacing:"-2px",
+          background:"linear-gradient(135deg,#ffffff 0%,#10b981 40%,#ffffff 60%,#a7f3d0 100%)",
+          backgroundSize:"200% auto",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
+          backgroundClip:"text",animation:"sp-shine 2s linear infinite"}}>Stellify</div>
+      </div>}
+      {phase>=2&&<div style={{fontSize:13,color:"rgba(255,255,255,.4)",letterSpacing:3,textTransform:"uppercase",marginTop:6,animation:"sp-in .5s ease both"}}>
+        AI Career Copilot · 🇨🇭 Schweiz
+      </div>}
+      {phase>=2&&<div style={{marginTop:20,display:"flex",gap:10,animation:"sp-in .5s ease .1s both"}}>
+        {["✍️ Bewerbungen","💼 LinkedIn","🤖 ATS","🎤 Interview"].map((t,i)=>(
+          <div key={i} style={{fontSize:10,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:99,padding:"4px 10px",color:"rgba(255,255,255,.45)",animation:`sp-in .4s ease ${.1+i*.08}s both`}}>{t}</div>
         ))}
+      </div>}
+
+      {/* Progress bar */}
+      <div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:"rgba(255,255,255,.04)"}}>
+        <div style={{height:"100%",background:"linear-gradient(90deg,#10b981,#059669,#10b981)",backgroundSize:"200% 100%",animation:`sp-bar 2.6s cubic-bezier(.4,0,.2,1) forwards, sp-shine 1s linear infinite`}}/>
       </div>
     </div>
   );
@@ -4123,7 +4276,7 @@ export default function App() {
   const [showPromo,setShowPromo]=useState(false);
   const closePromo=()=>{ try{sessionStorage.setItem("stf_promo_shown","1");}catch{} setShowPromo(false); };
   const [showReferral,setShowReferral]=useState(false);
-  const [pw,setPw]=useState(false); const [yearly,setYearly]=useState(true); // Jährlich Standard
+  const [pw,setPw]=useState(false); const [yearly,setYearly]=useState(false); // Monatlich Standard
   // Auth
   const [authSession, setAuthSession] = useState(()=>authGetSession());
   const [showAuth, setShowAuth] = useState(false);
@@ -6286,7 +6439,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                 </button>
               </div>
               {!yearly&&<div style={{fontSize:12,color:"rgba(255,255,255,.3)",display:"flex",alignItems:"center",gap:6}}>
-                <span style={{color:"var(--em)"}}>↑</span>
+                <span style={{color:"var(--em)",fontSize:14}}>→</span>
                 {lang==="de"?"Jährlich wählen und 2 Monate gratis sparen!":lang==="en"?"Choose yearly and save 2 months free!":lang==="fr"?"Choisissez l'annuel et économisez 2 mois !":"Scegli l'annuale e risparmia 2 mesi gratis!"}
               </div>}
             </div>
@@ -6382,33 +6535,33 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                     {tier.btn}
                   </button>}
                   {isPro&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    {/* Yearly – primary */}
-                    <button onClick={()=>window.open(C.stripeYearly,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(16,185,129,.35)",transition:"all .2s",position:"relative"}}
+                    {/* Monthly – primary */}
+                    <button onClick={()=>window.open(C.stripeMonthly,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(16,185,129,.35)",transition:"all .2s"}}
                       onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 8px 32px rgba(16,185,129,.5)";e.currentTarget.style.transform="translateY(-1px)";}}
                       onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 4px 20px rgba(16,185,129,.35)";e.currentTarget.style.transform="none";}}>
-                      <span style={{position:"absolute",top:-9,right:12,background:"#f59e0b",color:"white",fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:99}}>–17%</span>
-                      {lang==="de"?`Jährlich → CHF ${C.priceY}/Mo.`:lang==="en"?`Yearly → CHF ${C.priceY}/mo`:lang==="fr"?`Annuel → CHF ${C.priceY}/mois`:`Annuale → CHF ${C.priceY}/mese`}
-                    </button>
-                    {/* Monthly – secondary */}
-                    <button onClick={()=>window.open(C.stripeMonthly,"_blank")} style={{width:"100%",padding:"10px",borderRadius:12,border:"1px solid rgba(255,255,255,.12)",background:"transparent",color:"rgba(255,255,255,.45)",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s"}}
-                      onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.3)";e.currentTarget.style.color="rgba(255,255,255,.7)";}}
-                      onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.12)";e.currentTarget.style.color="rgba(255,255,255,.45)";}}>
                       {lang==="de"?`Monatlich → CHF ${C.priceM}/Mo.`:lang==="en"?`Monthly → CHF ${C.priceM}/mo`:lang==="fr"?`Mensuel → CHF ${C.priceM}/mois`:`Mensile → CHF ${C.priceM}/mese`}
+                    </button>
+                    {/* Yearly – secondary with badge */}
+                    <button onClick={()=>window.open(C.stripeYearly,"_blank")} style={{width:"100%",padding:"10px",borderRadius:12,border:"1px solid rgba(255,255,255,.12)",background:"transparent",color:"rgba(255,255,255,.5)",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s",position:"relative"}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(16,185,129,.4)";e.currentTarget.style.color="var(--em)";}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.12)";e.currentTarget.style.color="rgba(255,255,255,.5)";}}>
+                      <span style={{position:"absolute",top:-8,right:10,background:"#f59e0b",color:"white",fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:99}}>–17%</span>
+                      {lang==="de"?`Jährlich → CHF ${C.priceY}/Mo.`:lang==="en"?`Yearly → CHF ${C.priceY}/mo`:lang==="fr"?`Annuel → CHF ${C.priceY}/mois`:`Annuale → CHF ${C.priceY}/mese`}
                     </button>
                   </div>}
                   {isUlt&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    {/* Ultimate Yearly – primary */}
-                    <button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.35)",transition:"all .2s",position:"relative"}}
+                    {/* Ultimate Monthly – primary (correct Stripe link for monthly) */}
+                    <button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.35)",transition:"all .2s"}}
                       onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 8px 32px rgba(245,158,11,.5)";e.currentTarget.style.transform="translateY(-1px)";}}
                       onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 4px 20px rgba(245,158,11,.35)";e.currentTarget.style.transform="none";}}>
-                      <span style={{position:"absolute",top:-9,right:12,background:"#10b981",color:"white",fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:99}}>–20%</span>
-                      {lang==="de"?"Jährlich → CHF 39.90/Mo.":lang==="en"?"Yearly → CHF 39.90/mo":lang==="fr"?"Annuel → CHF 39.90/mois":"Annuale → CHF 39.90/mese"}
+                      {lang==="de"?`Monatlich → CHF ${C.priceUltimate}/Mo.`:lang==="en"?`Monthly → CHF ${C.priceUltimate}/mo`:lang==="fr"?`Mensuel → CHF ${C.priceUltimate}/mois`:`Mensile → CHF ${C.priceUltimate}/mese`}
                     </button>
-                    {/* Ultimate Monthly – secondary */}
-                    <button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"10px",borderRadius:12,border:"1px solid rgba(245,158,11,.25)",background:"transparent",color:"rgba(245,158,11,.6)",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s"}}
+                    {/* Ultimate Yearly – secondary (correct Stripe link for yearly) */}
+                    <button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"10px",borderRadius:12,border:"1px solid rgba(245,158,11,.25)",background:"transparent",color:"rgba(245,158,11,.6)",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s",position:"relative"}}
                       onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(245,158,11,.5)";e.currentTarget.style.color="#f59e0b";}}
                       onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(245,158,11,.25)";e.currentTarget.style.color="rgba(245,158,11,.6)";}}>
-                      {lang==="de"?`Monatlich → CHF ${C.priceUltimate}/Mo.`:lang==="en"?`Monthly → CHF ${C.priceUltimate}/mo`:lang==="fr"?`Mensuel → CHF ${C.priceUltimate}/mois`:`Mensile → CHF ${C.priceUltimate}/mese`}
+                      <span style={{position:"absolute",top:-8,right:10,background:"#10b981",color:"white",fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:99}}>–20%</span>
+                      {lang==="de"?"Jährlich → CHF 39.90/Mo.":lang==="en"?"Yearly → CHF 39.90/mo":lang==="fr"?"Annuel → CHF 39.90/mois":"Annuale → CHF 39.90/mese"}
                     </button>
                   </div>}
                   {isStarter&&<div>
