@@ -15,7 +15,7 @@ const C = {
   priceM: "19.90",
   priceY: "14.90",
   FREE_LIMIT: 1,
-  PRO_LIMIT: 20, // 20 Generierungen pro Tag
+  PRO_LIMIT: 100, // 100 Erstellungen pro Woche (Reset: Montag 07:00)
   CHAT_FREE_LIMIT: 25,
 
   ULTIMATE_LIMIT: 9999999,  // effektiv unbegrenzt
@@ -54,8 +54,9 @@ const getU = () => {
     const w = getWeekKey();                           // wöchentlicher Reset für Pro
     const resetMonth = d.month !== m;
     const resetDay   = d.day   !== new Date().toISOString().slice(0,10);
+    const resetWeek = d.week !== w;
     if(resetMonth) return {month:m, week:w, count:0, proCount:0, chatCount:0};
-    if(resetDay)   return {...d, day:new Date().toISOString().slice(0,10), proCount:0}; // Pro-Limit daily reset
+    if(resetWeek)  return {...d, week:w, proCount:0}; // Pro-Limit weekly reset (Montag 07:00)
     return d;
   } catch { return {month:"", week:"", count:0, proCount:0, chatCount:0}; }
 };
@@ -2873,12 +2874,13 @@ function ChatBot({ lang, pro, setPw, navTo, authSession, onAuthOpen }) {
     setActiveChatId(id);
     saveActiveChatId(id);
     setShowHistory(false);
-    // Grüssung direkt setzen
+    // Vollständige Begrüssung für neue Chats
+    const planLabel = authSession?.plan === "ultimate" ? "Ultimate" : authSession?.plan === "pro" ? "Pro" : "Free";
     const welcome = {r:"ai", t: L(
-      "Hallo! Ich bin Stella 👋 Deine KI-Karriere-Assistentin von Stellify. Wie kann ich dir helfen?",
-      "Hi! I'm Stella 👋 Your AI career assistant from Stellify. How can I help?",
-      "Bonjour! Je suis Stella 👋 Comment puis-je vous aider?",
-      "Ciao! Sono Stella 👋 Come posso aiutarti?"
+      `Hallo! Ich bin **Stella** ✨ – deine persönliche KI-Karriere-Assistentin von Stellify.\n\nIch freue mich riesig, dich an Bord zu haben! Egal ob du ein perfektes Motivationsschreiben brauchst, deinen Lebenslauf optimieren möchtest oder Fragen zum Schweizer Arbeitsmarkt hast – ich bin hier.\n\n**So startest du am besten:**\n1. **Wähle ein Tool** – Unsere Smart Forms unter [Tools](/app) erstellen Dokumente direkt für dich\n2. **Frag mich alles** – Karriere, Bewerbung, Gehalt, LinkedIn – ich helfe dir\n3. **Bleib im Überblick** – Dein Abo-Status: **${planLabel}**\n\nWie kann ich dir heute helfen? 🚀`,
+      `Hi! I'm **Stella** ✨ – your personal AI career assistant from Stellify.\n\nI'm so excited to have you on board! Whether you need a perfect cover letter, want to optimize your CV, or have questions about the Swiss job market – I'm here.\n\n**Best way to get started:**\n1. **Choose a Tool** – Our Smart Forms at [Tools](/app) create documents directly for you\n2. **Ask me anything** – Career, applications, salary, LinkedIn – I'll help\n3. **Stay on top** – Your plan: **${planLabel}**\n\nHow can I help you today? 🚀`,
+      `Bonjour! Je suis **Stella** ✨ – votre assistante IA carrière de Stellify.\n\nComment puis-je vous aider aujourd'hui? 🚀`,
+      `Ciao! Sono **Stella** ✨ – la tua assistente IA carriera di Stellify.\n\nCome posso aiutarti oggi? 🚀`
     )};
     const newChats = [{id, title: "Neuer Chat", msgs: [welcome], ts: Date.now()}, ...chats];
     setChats(newChats);
@@ -2922,7 +2924,8 @@ function ChatBot({ lang, pro, setPw, navTo, authSession, onAuthOpen }) {
   const isLoggedIn = !!authSession;
   const isUltimatePlan = authSession?.plan === "ultimate" || authSession?.isAdmin;
   const isProPlan = pro && !isUltimatePlan;
-  // Ultimate: no limit. Pro: 25 questions. Free/non-logged: system prompt handles deflection.
+  const isFreePlan = isLoggedIn && !isProPlan && !isUltimatePlan;
+  // Ultimate: no limit. Pro: 25 questions/day. Free: blocked from technical questions. Non-logged: SYSTEM_PUBLIC.
   const canChat = !isLoggedIn || isUltimatePlan || chatUsage < C.CHAT_FREE_LIMIT;
   const needsUpgrade = isLoggedIn && isProPlan && chatUsage >= C.CHAT_FREE_LIMIT;
 
@@ -2933,7 +2936,27 @@ Stellify-Tools (20+): ✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung
 
 Preise: Gratis (1 Bewerbung, kein Abo), Pro CHF 14.90/Mo. jährlich (CHF 178.80/Jahr), Ultimate CHF 39.90/Mo. jährlich (CHF 478.80/Jahr). Alle Pläne jederzeit kündbar via Stripe. Twint, Kreditkarte, Apple Pay akzeptiert.
 
-WICHTIG: Wenn jemand konkrete Karriere-Fragen stellt (Bewerbung schreiben, Lohnverhandlung, Zeugnis deuten usw.), antworte: "Für persönliche Karriereberatung brauchst du ein Stellify-Konto. Registriere dich jetzt gratis – deine erste vollständige Bewerbung ist kostenlos!" Weise auf den Login-Button hin. Beantworte keine konkreten Karrierefragen ohne Login.`;
+WICHTIG: Wenn jemand konkrete Karriere-Fragen stellt (Bewerbung schreiben, Lohnverhandlung, Zeugnis deuten usw.), antworte freundlich: "Das ist eine spannende Fachfrage! Um dir hierbei mit voller Experten-Präzision zu helfen, benötigst du ein Stellify-Konto. Registriere dich jetzt gratis – deine erste Bewerbung ist kostenlos!" Beantworte keine konkreten Karrierefragen ohne Login.`;
+
+  // System-Prompt für Free-Tier User (eingeloggt, aber kein Pro/Ultimate)
+  const SYSTEM_FREE = `Du bist Stella, die freundliche KI-Assistentin von Stellify – dem Schweizer AI Career Copilot. Der User ist eingeloggt aber hat den kostenlosen Plan.
+
+Du darfst IMMER beantworten:
+- Fragen zu Stellify, seinen Tools, Preisen und Funktionen
+- Allgemeine Informationen zum Schweizer Arbeitsmarkt (kurze Überblicks-Antworten)
+- Hilfe bei der Navigation und den Features der Plattform
+
+Du MUSST ablehnen (mit Upgrade-Hinweis) bei:
+- Konkreten Bewerbungs-Texten schreiben (Motivationsschreiben, Lebenslauf-Formulierungen)
+- Spezifischen Gehaltsverhandlungs-Strategien oder Lohnanalysen
+- Tiefgehender Karriereberatung, Fachfragen aus Bereichen wie Recht, Finanzen, IT, Medizin
+- Erstellung von Excel-Tabellen, PowerPoint-Präsentationen, LinkedIn-Posts
+- Zeugnis-Interpretation oder ATS-Optimierung für konkrete Stellen
+
+Wenn jemand eine fachspezifische Anfrage stellt, antworte IMMER so (passe den Text dem Kontext an):
+"Das ist eine spannende Fachfrage! 🚀 Um dir hierbei mit voller Experten-Präzision zu helfen und tiefere Analysen zu erstellen, benötigst du Stellify Pro. Mit Pro schalte ich mein gesamtes Fachwissen für dich frei – inklusive ${C.PRO_LIMIT} Erstellungen pro Woche und 25 Fragen täglich. Upgrade jetzt für CHF 14.90/Mo. und starte sofort!"
+
+Preise: Pro CHF 19.90/Mo. oder CHF 14.90/Mo. jährlich. Ultimate CHF 49.90/Mo. oder CHF 39.90/Mo. jährlich. Jederzeit kündbar.`;
 
   const SYSTEM_FULL = `Du bist Stella, die KI-Karriere-Assistentin von Stellify. Du hast tiefes Wissen über Karriere, Bewerbungen, den Schweizer Arbeitsmarkt und Produktivität.
 
@@ -2942,9 +2965,9 @@ Dein Wissen umfasst: Schweizer Bewerbungsunterlagen (Motivationsschreiben, Leben
 Tools von Stellify:
 ✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer, 💰 KI-Gehaltsrechner Schweiz, 📋 Bewerbungs-Tracker, ✍️ LinkedIn-Post Generator
 
-Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib Beispieltexte direkt aus wenn gefragt. Empfehle Tool-Namen exakt wie oben damit Links funktionieren. Sei warm, direkt, wie ein erfahrener Karriere-Coach.`;
+Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib Beispieltexte direkt aus wenn gefragt. Empfehle Tool-Namen exakt wie oben damit Links funktionieren. Sei warm, direkt, wie ein erfahrener Karriere-Coach. Du bist Profi – keine Limits, keine Einschränkungen für diesen User.`;
 
-  const SYSTEM = isLoggedIn ? SYSTEM_FULL : SYSTEM_PUBLIC;
+  const SYSTEM = isUltimatePlan ? SYSTEM_FULL : isProPlan ? SYSTEM_FULL : isFreePlan ? SYSTEM_FREE : SYSTEM_PUBLIC;
 
   const TOOL_MAP = {
     "bewerbung":["✍️ Bewerbungen","app"], "bewerbungen":["✍️ Bewerbungen","app"],
@@ -3034,41 +3057,6 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
   };
 
   return (<>
-    {/* Auto-Bubble */}
-    {cookieDone&&bubble&&!open&&(
-      <div style={{position:"fixed",bottom:96,right:20,maxWidth:230,background:"rgba(13,13,26,.98)",border:"1px solid rgba(16,185,129,.25)",borderRadius:"16px 16px 4px 16px",padding:"12px 16px",zIndex:1002,boxShadow:"0 12px 40px rgba(0,0,0,.5)",cursor:"pointer",animation:"fadeSlideUp .35s cubic-bezier(.34,1.3,.64,1)"}} onClick={openChat}>
-        <button onClick={e=>{e.stopPropagation();setBubble(false);}} style={{position:"absolute",top:8,right:10,background:"none",border:"none",color:"rgba(255,255,255,.25)",fontSize:11,cursor:"pointer",lineHeight:1,padding:2}}>✕</button>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
-          <div style={{width:20,height:20,borderRadius:"50%",background:"linear-gradient(135deg,#10b981,#059669)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,flexShrink:0}}>✦</div>
-          <span style={{fontSize:12,fontWeight:700,color:"white"}}>Stella</span>
-          <div style={{width:6,height:6,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 4px #22c55e"}}/>
-        </div>
-        <div style={{fontSize:12,color:"rgba(255,255,255,.7)",lineHeight:1.55,paddingRight:8}}>
-          {L("Hallo 👋 Wie kann ich dir helfen?","Hi 👋 How can I help you?","Bonjour 👋 Comment puis-je aider?","Ciao 👋 Come posso aiutarti?")}
-        </div>
-        <div style={{fontSize:11,color:"var(--em)",fontWeight:600,marginTop:6}}>
-          {L("Frag mich →","Ask me →","Demandez →","Chiedimi →")}
-        </div>
-      </div>
-    )}
-
-    {/* Floating Button */}
-    {cookieDone&&(
-      <div style={{position:"fixed",bottom:24,right:24,zIndex:1001}}>
-        {!open&&<>
-          <div style={{position:"absolute",inset:-6,borderRadius:"50%",border:"2px solid rgba(16,185,129,.4)",animation:"chatPulse 2.4s ease-out infinite",pointerEvents:"none"}}/>
-          <div style={{position:"absolute",inset:-13,borderRadius:"50%",border:"1.5px solid rgba(16,185,129,.18)",animation:"chatPulse 2.4s ease-out infinite",animationDelay:".6s",pointerEvents:"none"}}/>
-        </>}
-        <button onClick={openChat}
-          style={{position:"relative",width:58,height:58,borderRadius:"50%",background:"linear-gradient(135deg,#10b981,#059669)",border:"none",cursor:"pointer",boxShadow:"0 6px 28px rgba(16,185,129,.55),0 2px 8px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,transition:"transform .3s cubic-bezier(.34,1.56,.64,1),box-shadow .2s"}}
-          onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.1) translateY(-2px)";e.currentTarget.style.boxShadow="0 10px 36px rgba(16,185,129,.65),0 2px 8px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.2)";}}
-          onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow="0 6px 28px rgba(16,185,129,.55),0 2px 8px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.2)";}}>
-          {open ? <span style={{fontSize:18,fontWeight:300}}>✕</span> : "💬"}
-          {bubble&&!open&&<div style={{position:"absolute",top:2,right:2,width:13,height:13,borderRadius:"50%",background:"#ef4444",border:"2px solid white",boxShadow:"0 2px 6px rgba(239,68,68,.6)"}}/>}
-        </button>
-      </div>
-    )}
-
     {/* ── CHAT WINDOW ── */}
     {open&&(
       <div style={{position:"fixed",bottom:96,right:24,width:440,maxWidth:"calc(100vw - 32px)",height:"min(640px,calc(100vh - 110px))",background:"#08081a",border:"1px solid rgba(255,255,255,.09)",borderRadius:24,boxShadow:"0 40px 100px rgba(0,0,0,.75),0 0 0 1px rgba(16,185,129,.06) inset",zIndex:1000,display:"flex",flexDirection:"column",overflow:"hidden",animation:"chatIn .28s cubic-bezier(.34,1.2,.64,1)"}}>
@@ -3981,9 +3969,7 @@ export default function App() {
   const [page,setPage]=useState("landing");
   const [pro,setPro]=useState(false); const [usage,setUsage]=useState(0); const [proUsage,setProUsage]=useState(0);
   const [splash,setSplash]=useState(()=>!sessionStorage.getItem("stf_splashed"));
-  const [showPromo,setShowPromo]=useState(()=>{
-    try { return !sessionStorage.getItem("stf_promo_shown"); } catch { return true; }
-  });
+  const [showPromo,setShowPromo]=useState(false);
   const closePromo=()=>{ try{sessionStorage.setItem("stf_promo_shown","1");}catch{} setShowPromo(false); };
   const [showReferral,setShowReferral]=useState(false);
   const [pw,setPw]=useState(false); const [yearly,setYearly]=useState(true); // Jährlich Standard
@@ -4042,16 +4028,18 @@ export default function App() {
   });
   const acceptCookie=(all)=>{ try { localStorage.setItem("stf_cookie_v2",all?"all":"essential"); } catch{} setCookieBanner(false); };
 
-  // Promo-Modal: erscheint nach 8 Sekunden beim ersten Besuch
+  // Promo-Modal: erscheint nach 12 Sekunden beim ersten Besuch der Session
   useEffect(()=>{
-    const seen = sessionStorage.getItem("stf_promo_seen");
-    if(!seen) {
+    try {
+      if(sessionStorage.getItem("stf_promo_shown")) return; // already shown/dismissed this session
       const timer = setTimeout(()=>{
-        setShowPromo(true);
-        sessionStorage.setItem("stf_promo_seen","1");
-      }, 8000);
+        if(!sessionStorage.getItem("stf_promo_shown")) {
+          setShowPromo(true);
+          sessionStorage.setItem("stf_promo_shown","1");
+        }
+      }, 12000);
       return ()=>clearTimeout(timer);
-    }
+    } catch {}
   },[]);
 
   // PromoModal Komponente
@@ -4289,7 +4277,11 @@ Antworte NUR mit JSON:
           <LangSw/>
           <button className="nlk" style={{color:lc}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("tools")?.scrollIntoView({behavior:"smooth"}),100)}}>{t.nav.tools}</button>
           <button className="nlk" style={{color:lc}} onClick={()=>{navTo("landing");setTimeout(()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"}),100)}}>{t.nav.prices}</button>
-          <button className="nlk" style={{color:"var(--em)",fontWeight:700}} onClick={()=>navTo("chat")}>💬 Stella</button>
+          <button className="nlk" style={{color:"var(--em)",fontWeight:700,position:"relative"}} onClick={()=>navTo("chat")}
+            title={lang==="de"?"Stella – deine KI-Karriere-Assistentin. Klicke um zu chatten!":lang==="en"?"Stella – your AI career assistant. Click to chat!":lang==="fr"?"Stella – votre assistante IA carrière. Cliquez pour chatter!":"Stella – la tua assistente IA carriera. Clicca per chattare!"}>
+            ✦ Stella
+            <span style={{position:"absolute",top:-6,right:-6,width:8,height:8,borderRadius:"50%",background:"#22c55e",boxShadow:"0 0 6px #22c55e"}}/>
+          </button>
           <button onClick={()=>setShowProfiles(true)} style={{display:"flex",alignItems:"center",gap:6,background:activeProfile?"rgba(16,185,129,.12)":"rgba(11,11,18,.06)",border:"1.5px solid",borderColor:activeProfile?"rgba(16,185,129,.25)":"var(--bo)",borderRadius:20,padding:"5px 12px",cursor:"pointer",fontFamily:"var(--bd)",fontSize:12,fontWeight:600,color:activeProfile?"var(--em2)":dark?"rgba(255,255,255,.5)":"var(--mu)",transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="var(--em)"} onMouseLeave={e=>e.currentTarget.style.borderColor=activeProfile?"rgba(16,185,129,.25)":"var(--bo)"}>
             <span style={{fontSize:14}}>{activeProfile?.emoji||"👤"}</span>
             <span style={{maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{activeProfile?.name||(lang==="de"?"Profil":"Profile")}</span>
@@ -4448,16 +4440,16 @@ Antworte NUR mit JSON:
     <div style={{background:"linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06))",border:"1.5px solid rgba(245,158,11,.3)",borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
       <div>
         <div style={{fontFamily:"var(--hd)",fontSize:14,fontWeight:800,color:"#f59e0b",marginBottom:3}}>
-          ⚡ {L("Tageslimit erreicht – bereit für mehr?","Daily limit reached – ready for more?","Limite quotidien atteint – prêt pour plus?","Limite giornaliero raggiunto?")}
+          💎 {L("Wochen-Limit erreicht – bereit für mehr?","Weekly limit reached – ready for more?","Limite hebdomadaire atteint?","Limite settimanale raggiunto?")}
         </div>
         <div style={{fontSize:12,color:"rgba(255,255,255,.5)",lineHeight:1.5}}>
-          {L("Du hast heute alle 20 Generierungen genutzt. Ultimate gibt dir unbegrenzte Nutzung – ohne Reset, ohne Warten.",
-             "You've used all 20 generations today. Ultimate gives you unlimited use – no reset, no waiting.",
-             "Vous avez utilisé les 20 générations aujourd'hui. Ultimate offre une utilisation illimitée.",
-             "Hai usato tutte le 20 generazioni oggi. Ultimate offre utilizzo illimitato.")}
+          {L(`Du hast das Maximum aus deinem Pro-Abo diese Woche herausgeholt! Dein Limit wird Montag um 07:00 Uhr zurückgesetzt. Jetzt auf Ultimate upgraden und sofort unlimitiert weiterarbeiten. 💎`,
+             `You've maxed out your Pro plan this week! Limit resets Monday at 07:00. Upgrade to Ultimate and continue without waiting.`,
+             `Vous avez maximisé votre plan Pro cette semaine! Upgrade vers Ultimate pour continuer sans attendre.`,
+             `Hai raggiunto il massimo del tuo piano Pro questa settimana! Upgrade a Ultimate per continuare senza attese.`)}
         </div>
         <div style={{fontSize:11,color:"rgba(245,158,11,.6)",marginTop:4}}>
-          🔄 {L("Pro-Limit erneuert sich morgen früh um 00:00 Uhr","Pro limit resets tomorrow at midnight","Le quota Pro se renouvelle demain à minuit","Il limite Pro si rinnova domani a mezzanotte")}
+          🔄 {L("Pro-Limit erneuert sich Montag um 07:00 Uhr","Pro limit resets Monday at 07:00","Renouvellement lundi à 07h","Il limite si rinnova lunedì alle 07:00")}
         </div>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
@@ -4470,12 +4462,12 @@ Antworte NUR mit JSON:
   ):(
     <div className="ubar">
       <div style={{display:"flex",flexDirection:"column",gap:2}}>
-        <span style={{color:"var(--em)",fontWeight:700,fontSize:13}}>✦ Pro · <strong>{C.PRO_LIMIT-proUsage}</strong>/{C.PRO_LIMIT} {L("heute noch verfügbar","remaining today","restants aujourd'hui","rimasti oggi")}</span>
-        <span style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>🔄 {L("Reset täglich um 00:00","Resets daily at midnight","Renouvellement quotidien à minuit","Rinnovo quotidiano a mezzanotte")}</span>
+        <span style={{color:"var(--em)",fontWeight:700,fontSize:13}}>✦ Pro · <strong>{C.PRO_LIMIT-proUsage}</strong>/{C.PRO_LIMIT} {L("diese Woche noch verfügbar","remaining this week","restants cette semaine","rimasti questa settimana")}</span>
+        <span style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>🔄 {L("Reset jeden Montag 07:00 Uhr","Resets every Monday 07:00","Remise à zéro lundi 07h","Reset ogni lunedì 07:00")}</span>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:9}}>
         <div className="u-tr"><div className="u-fi" style={{width:`${(proUsage/C.PRO_LIMIT)*100}%`,background:proUsage/C.PRO_LIMIT>0.8?"#f59e0b":"var(--em)"}}/></div>
-        {proUsage/C.PRO_LIMIT>0.6&&<button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{background:"rgba(245,158,11,.15)",border:"1px solid rgba(245,158,11,.3)",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#f59e0b",cursor:"pointer",whiteSpace:"nowrap"}}>♾️ Ultimate</button>}
+        {proUsage/C.PRO_LIMIT>=0.8&&<button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{background:"rgba(245,158,11,.15)",border:"1px solid rgba(245,158,11,.3)",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#f59e0b",cursor:"pointer",whiteSpace:"nowrap"}}>♾️ Upgrade to Ultimate</button>}
       </div>
     </div>
   );
@@ -6169,7 +6161,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                     </div>
                     {yearly ? (
                       <div style={{fontSize:13,color:"rgba(255,255,255,.3)",margin:"6px 0 18px"}}>
-                        CHF {annualTotal}{lang==="de"?" /Jahr":" /year"} · <span style={{color:isPro?"var(--em)":"#f59e0b",fontWeight:700}}>–{savePct}%</span> {lang==="de"?"ggü. monatlich":lang==="en"?"vs. monthly":lang==="fr"?"vs. mensuel":"vs. mensile"}
+                        CHF {annualTotal}{lang==="de"?" /Jahr":" /year"} · <span style={{color:isPro?"var(--em)":"#f59e0b",fontWeight:700}}>–{savePct}%</span> {lang==="de"?"vs. monatlich":lang==="en"?"vs. monthly":lang==="fr"?"vs. mensuel":"vs. mensile"}
                       </div>
                     ) : (
                       <div style={{fontSize:13,color:"rgba(255,255,255,.3)",margin:"6px 0 18px"}}>
@@ -6185,8 +6177,8 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                   {isPro&&<div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.2)",borderRadius:10,padding:"10px 14px",marginBottom:14,display:"flex",alignItems:"center",gap:8}}>
                     <span style={{fontSize:16}}>⚡</span>
                     <div>
-                      <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>{lang==="de"?"20 Generierungen/Tag":lang==="en"?"20 generations/day":lang==="fr"?"20 générations/jour":"20 generazioni/giorno"}</div>
-                      <div style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>{lang==="de"?"Reset täglich um Mitternacht":lang==="en"?"Resets daily at midnight":lang==="fr"?"Réinitialisation à minuit":"Reset ogni mezzanotte"}</div>
+                      <div style={{fontSize:12,fontWeight:700,color:"#f59e0b"}}>{lang==="de"?"100 Erstellungen/Woche · 25 Fragen/Tag":lang==="en"?"100 creations/week · 25 questions/day":lang==="fr"?"100 créations/semaine · 25 questions/jour":"100 creazioni/settimana · 25 domande/giorno"}</div>
+                      <div style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>{lang==="de"?"Reset jeden Montag 07:00 Uhr":lang==="en"?"Resets every Monday 07:00":lang==="fr"?"Remise à zéro lundi 07h":"Reset ogni lunedì 07:00"}</div>
                     </div>
                   </div>}
 
@@ -6221,13 +6213,21 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                       {lang==="de"?`Monatlich → CHF ${C.priceM}/Mo.`:lang==="en"?`Monthly → CHF ${C.priceM}/mo`:lang==="fr"?`Mensuel → CHF ${C.priceM}/mois`:`Mensile → CHF ${C.priceM}/mese`}
                     </button>
                   </div>}
-                  {isUlt&&<button onClick={()=>window.open(yearly?C.stripeUltimateYearly:C.stripeUltimate,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"1.5px solid rgba(245,158,11,.4)",background:"transparent",color:"#f59e0b",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",transition:"all .2s"}}
-                    onMouseEnter={e=>{e.currentTarget.style.background="rgba(245,158,11,.08)";}}
-                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}>
-                    {yearly
-                      ? (lang==="de"?`Ultimate → CHF 39.90/Mo. jährlich`:lang==="en"?`Ultimate → CHF 39.90/mo yearly`:lang==="fr"?`Ultimate → CHF 39.90/mois annuel`:`Ultimate → CHF 39.90/mese annuale`)
-                      : (lang==="de"?`Ultimate → CHF ${C.priceUltimate}/Mo.`:lang==="en"?`Ultimate → CHF ${C.priceUltimate}/mo`:lang==="fr"?`Ultimate → CHF ${C.priceUltimate}/mois`:`Ultimate → CHF ${C.priceUltimate}/mese`)}
-                  </button>}
+                  {isUlt&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {/* Ultimate Yearly – primary */}
+                    <button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.35)",transition:"all .2s",position:"relative"}}
+                      onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 8px 32px rgba(245,158,11,.5)";e.currentTarget.style.transform="translateY(-1px)";}}
+                      onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 4px 20px rgba(245,158,11,.35)";e.currentTarget.style.transform="none";}}>
+                      <span style={{position:"absolute",top:-9,right:12,background:"#10b981",color:"white",fontSize:10,fontWeight:800,padding:"2px 8px",borderRadius:99}}>–20%</span>
+                      {lang==="de"?"Jährlich → CHF 39.90/Mo.":lang==="en"?"Yearly → CHF 39.90/mo":lang==="fr"?"Annuel → CHF 39.90/mois":"Annuale → CHF 39.90/mese"}
+                    </button>
+                    {/* Ultimate Monthly – secondary */}
+                    <button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"10px",borderRadius:12,border:"1px solid rgba(245,158,11,.25)",background:"transparent",color:"rgba(245,158,11,.6)",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s"}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor="rgba(245,158,11,.5)";e.currentTarget.style.color="#f59e0b";}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(245,158,11,.25)";e.currentTarget.style.color="rgba(245,158,11,.6)";}}>
+                      {lang==="de"?`Monatlich → CHF ${C.priceUltimate}/Mo.`:lang==="en"?`Monthly → CHF ${C.priceUltimate}/mo`:lang==="fr"?`Mensuel → CHF ${C.priceUltimate}/mois`:`Mensile → CHF ${C.priceUltimate}/mese`}
+                    </button>
+                  </div>}
                   <div style={{textAlign:"center",fontSize:11,color:"rgba(255,255,255,.18)",marginTop:10}}>{lang==="de"?"Stripe · Twint · Jederzeit kündbar":lang==="en"?"Stripe · Twint · Cancel anytime":lang==="fr"?"Stripe · Twint · Résiliable":"Stripe · Twint · Cancellabile"}</div>
                 </div>
               );
@@ -6983,8 +6983,11 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
   if(page==="chat") {
     const chatUsage2 = getChatCount();
     const isLoggedIn2 = !!authSession;
-    const canChat2   = isLoggedIn2 && (pro || chatUsage2 < C.CHAT_FREE_LIMIT);
-    const remaining2 = pro ? "∞" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage2);
+    const isUltimate2 = authSession?.plan === "ultimate" || authSession?.isAdmin;
+    const isPro2 = pro && !isUltimate2;
+    const isFree2 = isLoggedIn2 && !isPro2 && !isUltimate2;
+    const canChat2   = isLoggedIn2 && (isUltimate2 || isPro2 ? chatUsage2 < C.CHAT_FREE_LIMIT : true);
+    const remaining2 = isUltimate2 ? "∞" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage2);
     const L2 = (d,e,f,i) => ({de:d,en:e,fr:f,it:i}[lang]||d);
 
     const SYSTEM2 = `Du bist Stella, die KI-Karriere-Assistentin von Stellify – dem Schweizer AI Career Copilot. Du hast tiefes Wissen über alle Aspekte der Karriere, Bewerbung, Arbeitsmarkt Schweiz und Produktivität.
@@ -7047,6 +7050,18 @@ VERHALTEN:
 - Sei warm, direkt, professionell – wie ein erfahrener Karriere-Coach
 - Preis: Gratis (1× Bewerbung/Monat) oder Pro CHF 19.90/Mo`;
 
+    // SYSTEM_FREE2: Blocks technical questions for free-tier users
+    const SYSTEM_FREE2 = `Du bist Stella, die freundliche KI-Assistentin von Stellify – dem Schweizer AI Career Copilot. Der User ist eingeloggt aber hat den kostenlosen Plan.
+
+Du darfst IMMER beantworten: Fragen zu Stellify, Tools, Preisen, Navigation und allgemeine Überblicks-Infos zum Arbeitsmarkt.
+
+Bei fachspezifischen Anfragen (Bewerbungstexte schreiben, Gehaltsverhandlung, ATS-Optimierung, LinkedIn-Posts, Excel/PowerPoint erstellen, Karriereberatung in der Tiefe) antworte stets:
+"Das ist eine spannende Fachfrage! 🚀 Um dir hierbei mit voller Experten-Präzision zu helfen, benötigst du Stellify Pro. Mit Pro schalte ich mein gesamtes Fachwissen für dich frei – ${C.PRO_LIMIT} Erstellungen/Woche und 25 Fragen täglich. Upgrade jetzt für CHF 14.90/Mo. jährlich!"
+
+Bleibe freundlich, motivierend und konsequent. Beantworte keine konkreten Karrierefragen ohne Pro-Abo.`;
+
+    const ACTIVE_SYSTEM2 = isUltimate2 || isPro2 ? SYSTEM2 : isFree2 ? SYSTEM_FREE2 : `Du bist Stella von Stellify. Beantworte NUR Fragen zu Stellify und seinen Tools. Für Karriereberatung: "Registriere dich gratis für deine erste Bewerbung!"`;
+
     const TOOL_MAP2 = {
       "bewerbung":["app"],"bewerbungen":["app"],"linkedin":["linkedin"],"ats":["ats"],
       "zeugnis":["zeugnis"],"job-matching":["jobmatch"],"interview":["coach"],
@@ -7105,7 +7120,7 @@ VERHALTEN:
           }
           while(apiMsgs.length && apiMsgs[0].role !== "user") apiMsgs.shift();
           const finalMsgs = apiMsgs.slice(-10);
-          const msgsWithSystem = [{role:"system", content:SYSTEM2}, ...finalMsgs];
+          const msgsWithSystem = [{role:"system", content:ACTIVE_SYSTEM2}, ...finalMsgs];
 
           const res = await fetch(GROQ_URL, {
             method: "POST",
