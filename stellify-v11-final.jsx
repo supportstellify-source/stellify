@@ -2911,83 +2911,65 @@ function DocUpload({lang, onFile, onText, file, onClear}) {
 function SplashScreen({ onDone }) {
   const [phase, setPhase] = React.useState(0);
   useEffect(() => {
-    const t1 = setTimeout(()=>setPhase(1), 400);
-    const t2 = setTimeout(()=>setPhase(2), 900);
-    const t3 = setTimeout(()=>setPhase(3), 1400);
-    const t4 = setTimeout(onDone, 3000);
+    const t1 = setTimeout(()=>setPhase(1), 180);
+    const t2 = setTimeout(()=>setPhase(2), 620);
+    const t3 = setTimeout(()=>setPhase(3), 1100);
+    const t4 = setTimeout(onDone, 2600);
     return () => { clearTimeout(t1);clearTimeout(t2);clearTimeout(t3);clearTimeout(t4); };
   }, []);
-  const PARTICLES = Array.from({length:22},(_,i)=>({
-    x:Math.sin(i*2.85)*42+50, y:Math.cos(i*1.67)*38+50,
-    s:3+((i*7)%8), d:0.6+((i*0.31)%1.8), del:(i*0.08)
-  }));
   return (
     <div style={{position:"fixed",inset:0,zIndex:9999,overflow:"hidden",
-      background:"radial-gradient(ellipse 120% 80% at 50% 40%, #060d1a 0%, #020508 60%, #000 100%)",
+      background:"#FAFAF8",
       display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-      transition:"opacity .6s ease",opacity:phase===3?0:1,pointerEvents:phase===3?"none":"auto"}}>
+      transition:"opacity .5s ease",opacity:phase===3?0:1,pointerEvents:phase===3?"none":"auto"}}>
       <style>{`
-        @keyframes sp-orb{0%{transform:scale(1) translate(0,0);opacity:.55}50%{transform:scale(1.25) translate(8px,-12px);opacity:.85}100%{transform:scale(1) translate(0,0);opacity:.55}}
-        @keyframes sp-ring{0%{transform:scale(.1);opacity:1}100%{transform:scale(3.5);opacity:0}}
-        @keyframes sp-float{0%{transform:translateY(0) scale(1);opacity:.7}50%{transform:translateY(-18px) scale(1.1);opacity:1}100%{transform:translateY(0) scale(1);opacity:.7}}
-        @keyframes sp-in{from{opacity:0;transform:translateY(22px) scale(.8)}to{opacity:1;transform:translateY(0) scale(1)}}
-        @keyframes sp-shine{0%{background-position:200% center}100%{background-position:-200% center}}
-        @keyframes sp-bar{from{width:0}to{width:100%}}
-        @keyframes sp-pt{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-80px);opacity:0}}
+        @keyframes spl-in{from{opacity:0;transform:scale(.72) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+        @keyframes spl-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes spl-bar{from{width:0}to{width:100%}}
+        @keyframes spl-dot{0%,80%,100%{transform:scale(.45);opacity:.2}40%{transform:scale(1);opacity:.9}}
+        @keyframes spl-pulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.06);opacity:1}}
       `}</style>
 
-      {/* Deep orbs */}
-      <div style={{position:"absolute",width:700,height:700,borderRadius:"50%",background:"radial-gradient(circle,rgba(16,185,129,.18) 0%,transparent 70%)",top:"50%",left:"50%",transform:"translate(-50%,-50%)",animation:"sp-orb 6s ease infinite",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",background:"radial-gradient(circle,rgba(99,102,241,.2) 0%,transparent 70%)",top:"30%",right:"15%",animation:"sp-orb 8s ease 2s infinite",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",width:300,height:300,borderRadius:"50%",background:"radial-gradient(circle,rgba(245,158,11,.12) 0%,transparent 70%)",bottom:"20%",left:"10%",animation:"sp-orb 7s ease 1s infinite",pointerEvents:"none"}}/>
+      {/* Subtle dot grid */}
+      <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(rgba(37,99,235,.055) 1px,transparent 1px)",backgroundSize:"28px 28px",pointerEvents:"none"}}/>
 
-      {/* Floating particles */}
-      {PARTICLES.map((p,i)=>(
-        <div key={i} style={{position:"absolute",left:`${p.x}%`,top:`${p.y}%`,
-          width:p.s,height:p.s,borderRadius:"50%",
-          background:i%3===0?"rgba(16,185,129,.8)":i%3===1?"rgba(99,102,241,.7)":"rgba(245,158,11,.6)",
-          animation:`sp-pt ${p.d+2}s ease ${p.del}s infinite`,
-          boxShadow:`0 0 ${p.s*2}px currentColor`}}/>
-      ))}
+      {/* Blue glow behind icon */}
+      {phase>=1&&<div style={{position:"absolute",width:280,height:280,borderRadius:"50%",background:"radial-gradient(circle,rgba(37,99,235,.1) 0%,transparent 70%)",pointerEvents:"none",animation:"spl-in .6s ease both"}}/>}
 
-      {/* Expanding rings */}
-      {phase>=1&&[0,1,2].map(i=>(
-        <div key={i} style={{position:"absolute",width:140,height:140,borderRadius:"50%",
-          border:"1.5px solid rgba(16,185,129,.5)",
-          animation:`sp-ring ${1.4+i*.35}s cubic-bezier(.2,.6,.4,1) ${i*0.22}s forwards`}}/>
-      ))}
+      {/* Icon */}
+      <div style={{
+        width:76,height:76,borderRadius:22,
+        background:"linear-gradient(135deg,#2563EB,#1D4ED8)",
+        display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,
+        boxShadow:"0 8px 32px rgba(37,99,235,.28),0 2px 8px rgba(37,99,235,.15)",
+        animation:"spl-in .5s cubic-bezier(.34,1.56,.64,1) both, spl-pulse 2.8s ease 0.6s infinite",
+        marginBottom:22,position:"relative",zIndex:1
+      }}>✦</div>
 
-      {/* Central logo */}
-      <div style={{animation:`sp-float 3s ease 1s infinite`,position:"relative",zIndex:2}}>
-        {/* Glow */}
-        <div style={{position:"absolute",inset:-20,borderRadius:"50%",background:"radial-gradient(circle,rgba(16,185,129,.35),transparent 70%)",animation:`sp-orb 2s ease infinite`}}/>
-        <div style={{width:100,height:100,borderRadius:28,
-          background:"linear-gradient(135deg,#10b981 0%,#059669 50%,#0d9e6e 100%)",
-          display:"flex",alignItems:"center",justifyContent:"center",fontSize:48,
-          boxShadow:"0 0 0 2px rgba(16,185,129,.3),0 0 40px rgba(16,185,129,.6),0 0 80px rgba(16,185,129,.3),0 20px 40px rgba(0,0,0,.5)",
-          position:"relative",zIndex:1}}>✦</div>
-      </div>
+      {/* Brand name */}
+      {phase>=1&&<div style={{
+        fontFamily:"'Instrument Serif',Georgia,serif",
+        fontSize:42,fontWeight:400,color:"#1A1A18",letterSpacing:"-1px",
+        animation:"spl-up .45s cubic-bezier(.34,1.56,.64,1) both",
+        marginBottom:6,position:"relative",zIndex:1
+      }}>Stellify</div>}
 
-      {/* Brand text */}
-      {phase>=1&&<div style={{marginTop:28,textAlign:"center",animation:"sp-in .6s cubic-bezier(.34,1.56,.64,1) both"}}>
-        <div style={{
-          fontFamily:"'Bricolage Grotesque',system-ui",fontSize:44,fontWeight:900,letterSpacing:"-2px",
-          background:"linear-gradient(135deg,#ffffff 0%,#10b981 40%,#ffffff 60%,#a7f3d0 100%)",
-          backgroundSize:"200% auto",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
-          backgroundClip:"text",animation:"sp-shine 2s linear infinite"}}>Stellify</div>
-      </div>}
-      {phase>=2&&<div style={{fontSize:13,color:"rgba(255,255,255,.4)",letterSpacing:3,textTransform:"uppercase",marginTop:6,animation:"sp-in .5s ease both"}}>
-        AI Career Copilot · 🇨🇭 Schweiz
-      </div>}
-      {phase>=2&&<div style={{marginTop:20,display:"flex",gap:10,animation:"sp-in .5s ease .1s both"}}>
-        {["✍️ Bewerbungen","💼 LinkedIn","🤖 ATS","🎤 Interview"].map((t,i)=>(
-          <div key={i} style={{fontSize:10,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",borderRadius:99,padding:"4px 10px",color:"rgba(255,255,255,.45)",animation:`sp-in .4s ease ${.1+i*.08}s both`}}>{t}</div>
+      {/* Tagline */}
+      {phase>=2&&<div style={{
+        fontSize:12,fontWeight:400,color:"#5C5C58",letterSpacing:".07em",
+        animation:"spl-up .38s ease both",marginBottom:26,position:"relative",zIndex:1
+      }}>AI Career Copilot · 🇨🇭 Schweiz</div>}
+
+      {/* Loading dots */}
+      {phase>=2&&<div style={{display:"flex",gap:7,position:"relative",zIndex:1,animation:"spl-up .3s ease .05s both"}}>
+        {[0,1,2].map(i=>(
+          <div key={i} style={{width:7,height:7,borderRadius:"50%",background:"#2563EB",opacity:.25,animation:`spl-dot 1.2s ease-in-out ${i*.2}s infinite`}}/>
         ))}
       </div>}
 
       {/* Progress bar */}
-      <div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:"rgba(255,255,255,.04)"}}>
-        <div style={{height:"100%",background:"linear-gradient(90deg,#10b981,#059669,#10b981)",backgroundSize:"200% 100%",animation:`sp-bar 2.6s cubic-bezier(.4,0,.2,1) forwards, sp-shine 1s linear infinite`}}/>
+      <div style={{position:"absolute",bottom:0,left:0,right:0,height:2,background:"rgba(37,99,235,.08)"}}>
+        <div style={{height:"100%",background:"linear-gradient(90deg,#2563EB,#818CF8,#06B6D4)",animation:"spl-bar 2.2s cubic-bezier(.4,0,.2,1) forwards"}}/>
       </div>
     </div>
   );
