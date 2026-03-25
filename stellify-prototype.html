@@ -1,0 +1,2607 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stellify – Dein KI-Karriere-Copilot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #FAFAF8;
+    --surface: #FFFFFF;
+    --border: rgba(0,0,0,0.08);
+    --border-md: rgba(0,0,0,0.14);
+    --text-primary: #1A1A18;
+    --text-secondary: #5C5C58;
+    --text-muted: #9A9A94;
+    --accent: #2563EB;
+    --accent-soft: #EFF4FF;
+    --accent-hover: #1D4ED8;
+    --green: #059669;
+    --green-soft: #ECFDF5;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 18px;
+    --radius-xl: 28px;
+    --font-display: 'Instrument Serif', Georgia, serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.07), 0 2px 6px rgba(0,0,0,0.04);
+    --shadow-lg: 0 12px 40px rgba(0,0,0,0.09), 0 4px 12px rgba(0,0,0,0.04);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* NAV */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(250,250,248,0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 max(24px, calc((100% - 1120px) / 2));
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .nav-logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--text-primary);
+    text-decoration: none;
+    letter-spacing: -0.3px;
+  }
+
+  .nav-logo span { color: var(--accent); }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .nav-links a:hover { color: var(--text-primary); background: rgba(0,0,0,0.04); }
+
+  .nav-cta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .btn-ghost {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    transition: color 0.15s, background 0.15s;
+    text-decoration: none;
+  }
+
+  .btn-ghost:hover { color: var(--text-primary); background: rgba(0,0,0,0.04); }
+
+  .btn-primary {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    padding: 9px 20px;
+    border-radius: var(--radius-md);
+    transition: background 0.15s, transform 0.1s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-primary-lg {
+    font-size: 16px;
+    padding: 14px 28px;
+    border-radius: var(--radius-lg);
+    gap: 8px;
+  }
+
+  .btn-secondary-lg {
+    font-family: var(--font-body);
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border-md);
+    cursor: pointer;
+    padding: 13px 28px;
+    border-radius: var(--radius-lg);
+    transition: border-color 0.15s, color 0.15s, transform 0.1s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-secondary-lg:hover { border-color: rgba(0,0,0,0.25); color: var(--text-primary); transform: translateY(-1px); }
+
+  /* SECTIONS */
+  section {
+    padding: 96px max(24px, calc((100% - 1120px) / 2));
+  }
+
+  /* HERO */
+  .hero {
+    padding-top: 80px;
+    padding-bottom: 80px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 64px;
+    min-height: calc(100vh - 60px);
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 100px;
+    margin-bottom: 28px;
+    border: 1px solid rgba(37,99,235,0.15);
+  }
+
+  .hero-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(42px, 5vw, 58px);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    color: var(--text-primary);
+    margin-bottom: 24px;
+  }
+
+  .hero h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .hero-sub {
+    font-size: 18px;
+    font-weight: 300;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: 40px;
+    max-width: 480px;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 48px;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 36px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .hero-stat-num {
+    font-family: var(--font-display);
+    font-size: 26px;
+    color: var(--text-primary);
+    display: block;
+  }
+
+  .hero-stat-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* HERO VISUAL */
+  .hero-visual {
+    position: relative;
+  }
+
+  .chat-mockup {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chat-mockup::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent) 0%, #818CF8 50%, #06B6D4 100%);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
+  .chat-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .chat-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 14px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .chat-name { font-size: 14px; font-weight: 500; }
+  .chat-status { font-size: 12px; color: var(--green); display: flex; align-items: center; gap: 5px; }
+  .chat-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  .chat-messages { display: flex; flex-direction: column; gap: 12px; }
+
+  .msg {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .msg-user {
+    background: var(--accent);
+    color: #fff;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg-ai {
+    background: #F5F5F3;
+    color: var(--text-primary);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg-ai strong { font-weight: 500; }
+
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 12px 14px;
+    background: #F5F5F3;
+    border-radius: 14px;
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+    width: fit-content;
+  }
+
+  .typing-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: bounce 1.2s infinite;
+  }
+
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-5px); }
+  }
+
+  .floating-card {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    box-shadow: var(--shadow-md);
+    font-size: 13px;
+    animation: float 4s ease-in-out infinite;
+  }
+
+  .floating-card-1 {
+    bottom: -20px;
+    left: -40px;
+    animation-delay: 0s;
+  }
+
+  .floating-card-2 {
+    top: 40px;
+    right: -30px;
+    animation-delay: 2s;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .fc-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .fc-value { font-weight: 500; color: var(--text-primary); display: flex; align-items: center; gap: 6px; }
+  .fc-green { color: var(--green); font-size: 13px; }
+
+  /* LOGOS */
+  .logos-section {
+    padding-top: 40px;
+    padding-bottom: 64px;
+    text-align: center;
+  }
+
+  .logos-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .logos-marquee-wrap {
+    overflow: hidden;
+    position: relative;
+  }
+  .logos-marquee-wrap::before,
+  .logos-marquee-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 80px;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .logos-marquee-wrap::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
+  .logos-marquee-wrap::after { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+
+  .logos-marquee {
+    display: flex;
+    align-items: center;
+    gap: 56px;
+    width: max-content;
+    animation: marquee-scroll 24s linear infinite;
+  }
+  .logos-marquee:hover { animation-play-state: paused; }
+
+  @keyframes marquee-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .logo-item {
+    font-family: var(--font-display);
+    font-size: 17px;
+    color: var(--text-muted);
+    opacity: 0.45;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .logo-item:hover { opacity: 0.85; }
+
+  /* SCROLL TO TOP */
+  .scroll-top-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    color: var(--bg);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 90;
+    opacity: 0; pointer-events: none;
+    transform: translateY(12px);
+    transition: opacity 0.25s, transform 0.25s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  }
+  .scroll-top-btn.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .scroll-top-btn:hover { transform: translateY(-3px); }
+
+  /* COOKIE BANNER */
+  .cookie-banner {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border-md);
+    padding: 16px max(24px, calc((100% - 1120px) / 2));
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    z-index: 195;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.07);
+    transition: transform 0.35s cubic-bezier(.4,0,.2,1);
+  }
+  .cookie-banner.hidden { transform: translateY(110%); }
+  .cookie-text {
+    flex: 1;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    min-width: 220px;
+  }
+  .cookie-text a { color: var(--accent); text-decoration: none; }
+  .cookie-text a:hover { text-decoration: underline; }
+  .cookie-actions { display: flex; gap: 10px; flex-shrink: 0; }
+  .cookie-btn-accept {
+    font-family: var(--font-body); font-size: 14px; font-weight: 500;
+    background: var(--accent); color: #fff; border: none;
+    padding: 9px 20px; border-radius: var(--radius-md); cursor: pointer;
+    transition: background 0.15s;
+  }
+  .cookie-btn-accept:hover { background: var(--accent-hover); }
+  .cookie-btn-decline {
+    font-family: var(--font-body); font-size: 14px;
+    background: none; color: var(--text-muted);
+    border: 1px solid var(--border-md);
+    padding: 9px 16px; border-radius: var(--radius-md); cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .cookie-btn-decline:hover { color: var(--text-secondary); border-color: rgba(0,0,0,0.2); }
+
+  /* COUNTER ANIMATION */
+  .hero-stat-num { display: block; }
+
+  /* FEATURES */
+  .section-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: block;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 4vw, 44px);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: -0.6px;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+  }
+
+  .section-sub {
+    font-size: 17px;
+    font-weight: 300;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 560px;
+    margin-bottom: 60px;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    cursor: default;
+  }
+
+  .feature-card:hover {
+    border-color: var(--border-md);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .feature-icon {
+    width: 44px;
+    height: 44px;
+    background: var(--accent-soft);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    font-size: 20px;
+  }
+
+  .feature-card h3 {
+    font-size: 17px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+  }
+
+  .feature-card p {
+    font-size: 14px;
+    font-weight: 300;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    flex: 1;
+  }
+  .feature-card { display: flex; flex-direction: column; }
+  .feature-example {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .fe-before { font-size: 12px; color: var(--text-muted); background: var(--bg); padding: 4px 10px; border-radius: 100px; }
+  .fe-after { font-size: 12px; color: var(--green); background: var(--green-soft); padding: 4px 10px; border-radius: 100px; font-weight: 500; }
+  .fe-arrow { font-size: 14px; color: var(--text-muted); }
+  .fe-tag { font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 4px 10px; border-radius: 100px; font-weight: 500; }
+  .fe-quote { font-size: 12px; color: var(--text-secondary); font-style: italic; line-height: 1.5; }
+
+  /* HOW IT WORKS */
+  .how-bg {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    position: relative;
+  }
+
+  .steps-grid::before {
+    content: '';
+    position: absolute;
+    top: 22px;
+    left: calc(12.5% + 22px);
+    right: calc(12.5% + 22px);
+    height: 1px;
+    background: repeating-linear-gradient(90deg, var(--border-md) 0, var(--border-md) 8px, transparent 8px, transparent 16px);
+  }
+
+  .step {
+    text-align: center;
+    position: relative;
+  }
+
+  .step-num {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+    margin: 0 auto 20px;
+    position: relative;
+    z-index: 1;
+    background: var(--bg);
+  }
+
+  .step h4 { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+  .step p { font-size: 13px; font-weight: 300; color: var(--text-secondary); line-height: 1.6; }
+
+  /* PRICING */
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    align-items: stretch;
+  }
+  .pricing-card { display: flex; flex-direction: column; }
+  .pricing-features { flex: 1; }
+  .pricing-toggle { display:flex; align-items:center; gap:0; background:var(--bg); border:1px solid var(--border-md); border-radius:100px; padding:3px; margin-bottom:32px; width:fit-content; }
+  .ptog-btn { font-family:var(--font-body); font-size:13px; font-weight:400; border:none; background:none; cursor:pointer; padding:6px 16px; border-radius:100px; color:var(--text-secondary); transition:all .15s; white-space:nowrap; }
+  .ptog-btn.active { background:var(--surface); color:var(--text-primary); font-weight:500; box-shadow:var(--shadow-sm); }
+  .yearly-badge { font-size:11px; font-weight:500; background:#FEF3C7; color:#92400E; padding:2px 7px; border-radius:100px; margin-left:4px; }
+
+  .pricing-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+
+  .pricing-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+  .pricing-card.featured {
+    border: 2px solid var(--accent);
+    position: relative;
+  }
+
+  .pricing-badge {
+    position: absolute;
+    top: -13px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 14px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+
+  .pricing-plan { font-size: 13px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; }
+
+  .pricing-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+
+  .pricing-chf { font-size: 18px; font-weight: 400; color: var(--text-secondary); margin-top: 6px; }
+  .pricing-num { font-family: var(--font-display); font-size: 44px; line-height: 1; color: var(--text-primary); }
+  .pricing-period { font-size: 14px; color: var(--text-muted); }
+  .pricing-desc { font-size: 14px; color: var(--text-secondary); margin-bottom: 28px; line-height: 1.5; }
+
+  .pricing-features {
+    list-style: none;
+    margin-bottom: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pricing-features li {
+    font-size: 14px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.4;
+  }
+
+  .check {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--green-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .check svg { width: 10px; height: 10px; stroke: var(--green); stroke-width: 2.5; fill: none; }
+
+  .btn-plan {
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 500;
+    width: 100%;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    text-align: center;
+    display: block;
+    text-decoration: none;
+  }
+
+  .btn-plan-outline {
+    background: none;
+    border: 1px solid var(--border-md);
+    color: var(--text-primary);
+  }
+
+  .btn-plan-outline:hover { border-color: rgba(0,0,0,0.3); background: rgba(0,0,0,0.02); }
+
+  .btn-plan-filled {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+  }
+
+  .btn-plan-filled:hover { background: var(--accent-hover); }
+
+  /* TESTIMONIALS */
+  .testimonials-section { background: var(--bg); }
+
+  .testimonials-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .testimonial-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: box-shadow 0.2s;
+  }
+
+  .testimonial-card:hover { box-shadow: var(--shadow-md); }
+
+  .stars { color: #F59E0B; font-size: 14px; letter-spacing: 2px; }
+
+  .testimonial-text {
+    font-size: 15px;
+    font-weight: 300;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    flex: 1;
+  }
+
+  .testimonial-author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .author-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    flex-shrink: 0;
+    color: #fff;
+  }
+
+  .author-name { font-size: 14px; font-weight: 500; }
+  .author-role { font-size: 12px; color: var(--text-muted); }
+
+  /* FAQ */
+  .faq-section { background: var(--surface); border-top: 1px solid var(--border); }
+
+  .faq-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .faq-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px 24px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .faq-item:hover { border-color: var(--border-md); }
+
+  .faq-q {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .faq-a { font-size: 14px; font-weight: 300; color: var(--text-secondary); line-height: 1.65; }
+
+  /* CTA SECTION */
+  .cta-section {
+    text-align: center;
+    background: var(--text-primary);
+    color: #fff;
+  }
+
+  .cta-section .section-title { color: #fff; }
+  .cta-section .section-sub { color: rgba(255,255,255,0.6); margin: 0 auto 40px; }
+
+  .btn-white {
+    font-family: var(--font-body);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    padding: 14px 28px;
+    border-radius: var(--radius-lg);
+    transition: opacity 0.15s, transform 0.1s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-white:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* FOOTER */
+  footer {
+    background: var(--text-primary);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 48px max(24px, calc((100% - 1120px) / 2)) 32px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .footer-top {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 48px;
+    margin-bottom: 48px;
+  }
+
+  .footer-logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: #fff;
+    display: block;
+    margin-bottom: 12px;
+    text-decoration: none;
+  }
+
+  .footer-logo span { color: rgba(99,156,255,0.9); }
+
+  .footer-desc {
+    font-size: 14px;
+    font-weight: 300;
+    line-height: 1.6;
+    max-width: 260px;
+  }
+
+  .footer-col h5 {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 16px;
+    letter-spacing: 0.04em;
+  }
+
+  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+
+  .footer-col a {
+    font-size: 14px;
+    font-weight: 300;
+    color: rgba(255,255,255,0.45);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .footer-col a:hover { color: rgba(255,255,255,0.85); }
+
+  .footer-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .footer-bottom-links { display: flex; gap: 24px; }
+  .footer-bottom-links a { color: rgba(255,255,255,0.35); text-decoration: none; }
+  .footer-bottom-links a:hover { color: rgba(255,255,255,0.7); }
+
+  /* AUTH MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    padding: 24px;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    animation: modal-in 0.2s ease;
+  }
+
+  @keyframes modal-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--text-secondary);
+    transition: background 0.15s;
+  }
+
+  .modal-close:hover { background: #eee; }
+
+  .modal-logo {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .modal-logo span { color: var(--accent); }
+
+  .modal-title { font-size: 20px; font-weight: 500; margin-bottom: 6px; }
+  .modal-sub { font-size: 14px; color: var(--text-secondary); margin-bottom: 28px; }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--bg);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    margin-bottom: 24px;
+    gap: 3px;
+  }
+
+  .tab-btn {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 400;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 9px;
+    border-radius: calc(var(--radius-md) - 3px);
+    color: var(--text-secondary);
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .tab-btn.active { background: var(--surface); color: var(--text-primary); font-weight: 500; box-shadow: var(--shadow-sm); }
+
+  .form-group { margin-bottom: 16px; }
+
+  .form-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; display: block; }
+
+  .form-input {
+    font-family: var(--font-body);
+    font-size: 15px;
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid var(--border-md);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+  .form-input::placeholder { color: var(--text-muted); }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 48px; min-height: auto; }
+    .hero-visual .floating-card { display: none; }
+    .features-grid, .pricing-grid, .testimonials-grid { grid-template-columns: 1fr; }
+    .steps-grid { grid-template-columns: 1fr 1fr; }
+    .steps-grid::before { display: none; }
+    .faq-grid { grid-template-columns: 1fr; }
+    .footer-top { grid-template-columns: 1fr 1fr; }
+    nav .nav-links { display: none; }
+  }
+
+  @media (max-width: 600px) {
+    section { padding: 64px 20px; }
+    nav { padding: 0 20px; }
+    footer { padding: 48px 20px 32px; }
+    .footer-top { grid-template-columns: 1fr; gap: 32px; }
+    .steps-grid { grid-template-columns: 1fr; }
+    .footer-bottom { flex-direction: column; text-align: center; }
+  }
+
+  /* SCROLL REVEAL */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* INTRO ANIMATION */
+  #intro-overlay {
+    position: fixed; inset: 0; z-index: 9999; background: #060608;
+    overflow: hidden;
+    transition: opacity 1s cubic-bezier(.4,0,.2,1);
+  }
+  #intro-overlay.hide { opacity: 0; pointer-events: none; }
+  #intro-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .intro-skip {
+    position: absolute; bottom: 32px; right: 32px; z-index: 3;
+    font-family: var(--font-body); font-size: 13px; color: rgba(255,255,255,0.25);
+    background: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 100px;
+    padding: 7px 18px; cursor: pointer; transition: color 0.2s, border-color 0.2s;
+    opacity: 0; animation: iskip-in 0.5s ease 2s forwards;
+  }
+  .intro-skip:hover { color: rgba(255,255,255,0.6); border-color: rgba(255,255,255,0.25); }
+  @keyframes iskip-in { to { opacity: 1; } }
+
+  /* LANGUAGE SWITCHER */
+  .lang-switcher { display: flex; gap: 2px; align-items: center; }
+  .lang-btn {
+    font-family: var(--font-body); font-size: 12px; font-weight: 500;
+    color: var(--text-muted); background: none; border: none; cursor: pointer;
+    padding: 5px 8px; border-radius: 6px; transition: color 0.15s, background 0.15s;
+    letter-spacing: 0.04em;
+  }
+  .lang-btn:hover { color: var(--text-primary); background: rgba(0,0,0,0.05); }
+  .lang-btn.active { color: var(--accent); background: var(--accent-soft); }
+
+  /* STELLA CHAT */
+  #stella-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: flex-end;
+    justify-content: flex-end;
+    z-index: 900;
+    backdrop-filter: blur(4px);
+    padding: 80px 32px 32px;
+  }
+
+  #stella-overlay.open { display: flex; }
+
+  .stella-window {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    width: 420px;
+    max-width: 100%;
+    height: 600px;
+    max-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: stella-in 0.25s ease;
+  }
+
+  @keyframes stella-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .stella-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .stella-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .stella-header-info { flex: 1; }
+  .stella-header-name { font-size: 15px; font-weight: 500; }
+  .stella-header-status { font-size: 12px; color: var(--green); display: flex; align-items: center; gap: 5px; }
+  .stella-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  .stella-close {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--text-secondary);
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+
+  .stella-close:hover { background: #eee; }
+
+  .stella-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+
+  .stella-messages::-webkit-scrollbar { width: 4px; }
+  .stella-messages::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 2px; }
+
+  .smsg {
+    max-width: 82%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .smsg-ai {
+    background: #F5F5F3;
+    color: var(--text-primary);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+
+  .smsg-user {
+    background: var(--accent);
+    color: #fff;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+
+  .stella-typing {
+    display: flex; gap: 4px;
+    padding: 12px 14px;
+    background: #F5F5F3;
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+    align-self: flex-start;
+    width: fit-content;
+  }
+
+  .stella-typing-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    animation: bounce 1.2s infinite;
+  }
+
+  .stella-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .stella-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  .stella-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 20px 12px;
+    flex-shrink: 0;
+  }
+
+  .stella-suggestion {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid rgba(37,99,235,0.15);
+    border-radius: 100px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+
+  .stella-suggestion:hover { background: rgba(37,99,235,0.12); }
+
+  .stella-input-area {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .stella-input {
+    flex: 1;
+    font-family: var(--font-body);
+    font-size: 14px;
+    border: 1px solid var(--border-md);
+    border-radius: 20px;
+    padding: 10px 16px;
+    resize: none;
+    outline: none;
+    line-height: 1.4;
+    max-height: 100px;
+    background: var(--bg);
+    color: var(--text-primary);
+    transition: border-color 0.15s;
+  }
+
+  .stella-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .stella-input::placeholder { color: var(--text-muted); }
+
+  .stella-send {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, transform 0.1s;
+    flex-shrink: 0;
+  }
+
+  .stella-send:hover { background: var(--accent-hover); transform: scale(1.05); }
+  .stella-send:disabled { background: var(--border-md); cursor: not-allowed; transform: none; }
+
+  /* DARK MODE */
+  [data-theme="dark"] {
+    --bg: #0F0F0E;
+    --surface: #1A1A18;
+    --border: rgba(255,255,255,0.07);
+    --border-md: rgba(255,255,255,0.12);
+    --text-primary: #F5F5F2;
+    --text-secondary: #A0A09A;
+    --text-muted: #6A6A64;
+    --accent-soft: rgba(37,99,235,0.15);
+    --green-soft: rgba(5,150,105,0.15);
+  }
+  [data-theme="dark"] nav { background: rgba(15,15,14,0.9); }
+  [data-theme="dark"] .msg-ai,
+  [data-theme="dark"] .smsg-ai,
+  [data-theme="dark"] .stella-typing { background: #252522; }
+  [data-theme="dark"] .how-bg,
+  [data-theme="dark"] .faq-section { background: #141412; }
+  [data-theme="dark"] .fe-before { background: #252522; }
+  [data-theme="dark"] .modal-close:hover,
+  [data-theme="dark"] .stella-close:hover { background: #2a2a28; }
+  [data-theme="dark"] .mobile-nav { background: #0F0F0E; }
+
+  .dark-toggle {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--border-md);
+    background: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary);
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+  }
+  .dark-toggle:hover { background: rgba(128,128,128,0.1); color: var(--text-primary); }
+
+  /* HAMBURGER + MOBILE NAV */
+  .hamburger {
+    display: none;
+    width: 36px; height: 36px;
+    border: none; background: none;
+    cursor: pointer;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 5px; padding: 4px;
+    border-radius: var(--radius-sm);
+    transition: background 0.15s;
+  }
+  .hamburger:hover { background: rgba(0,0,0,0.05); }
+  .hamburger span {
+    display: block; width: 20px; height: 2px;
+    background: var(--text-secondary); border-radius: 2px;
+    transition: transform 0.25s, opacity 0.25s, width 0.25s;
+    transform-origin: center;
+  }
+  .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .hamburger.open span:nth-child(2) { opacity: 0; width: 0; }
+  .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  .mobile-nav {
+    position: fixed;
+    inset: 60px 0 0 0;
+    background: var(--bg);
+    z-index: 99;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 4px;
+    border-top: 1px solid var(--border);
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+    overflow-y: auto;
+  }
+  .mobile-nav.open { transform: none; }
+  .mobile-nav a {
+    font-family: var(--font-body);
+    font-size: 17px; font-weight: 400;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    transition: color 0.15s, background 0.15s;
+    display: block;
+  }
+  .mobile-nav a:hover { color: var(--text-primary); background: rgba(128,128,128,0.08); }
+  .mobile-nav-stella {
+    font-family: var(--font-body);
+    font-size: 17px; font-weight: 500;
+    color: var(--accent);
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    transition: background 0.15s;
+    background: none; border: none; cursor: pointer; text-align: left; width: 100%;
+  }
+  .mobile-nav-stella:hover { background: var(--accent-soft); }
+  .mobile-nav-divider { height: 1px; background: var(--border); margin: 8px 0; }
+  .mobile-nav-cta { display: flex; flex-direction: column; gap: 10px; }
+  .mobile-nav-ghost {
+    font-family: var(--font-body); font-size: 16px; font-weight: 400;
+    padding: 13px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-md); color: var(--text-primary);
+    text-align: center; background: none; cursor: pointer; width: 100%;
+    transition: background 0.15s;
+  }
+  .mobile-nav-ghost:hover { background: rgba(128,128,128,0.08); }
+
+  @media (max-width: 900px) {
+    .hamburger { display: flex; }
+  }
+
+  /* CV COMPARE SECTION */
+  .cv-compare-section { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .cv-compare-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    max-width: 880px;
+    margin: 0 auto;
+  }
+  .cv-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .cv-card-header {
+    padding: 12px 18px;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 500;
+  }
+  .cv-card-header.before { background: #FFF5F5; color: #B91C1C; }
+  .cv-card-header.after { background: var(--green-soft); color: var(--green); }
+  [data-theme="dark"] .cv-card-header.before { background: rgba(185,28,28,0.12); }
+  .cv-card-body { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .cv-line { height: 9px; border-radius: 100px; background: var(--border-md); position: relative; }
+  .cv-line.short { width: 40%; }
+  .cv-line.med { width: 65%; }
+  .cv-line.long { width: 88%; }
+  .cv-line.full { width: 100%; }
+  .cv-block {
+    display: flex; flex-direction: column; gap: 7px;
+    padding: 11px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+  }
+  .cv-block-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .cv-block.bad { opacity: 0.55; }
+  .cv-block.bad .cv-line { background: rgba(239,68,68,0.25); }
+  .cv-block.good { border-color: rgba(5,150,105,0.3); background: rgba(5,150,105,0.04); }
+  .cv-block.good .cv-line { background: rgba(5,150,105,0.3); }
+  .cv-ai-tag {
+    position: absolute; top: 8px; right: 8px;
+    font-size: 10px; font-weight: 500; color: var(--green);
+    background: var(--green-soft); padding: 2px 7px; border-radius: 100px;
+  }
+  .cv-score-row { margin-top: 4px; }
+  .cv-score-meta { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .cv-score-track { height: 6px; background: var(--border); border-radius: 100px; overflow: hidden; }
+  .cv-score-fill { height: 100%; border-radius: 100px; transition: width 0.8s ease; }
+  @media (max-width: 700px) { .cv-compare-wrap { grid-template-columns: 1fr; } }
+
+  /* FAQ ACCORDION */
+  .faq-a {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.32s ease, margin-top 0.2s;
+    margin-top: 0;
+  }
+  .faq-item.open .faq-a { max-height: 240px; margin-top: 10px; }
+  .faq-item.open { border-color: var(--border-md); }
+  .faq-chevron { flex-shrink: 0; transition: transform 0.3s; color: var(--text-muted); }
+  .faq-item.open .faq-chevron { transform: rotate(180deg); }
+  .faq-item { user-select: none; }
+
+  /* STELLA FAB */
+  #stella-fab {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 800;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(37,99,235,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 20px;
+  }
+
+  #stella-fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(37,99,235,0.5); }
+
+  .fab-pulse {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid rgba(37,99,235,0.3);
+    animation: fab-pulse 2s ease-out infinite;
+  }
+
+  @keyframes fab-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- INTRO OVERLAY -->
+<div id="intro-overlay">
+  <canvas id="intro-canvas"></canvas>
+  <button class="intro-skip" onclick="skipIntro()">Skip</button>
+</div>
+
+<!-- STELLA CHAT WINDOW -->
+<div id="stella-overlay" onclick="closeStellaOutside(event)">
+  <div class="stella-window">
+    <div class="stella-header">
+      <div class="stella-avatar">S</div>
+      <div class="stella-header-info">
+        <div class="stella-header-name">Stella</div>
+        <div class="stella-header-status"><span class="stella-status-dot"></span> KI-Karriere-Assistentin</div>
+      </div>
+      <button class="stella-close" onclick="closeStella()">&#x2715;</button>
+    </div>
+    <div class="stella-messages" id="stella-msgs">
+      <div class="smsg smsg-ai">Hallo! Ich bin <strong>Stella</strong>, deine KI-Karriere-Assistentin von Stellify.<br><br>Ich helfe dir bei CV-Optimierung, Bewerbungsschreiben, Job-Matching und Interview-Vorbereitung &#8211; speziell für den Schweizer Markt. Wie kann ich dir helfen?</div>
+    </div>
+    <div class="stella-suggestions" id="stella-suggestions">
+      <button class="stella-suggestion" onclick="sendSuggestion('Mein CV optimieren')">CV optimieren</button>
+      <button class="stella-suggestion" onclick="sendSuggestion('Lehrstelle finden in der Schweiz')">Lehrstelle finden</button>
+      <button class="stella-suggestion" onclick="sendSuggestion('Motivationsschreiben erstellen')">Motivationsschreiben</button>
+      <button class="stella-suggestion" onclick="sendSuggestion('Interview-Tipps')">Interview-Tipps</button>
+    </div>
+    <div class="stella-input-area">
+      <textarea class="stella-input" id="stella-input" placeholder="Frag Stella etwas..." rows="1" onkeydown="stellaKeydown(event)" oninput="autoResize(this)"></textarea>
+      <button class="stella-send" id="stella-send-btn" onclick="sendStella()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- STELLA FAB -->
+<button id="stella-fab" onclick="openStella()" title="Stella fragen">
+  <div class="fab-pulse"></div>
+  S
+</button>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">Stell<span>ify</span></a>
+  <ul class="nav-links">
+    <li><a href="#features" data-t="nav_features">Features</a></li>
+    <li><a href="#how" data-t="nav_how">So funktioniert's</a></li>
+    <li><a href="#pricing" data-t="nav_pricing">Preise</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="#" onclick="openStella(); return false;" style="color:var(--accent); font-weight:500;">Stella ✦</a></li>
+  </ul>
+  <div class="nav-cta">
+    <button class="btn-ghost" onclick="openModal('login')">Anmelden</button>
+    <button class="btn-primary" onclick="openModal('register')">
+      Kostenlos starten
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+  <div class="lang-switcher">
+    <button class="lang-btn active" onclick="setLang('de')">DE</button>
+    <button class="lang-btn" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" onclick="setLang('fr')">FR</button>
+    <button class="lang-btn" onclick="setLang('it')">IT</button>
+  </div>
+  <button class="dark-toggle" id="dark-toggle" onclick="toggleDarkMode()" title="Dark Mode"></button>
+  <button class="hamburger" id="hamburger-btn" onclick="toggleMobileNav()" aria-label="Menü">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- MOBILE NAV -->
+<div class="mobile-nav" id="mobile-nav">
+  <a href="#features" onclick="closeMobileNav()">Features</a>
+  <a href="#how" onclick="closeMobileNav()">So funktioniert's</a>
+  <a href="#pricing" onclick="closeMobileNav()">Preise</a>
+  <a href="#faq" onclick="closeMobileNav()">FAQ</a>
+  <button class="mobile-nav-stella" onclick="openStella(); closeMobileNav();">Stella ✦</button>
+  <div class="mobile-nav-divider"></div>
+  <div class="mobile-nav-cta">
+    <button class="mobile-nav-ghost" onclick="openModal('login'); closeMobileNav();">Anmelden</button>
+    <button class="btn-primary btn-primary-lg" style="width:100%; justify-content:center;" onclick="openModal('register'); closeMobileNav();">
+      Kostenlos starten
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      KI-gestützt für den Schweizer Arbeitsmarkt
+    </div>
+    <h1>Dein persönlicher <em>Karriere&#8209;Copilot</em></h1>
+    <p class="hero-sub">Stellify analysiert dein CV, optimiert deine Bewerbungen und findet die passenden Jobs – alles mit modernster KI, die den Schweizer Markt versteht.</p>
+    <div class="hero-actions">
+      <button class="btn-primary btn-primary-lg" onclick="openModal('register')">
+        Jetzt kostenlos testen
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+      <a href="#features" class="btn-secondary-lg">
+        Mehr erfahren
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div>
+        <span class="hero-stat-num" data-count="4200" data-suffix="+" data-sep="'">4'200+</span>
+        <span class="hero-stat-label" data-t="stat1">aktive Nutzer</span>
+      </div>
+      <div>
+        <span class="hero-stat-num" data-count="89" data-suffix="%">89%</span>
+        <span class="hero-stat-label" data-t="stat2">höhere Rücklaufquote</span>
+      </div>
+      <div>
+        <span class="hero-stat-num" data-count="3" data-suffix="×">3×</span>
+        <span class="hero-stat-label" data-t="stat3">mehr Interviews</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-visual">
+    <div class="chat-mockup">
+      <div class="chat-header">
+        <div class="chat-avatar">S</div>
+        <div>
+          <div class="chat-name">Stella – KI-Assistentin</div>
+          <div class="chat-status"><span class="chat-status-dot"></span> Online – bereit zu helfen</div>
+        </div>
+      </div>
+      <div class="chat-messages">
+        <div class="msg msg-user">Kannst du mein CV für eine UX Designer Stelle bei einer Zürcher Agentur optimieren?</div>
+        <div class="msg msg-ai"><strong>Natürlich!</strong> Ich habe dein CV analysiert und 3 konkrete Verbesserungen gefunden:<br><br>1. Deine Portfolio-Projekte fehlen noch im Header<br>2. Keywords für ATS-Systeme ergänzen<br>3. Berufserfahrung auf CH-Standard formatieren</div>
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>
+    </div>
+    <div class="floating-card floating-card-1">
+      <div class="fc-label">CV-Stärke</div>
+      <div class="fc-value">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        <span>78 → 94 Punkte</span>
+        <span class="fc-green">+16</span>
+      </div>
+    </div>
+    <div class="floating-card floating-card-2">
+      <div class="fc-label">Jobs gefunden</div>
+      <div class="fc-value">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>24 passende Stellen</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGOS -->
+<div class="logos-section" style="padding: 40px 0;">
+  <p class="logos-label">Vertrauen von Jobsuchenden bei</p>
+  <div class="logos-marquee-wrap">
+    <div class="logos-marquee" aria-hidden="true">
+      <span class="logo-item">Swisscom</span>
+      <span class="logo-item">Migros</span>
+      <span class="logo-item">UBS</span>
+      <span class="logo-item">Nestlé</span>
+      <span class="logo-item">Roche</span>
+      <span class="logo-item">SBB</span>
+      <span class="logo-item">ABB</span>
+      <span class="logo-item">Zurich</span>
+      <span class="logo-item">Novartis</span>
+      <span class="logo-item">PostFinance</span>
+      <!-- duplicate for seamless loop -->
+      <span class="logo-item">Swisscom</span>
+      <span class="logo-item">Migros</span>
+      <span class="logo-item">UBS</span>
+      <span class="logo-item">Nestlé</span>
+      <span class="logo-item">Roche</span>
+      <span class="logo-item">SBB</span>
+      <span class="logo-item">ABB</span>
+      <span class="logo-item">Zurich</span>
+      <span class="logo-item">Novartis</span>
+      <span class="logo-item">PostFinance</span>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <span class="section-label reveal" data-t="feat_label">Funktionen</span>
+  <h2 class="section-title reveal">Alles, was du für deine<br>Traumstelle brauchst</h2>
+  <p class="section-sub reveal">Von der CV-Analyse bis zum Interview-Training – Stellify begleitet dich durch den gesamten Bewerbungsprozess.</p>
+
+  <div class="features-grid">
+    <div class="feature-card reveal">
+      <div class="feature-icon">📄</div>
+      <h3>CV-Analyse & Optimierung</h3>
+      <p>Sarah lud ihr altes CV hoch – Stellify fand 7 kritische Schwachstellen in 30 Sekunden. Drei Wochen später hatte sie ihren Traumjob bei einer Zürcher Tech-Firma.</p>
+      <div class="feature-example">
+        <span class="fe-before">CV-Score: 54</span>
+        <span class="fe-arrow">→</span>
+        <span class="fe-after">CV-Score: 91</span>
+      </div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">🎯</div>
+      <h3>Smartes Job-Matching</h3>
+      <p>Statt 80 irrelevante Stellen durchforsten: Stellify zeigt dir die 5 Jobs, bei denen du die höchste Chance hast – gefiltert nach Lohn, Region und deinem Profil.</p>
+      <div class="feature-example">
+        <span class="fe-tag">Zürich</span>
+        <span class="fe-tag">CHF 95k+</span>
+        <span class="fe-tag">94% Match</span>
+      </div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">✉️</div>
+      <h3>Motivationsschreiben mit KI</h3>
+      <p>Kein generischer Text. Stellify liest die Stellenausschreibung, analysiert dein Profil und schreibt ein Schreiben, das der HR-Managerin sofort auffällt.</p>
+      <div class="feature-example">
+        <span class="fe-quote">«Das beste Bewerbungsschreiben, das wir je erhalten haben.»</span>
+      </div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">🎤</div>
+      <h3>Interview-Vorbereitung</h3>
+      <p>Marco übte 3 Abende mit Stella. Beim echten Interview bei der UBS kannte er jede Frage – und bekam das Angebot noch am selben Tag.</p>
+      <div class="feature-example">
+        <span class="fe-before">Nervös</span>
+        <span class="fe-arrow">→</span>
+        <span class="fe-after">Angebot erhalten ✓</span>
+      </div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">📊</div>
+      <h3>Lohn-Benchmarking</h3>
+      <p>Lisa wusste nicht, was sie verlangen sollte. Stellify zeigte ihr: Für ihre Rolle in Basel liegt der Markt bei CHF 110k – sie verhandelte CHF 18k mehr heraus.</p>
+      <div class="feature-example">
+        <span class="fe-before">CHF 92k</span>
+        <span class="fe-arrow">→</span>
+        <span class="fe-after">CHF 110k ✓</span>
+      </div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">🇨🇭</div>
+      <h3>Gemacht für die Schweiz</h3>
+      <p>Ob Bewerbung in Zürich, Genf oder Lugano – Stellify kennt die lokalen Gepflogenheiten, Sprachen und was Schweizer Arbeitgeber wirklich wollen.</p>
+      <div class="feature-example">
+        <span class="fe-tag">Deutsch</span>
+        <span class="fe-tag">Français</span>
+        <span class="fe-tag">Italiano</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="how-bg">
+  <span class="section-label reveal">So funktioniert's</span>
+  <h2 class="section-title reveal" style="text-align:center;">In 4 Schritten zur<br>Wunschstelle</h2>
+  <p class="section-sub reveal" style="text-align:center; margin:0 auto 60px;">Kein kompliziertes Onboarding. Du bist in weniger als 5 Minuten startklar.</p>
+
+  <div class="steps-grid">
+    <div class="step reveal">
+      <div class="step-num">1</div>
+      <h4>Profil erstellen</h4>
+      <p>Registriere dich kostenlos und gib deine Karriereziele ein.</p>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">2</div>
+      <h4>CV hochladen</h4>
+      <p>Lade dein bestehendes CV hoch – als PDF oder Word-Datei.</p>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">3</div>
+      <h4>Analyse erhalten</h4>
+      <p>Stellify analysiert dein Profil und zeigt dir konkrete nächste Schritte.</p>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">4</div>
+      <h4>Bewerben & Erfolg</h4>
+      <p>Bewirb dich direkt aus der App mit optimierten Unterlagen.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <span class="section-label reveal">Preise</span>
+  <h2 class="section-title reveal" data-t="price_title">Transparent. Fair. Schweizer Qualität.</h2>
+  <p class="section-sub reveal">Starte kostenlos und upgrade wenn du bereit bist. Keine versteckten Kosten.</p>
+
+  <div style="display:flex; align-items:center; gap:16px; margin-bottom:40px;">
+    <div class="pricing-toggle">
+      <button class="ptog-btn active" id="tog-monthly" onclick="setBilling('monthly')">Monatlich</button>
+      <button class="ptog-btn" id="tog-yearly" onclick="setBilling('yearly')">Jährlich <span class="yearly-badge">2 Monate gratis</span></button>
+    </div>
+  </div>
+
+  <div class="pricing-grid">
+    <div class="pricing-card reveal">
+      <p class="pricing-plan">Free</p>
+      <div class="pricing-price">
+        <span class="pricing-chf">CHF</span>
+        <span class="pricing-num" id="p-free">0</span>
+        <span class="pricing-period">/ Monat</span>
+      </div>
+      <p class="pricing-desc">Für den Einstieg. Keine Kreditkarte nötig.</p>
+      <ul class="pricing-features">
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>1 CV-Analyse pro Monat</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Basis-Job-Matching</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>1 Motivationsschreiben</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Community-Zugang</li>
+      </ul>
+      <button class="btn-plan btn-plan-outline" onclick="openModal('register')">Kostenlos starten</button>
+    </div>
+
+    <div class="pricing-card reveal" style="border-color:rgba(5,150,105,0.35); position:relative;">
+      <div class="pricing-badge" style="background:var(--green);">Für Schüler &amp; Lernende</div>
+      <p class="pricing-plan" style="color:var(--green);">Schüler</p>
+      <div class="pricing-price">
+        <span class="pricing-chf">CHF</span>
+        <span class="pricing-num" id="p-schueler" style="color:var(--green);">9.90</span>
+        <span class="pricing-period" id="pp-schueler">/ Monat</span>
+      </div>
+      <p class="pricing-desc">Speziell für alle, die eine Lehrstelle oder den ersten Job suchen.</p>
+      <ul class="pricing-features">
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Unbegrenzte Lehrstellen-Suche</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>CV-Analyse für Schulabgänger</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Motivationsschreiben für Lehre</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Stella-Chat</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Schnupperlehre-Vorbereitung</li>
+      </ul>
+      <button class="btn-plan" style="background:var(--green);border:none;color:#fff;font-weight:500;width:100%;padding:12px;border-radius:var(--radius-md);cursor:pointer;font-family:var(--font-body);font-size:15px;" onclick="openModal('register')">Jetzt starten</button>
+    </div>
+
+    <div class="pricing-card featured reveal" style="position:relative;">
+      <div class="pricing-badge">Beliebteste Wahl</div>
+      <p class="pricing-plan">Pro</p>
+      <div class="pricing-price">
+        <span class="pricing-chf">CHF</span>
+        <span class="pricing-num" id="p-pro">19.90</span>
+        <span class="pricing-period" id="pp-pro">/ Monat</span>
+      </div>
+      <p class="pricing-desc">Für aktive Jobsuchende, die schnell vorwärtskommen wollen.</p>
+      <ul class="pricing-features">
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Unbegrenzte CV-Analysen</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Erweitertes Job-Matching</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Unbegrenzte Motivationsschreiben</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Interview-Training</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Lohn-Benchmarking</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Prioritäts-Support</li>
+      </ul>
+      <button class="btn-plan btn-plan-filled" onclick="openModal('register')">Pro aktivieren</button>
+    </div>
+
+    <div class="pricing-card reveal">
+      <p class="pricing-plan">Team</p>
+      <div class="pricing-price">
+        <span class="pricing-chf">CHF</span>
+        <span class="pricing-num" id="p-team">49.90</span>
+        <span class="pricing-period" id="pp-team">/ Monat</span>
+      </div>
+      <p class="pricing-desc">Für HR-Teams und Outplacement-Anbieter.</p>
+      <ul class="pricing-features">
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Alles aus Pro</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Bis zu 10 Nutzer</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Team-Dashboard &amp; Analytics</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Dedizierter Account Manager</li>
+        <li><span class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>CH-DSG konform</li>
+      </ul>
+      <button class="btn-plan btn-plan-outline" onclick="openModal('register')">Team anfragen</button>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section id="testimonials" class="testimonials-section">
+  <span class="section-label reveal" data-t="testi_label">Stimmen</span>
+  <h2 class="section-title reveal">Was unsere Nutzer sagen</h2>
+  <p class="section-sub reveal">Echte Erfahrungen aus dem Schweizer Arbeitsmarkt.</p>
+
+  <div class="testimonials-grid">
+    <div class="testimonial-card reveal">
+      <div class="stars">★★★★★</div>
+      <p class="testimonial-text">Ich habe innerhalb von 3 Wochen nach dem Start mit Stellify zwei Intervieweinladungen erhalten – zuvor war ich monatelang ohne Rückmeldung. Das CV-Feedback war konkret und umsetzbar.</p>
+      <div class="testimonial-author">
+        <div class="author-avatar" style="background:#2563EB;">MH</div>
+        <div>
+          <div class="author-name">Marc H.</div>
+          <div class="author-role">Senior Software Engineer, Zürich</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial-card reveal">
+      <div class="stars">★★★★★</div>
+      <p class="testimonial-text">Das Motivationsschreiben-Tool ist Gold wert. Es klingt nicht wie KI – sondern wirklich wie ich. Und die Schweiz-spezifischen Anpassungen machen einen grossen Unterschied.</p>
+      <div class="testimonial-author">
+        <div class="author-avatar" style="background:#059669;">LB</div>
+        <div>
+          <div class="author-name">Laura B.</div>
+          <div class="author-role">Marketing Managerin, Bern</div>
+        </div>
+      </div>
+    </div>
+    <div class="testimonial-card reveal">
+      <div class="stars">★★★★☆</div>
+      <p class="testimonial-text">Die Interview-Vorbereitung hat mir geholfen, souveräner aufzutreten. Ich wusste auf jede Frage eine gute Antwort – das erste Mal in meiner Karriere hatte ich kein Lampenfieber.</p>
+      <div class="testimonial-author">
+        <div class="author-avatar" style="background:#9333EA;">TM</div>
+        <div>
+          <div class="author-name">Thomas M.</div>
+          <div class="author-role">Projektleiter, Basel</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CV COMPARE -->
+<section class="cv-compare-section">
+  <span class="section-label reveal" style="text-align:center; display:block;">Vorher / Nachher</span>
+  <h2 class="section-title reveal" style="text-align:center;">Was KI-Optimierung<br><em style="font-style:italic; color:var(--accent);">wirklich</em> bewirkt</h2>
+  <p class="section-sub reveal" style="text-align:center; margin:0 auto 48px;">Sieh selbst, wie Stellify ein durchschnittliches CV in eine überzeugende Bewerbung verwandelt.</p>
+
+  <div class="cv-compare-wrap reveal">
+    <!-- BEFORE -->
+    <div class="cv-card">
+      <div class="cv-card-header before">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Vorher – Ohne Optimierung
+      </div>
+      <div class="cv-card-body">
+        <div class="cv-block bad">
+          <div class="cv-block-label">Zusammenfassung</div>
+          <div class="cv-line long"></div>
+          <div class="cv-line med"></div>
+        </div>
+        <div class="cv-block bad">
+          <div class="cv-block-label">Berufserfahrung</div>
+          <div class="cv-line full"></div>
+          <div class="cv-line med"></div>
+          <div class="cv-line short"></div>
+        </div>
+        <div class="cv-block bad">
+          <div class="cv-block-label">Fähigkeiten</div>
+          <div class="cv-line long"></div>
+          <div class="cv-line short"></div>
+        </div>
+        <div class="cv-score-row">
+          <div class="cv-score-meta"><span>CV-Score</span><span style="color:#EF4444; font-weight:500;">54 / 100</span></div>
+          <div class="cv-score-track"><div class="cv-score-fill" style="width:54%; background:#EF4444;"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AFTER -->
+    <div class="cv-card" style="border-color:rgba(5,150,105,0.3);">
+      <div class="cv-card-header after">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Nachher – KI-optimiert von Stellify
+      </div>
+      <div class="cv-card-body">
+        <div class="cv-block good">
+          <div class="cv-block-label">Zusammenfassung</div>
+          <div class="cv-line full"></div>
+          <div class="cv-line long"></div>
+          <div class="cv-ai-tag">✓ KI-optimiert</div>
+        </div>
+        <div class="cv-block good">
+          <div class="cv-block-label">Berufserfahrung</div>
+          <div class="cv-line full"></div>
+          <div class="cv-line long"></div>
+          <div class="cv-line med"></div>
+          <div class="cv-ai-tag">✓ ATS-Keywords</div>
+        </div>
+        <div class="cv-block good">
+          <div class="cv-block-label">Fähigkeiten</div>
+          <div class="cv-line full"></div>
+          <div class="cv-line long"></div>
+          <div class="cv-ai-tag">✓ CH-Standard</div>
+        </div>
+        <div class="cv-score-row">
+          <div class="cv-score-meta"><span>CV-Score</span><span style="color:var(--green); font-weight:500;">94 / 100 &nbsp;+40 ↑</span></div>
+          <div class="cv-score-track"><div class="cv-score-fill" style="width:94%; background:var(--green);"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="faq-section">
+  <span class="section-label reveal" style="text-align:center; display:block;">FAQ</span>
+  <h2 class="section-title reveal" style="text-align:center;">Häufige Fragen</h2>
+  <p class="section-sub reveal" style="text-align:center; margin: 0 auto 48px;">Nicht gefunden was du suchst? Schreib uns einfach.</p>
+
+  <div class="faq-grid">
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Für welche Kantone ist Stellify geeignet?
+        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <p class="faq-a">Stellify deckt die gesamte Schweiz ab – Deutschschweiz, Romandie und Tessin. Sprache und Marktdaten werden pro Region angepasst.</p>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Wie sicher sind meine Daten?
+        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <p class="faq-a">Alle Daten werden auf Servern in der Schweiz gespeichert und verarbeitet. Wir folgen dem Schweizer Datenschutzgesetz (DSG) und DSGVO.</p>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Kann ich den Free-Plan jederzeit upgraden?
+        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <p class="faq-a">Ja, jederzeit. Du kannst in deinem Account direkt upgraden – die Abrechnung erfolgt anteilig ab dem Wechseldatum.</p>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Welche CV-Formate werden unterstützt?
+        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <p class="faq-a">PDF, Word (.docx) und direkte Text-Eingabe. Wir empfehlen PDF für die beste Analyse-Qualität.</p>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Gibt es eine Mindestlaufzeit?
+        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <p class="faq-a">Nein. Beide kostenpflichtigen Pläne sind monatlich kündbar. Keine Bindung, keine versteckten Gebühren.</p>
+    </div>
+    <div class="faq-item reveal" onclick="toggleFaq(this)">
+      <div class="faq-q">Funktioniert Stellify auch für Quereinsteiger?
+        <svg class="faq-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <p class="faq-a">Ja. Die KI erkennt übertragbare Fähigkeiten und hilft dir, dein Profil gezielt für neue Branchen zu positionieren.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2 class="section-title" style="margin-bottom:16px;" data-t="cta_title">Starte noch heute.</h2>
+  <p class="section-sub">Kostenlos, ohne Kreditkarte, in 2 Minuten eingerichtet.</p>
+  <button class="btn-white" onclick="openModal('register')">
+    Jetzt kostenlos starten
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  </button>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div>
+      <a class="footer-logo" href="#">Stell<span>ify</span></a>
+      <p class="footer-desc">Dein KI-gestützter Karriere-Copilot für den Schweizer Arbeitsmarkt. Modern. Präzise. Schweizerdeutsch.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Produkt</h5>
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Preise</a></li>
+        <li><a href="#how">So funktioniert's</a></li>
+        <li><a href="#">Changelog</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Ressourcen</h5>
+      <ul>
+        <li><a href="#">Blog</a></li>
+        <li><a href="#">CV-Vorlagen</a></li>
+        <li><a href="#">Lohn-Guide</a></li>
+        <li><a href="#">Support</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Unternehmen</h5>
+      <ul>
+        <li><a href="#">Über uns</a></li>
+        <li><a href="#">Karriere</a></li>
+        <li><a href="#">Presse</a></li>
+        <li><a href="#">Kontakt</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2025 Stellify. Hergestellt in der Schweiz 🇨🇭</span>
+    <div class="footer-bottom-links">
+      <a href="#">Datenschutz</a>
+      <a href="#">AGB</a>
+      <a href="#">Impressum</a>
+    </div>
+  </div>
+</footer>
+
+<!-- SCROLL TO TOP -->
+<button class="scroll-top-btn" id="scroll-top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Nach oben scrollen">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+</button>
+
+<!-- COOKIE BANNER -->
+<div class="cookie-banner" id="cookie-banner">
+  <p class="cookie-text">Wir verwenden Cookies, um dein Erlebnis zu verbessern und unsere Dienste zu optimieren. Mit «Akzeptieren» stimmst du unserer <a href="#">Datenschutzrichtlinie</a> zu.</p>
+  <div class="cookie-actions">
+    <button class="cookie-btn-decline" onclick="dismissCookie(false)">Ablehnen</button>
+    <button class="cookie-btn-accept" onclick="dismissCookie(true)">Akzeptieren</button>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <span class="modal-logo">Stell<span>ify</span></span>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Anmelden</button>
+      <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Registrieren</button>
+    </div>
+
+    <div id="login-form">
+      <div class="form-group">
+        <label class="form-label">E-Mail</label>
+        <input type="email" class="form-input" placeholder="dein@email.ch">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort</label>
+        <input type="password" class="form-input" placeholder="••••••••">
+      </div>
+      <button class="btn-plan btn-plan-filled" style="margin-top:8px;">Anmelden</button>
+      <div class="divider">oder</div>
+      <button class="btn-plan btn-plan-outline" onclick="alert('Google Login wird verbunden...')" style="display:flex; align-items:center; justify-content:center; gap:10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Mit Google anmelden
+      </button>
+
+    <div id="register-form" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">Vorname</label>
+        <input type="text" class="form-input" placeholder="Max">
+      </div>
+      <div class="form-group">
+        <label class="form-label">E-Mail</label>
+        <input type="email" class="form-input" placeholder="dein@email.ch">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Passwort</label>
+        <input type="password" class="form-input" placeholder="Mindestens 8 Zeichen">
+      </div>
+      <button class="btn-plan btn-plan-filled" style="margin-top:8px;">Konto erstellen</button>
+      <div class="divider">oder</div>
+      <button class="btn-plan btn-plan-outline" onclick="alert('Google Login wird verbunden...')" style="display:flex; align-items:center; justify-content:center; gap:10px;">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Mit Google registrieren
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const T={de:{nav_features:'Features',nav_how:"So funktioniert's",nav_pricing:'Preise',nav_faq:'FAQ',nav_stella:'Stella ✶',nav_login:'Anmelden',nav_cta:'Kostenlos starten',hero_badge:'KI-gestützt für den Schweizer Arbeitsmarkt',hero_h1:'Dein persönlicher Karriere‑Copilot',hero_sub:'Stellify analysiert dein CV, optimiert deine Bewerbungen und findet die passenden Jobs.',hero_btn:'Jetzt kostenlos testen',hero_btn2:'Mehr erfahren',stat1:'aktive Nutzer',stat2:'höhere Rücklaufquote',stat3:'mehr Interviews',feat_label:'Funktionen',feat_title:'Alles, was du für deine Traumstelle brauchst',feat_sub:'Von der CV-Analyse bis zum Interview-Training.',how_label:"So funktioniert's",how_title:'In 4 Schritten zur Wunschstelle',how_sub:'Kein kompliziertes Onboarding. In weniger als 5 Minuten startklar.',price_label:'Preise',price_title:'Transparent. Fair. Schweizer Qualität.',price_sub:'Starte kostenlos und upgrade wenn du bereit bist.',testi_label:'Stimmen',testi_title:'Was unsere Nutzer sagen',testi_sub:'Echte Erfahrungen aus dem Schweizer Arbeitsmarkt.',faq_label:'FAQ',faq_title:'Häufige Fragen',faq_sub:'Nicht gefunden? Schreib uns.',cta_title:'Starte noch heute.',cta_sub:'Kostenlos, ohne Kreditkarte, in 2 Minuten.',cta_btn:'Jetzt kostenlos starten',footer_desc:'Dein KI-gestützter Karriere-Copilot für den Schweizer Arbeitsmarkt.',footer_made:'Hergestellt in der Schweiz'},fr:{nav_features:'Fonctionnalités',nav_how:'Comment ça marche',nav_pricing:'Tarifs',nav_faq:'FAQ',nav_stella:'Stella ✶',nav_login:'Se connecter',nav_cta:'Commencer gratuitement',hero_badge:'Propulsé par IA pour le marché suisse',hero_h1:'Votre copilote carrière personnel',hero_sub:'Stellify analyse votre CV, optimise vos candidatures et trouve les postes qui vous correspondent.',hero_btn:'Essayer gratuitement',hero_btn2:'En savoir plus',stat1:'utilisateurs actifs',stat2:'taux de réponse amélioré',stat3:"plus d'entretiens",feat_label:'Fonctionnalités',feat_title:'Tout ce dont vous avez besoin',feat_sub:"De l'analyse de CV à la préparation aux entretiens.",how_label:'Comment ça marche',how_title:'Votre emploi de rêve en 4 étapes',how_sub:'Pas de configuration complexe. Prêt en moins de 5 minutes.',price_label:'Tarifs',price_title:'Transparent. Équitable. Qualité suisse.',price_sub:'Commencez gratuitement et passez au plan supérieur quand vous voulez.',testi_label:'Témoignages',testi_title:'Ce que disent nos utilisateurs',testi_sub:'De vraies expériences du marché du travail suisse.',faq_label:'FAQ',faq_title:'Questions fréquentes',faq_sub:'Écrivez-nous.',cta_title:"Commencez dès aujourd'hui.",cta_sub:'Gratuit, sans carte de crédit, en 2 minutes.',cta_btn:'Commencer gratuitement',footer_desc:'Votre copilote carrière IA pour le marché suisse.',footer_made:'Fabriqué en Suisse'},it:{nav_features:'Funzionalità',nav_how:'Come funziona',nav_pricing:'Prezzi',nav_faq:'FAQ',nav_stella:'Stella ✶',nav_login:'Accedi',nav_cta:'Inizia gratis',hero_badge:'Alimentato da IA per il mercato svizzero',hero_h1:'Il tuo copilota professionale personale',hero_sub:'Stellify analizza il tuo CV, ottimizza le candidature e trova i lavori giusti.',hero_btn:'Prova gratuitamente',hero_btn2:'Scopri di più',stat1:'utenti attivi',stat2:'tasso di risposta migliorato',stat3:'più colloqui',feat_label:'Funzionalità',feat_title:'Tutto ciò di cui hai bisogno',feat_sub:"Dall'analisi del CV alla preparazione ai colloqui.",how_label:'Come funziona',how_title:'Il lavoro dei tuoi sogni in 4 passi',how_sub:'Nessuna configurazione. Pronto in meno di 5 minuti.',price_label:'Prezzi',price_title:'Trasparente. Equo. Qualità svizzera.',price_sub:'Inizia gratuitamente e passa al piano superiore quando sei pronto.',testi_label:'Testimonianze',testi_title:'Cosa dicono i nostri utenti',testi_sub:'Esperienze reali dal mercato del lavoro svizzero.',faq_label:'FAQ',faq_title:'Domande frequenti',faq_sub:'Scrivici.',cta_title:'Inizia oggi stesso.',cta_sub:'Gratuito, senza carta di credito, in 2 minuti.',cta_btn:'Inizia gratuitamente',footer_desc:'Il tuo copilota carriera IA per il mercato svizzero.',footer_made:'Fatto in Svizzera'},en:{nav_features:'Features',nav_how:'How it works',nav_pricing:'Pricing',nav_faq:'FAQ',nav_stella:'Stella ✶',nav_login:'Sign in',nav_cta:'Get started free',hero_badge:'AI-powered for the Swiss job market',hero_h1:'Your personal career copilot',hero_sub:'Stellify analyses your CV, optimises your applications and finds matching jobs.',hero_btn:'Try for free',hero_btn2:'Learn more',stat1:'active users',stat2:'higher response rate',stat3:'more interviews',feat_label:'Features',feat_title:'Everything you need to land your dream job',feat_sub:'From CV analysis to interview training.',how_label:'How it works',how_title:'Your dream job in 4 steps',how_sub:'No complex onboarding. Ready in under 5 minutes.',price_label:'Pricing',price_title:'Transparent. Fair. Swiss quality.',price_sub:'Start free and upgrade when you are ready.',testi_label:'Testimonials',testi_title:'What our users say',testi_sub:'Real experiences from the Swiss job market.',faq_label:'FAQ',faq_title:'Frequently asked questions',faq_sub:'Write to us.',cta_title:'Start today.',cta_sub:'Free, no credit card, set up in 2 minutes.',cta_btn:'Get started free',footer_desc:'Your AI-powered career copilot for the Swiss job market.',footer_made:'Made in Switzerland'}};
+
+let currentLang='de';
+const tkeys=['nav_features','nav_how','nav_pricing','nav_faq','nav_stella','nav_login','nav_cta','hero_badge','hero_h1','hero_sub','hero_btn','hero_btn2','stat1','stat2','stat3','feat_label','feat_title','feat_sub','how_label','how_title','how_sub','price_label','price_title','price_sub','testi_label','testi_title','testi_sub','faq_label','faq_title','faq_sub','cta_title','cta_sub','cta_btn','footer_desc','footer_made'];
+
+function setLang(lang){
+  currentLang=lang;
+  const t=T[lang];
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===lang));
+  tkeys.forEach(k=>document.querySelectorAll('[data-t="'+k+'"]').forEach(el=>{el.innerHTML=t[k]||el.innerHTML;}));
+}
+
+function skipIntro(){
+  const o=document.getElementById('intro-overlay');
+  o.classList.add('hide');
+  document.body.style.overflow='';
+  setTimeout(()=>o.style.display='none',1000);
+}
+
+window.addEventListener('load',()=>{
+  document.body.style.overflow='hidden';
+  const canvas=document.getElementById('intro-canvas');
+  const ctx=canvas.getContext('2d');
+  let W,H,animId;
+
+  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+  resize();window.addEventListener('resize',()=>{resize();});
+
+  const COLS=['#639CFF','#818CF8','#34D399','#F59E0B','#F472B6','#A78BFA','#60A5FA','#4ADE80'];
+  const startTime=performance.now();
+  const DURATION=5000;
+
+  // ── Particles: star field ──────────────────────────────────
+  const stars=[];
+  for(let i=0;i<120;i++){
+    stars.push({
+      x:Math.random(),y:Math.random(),
+      r:.3+Math.random()*1.4,
+      alpha:Math.random(),speed:.0002+Math.random()*.0006,
+      twinkle:Math.random()*Math.PI*2,ts:.015+Math.random()*.03,
+      color:COLS[Math.floor(Math.random()*COLS.length)]
+    });
+  }
+
+  // ── Floating words: elegant, international ─────────────────
+  const FLOAT_WORDS=[
+    {t:'Hello',c:'#639CFF'},{t:'Bonjour',c:'#818CF8'},{t:'Ciao',c:'#34D399'},
+    {t:'Hallo',c:'#F472B6'},{t:'Dream Job',c:'#A78BFA'},{t:'Résumé',c:'#60A5FA'},
+    {t:'Career',c:'#4ADE80'},{t:'Carrière',c:'#F59E0B'},{t:'Apply',c:'#639CFF'},
+    {t:'Postuler',c:'#818CF8'},{t:'Lavoro',c:'#34D399'},{t:'Stellify',c:'#ffffff'},
+  ];
+  const floaters=FLOAT_WORDS.map((w,i)=>({
+    ...w,
+    x:.1+Math.random()*.8,y:.15+Math.random()*.7,
+    vx:(Math.random()-.5)*.00015,vy:(Math.random()-.5)*.00012,
+    alpha:0,targetAlpha:.55+Math.random()*.3,
+    size:11+Math.floor(Math.random()*8),
+    delay:600+i*180,
+    phase:Math.random()*Math.PI*2
+  }));
+
+  // ── Beam lines from center ─────────────────────────────────
+  const beams=Array.from({length:8},(_,i)=>({
+    angle:(i/8)*Math.PI*2+Math.random()*.3,
+    len:0,speed:.005+Math.random()*.004,color:COLS[i%COLS.length],alpha:0
+  }));
+
+  // ── Ripple rings ──────────────────────────────────────────
+  const ripples=[];
+  let lastRipple=0;
+
+  let t=0;
+  function draw(now){
+    animId=requestAnimationFrame(draw);
+    const elapsed=now-startTime;
+    t=elapsed*.001;
+    ctx.clearRect(0,0,W,H);
+    const cx=W/2,cy=H/2;
+    const progress=Math.min(elapsed/DURATION,1);
+    function easeOut(x){return 1-Math.pow(1-x,3);}
+
+    // ── Dark background gradient ──────────────────────────────
+    const bg=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)*.7);
+    bg.addColorStop(0,'#0d0d18');
+    bg.addColorStop(.5,'#07070f');
+    bg.addColorStop(1,'#030306');
+    ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+    // ── Star field ────────────────────────────────────────────
+    const starP=easeOut(Math.min(elapsed/1200,1));
+    stars.forEach(s=>{
+      s.twinkle+=s.ts;
+      s.x=(s.x+s.speed)%1;
+      const tw=.3+.7*(.5+.5*Math.sin(s.twinkle));
+      const a=Math.min(s.alpha*starP,.9)*tw;
+      if(a<.02)return;
+      ctx.beginPath();
+      ctx.arc(s.x*W,s.y*H,s.r,0,Math.PI*2);
+      ctx.fillStyle=s.color;
+      ctx.globalAlpha=a*.6;
+      ctx.fill();
+      ctx.globalAlpha=1;
+    });
+
+    // ── Grid lines – subtle perspective grid ──────────────────
+    if(elapsed>300){
+      const gp=easeOut(Math.min((elapsed-300)/1000,1))*.12;
+      ctx.strokeStyle=`rgba(99,156,255,${gp})`;
+      ctx.lineWidth=.5;
+      const cols=12,rows=8;
+      for(let i=0;i<=cols;i++){
+        const x=cx+(i/cols-.5)*W*1.4;
+        ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(cx+(x-cx)*.2,H);ctx.stroke();
+      }
+      for(let j=0;j<=rows;j++){
+        const y=j/rows*H;
+        ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+      }
+    }
+
+    // ── Ripple rings from center ──────────────────────────────
+    if(elapsed>400 && elapsed-lastRipple>700){
+      ripples.push({r:0,maxR:Math.min(W,H)*.45,alpha:.5,color:COLS[ripples.length%COLS.length]});
+      lastRipple=elapsed;
+    }
+    ripples.forEach((rp,ri)=>{
+      rp.r+=2.2;rp.alpha*=.972;
+      if(rp.alpha<.01){ripples.splice(ri,1);return;}
+      ctx.beginPath();ctx.arc(cx,cy,rp.r,0,Math.PI*2);
+      ctx.strokeStyle=rp.color;ctx.lineWidth=1;
+      ctx.globalAlpha=rp.alpha;ctx.stroke();ctx.globalAlpha=1;
+    });
+
+    // ── Beams ─────────────────────────────────────────────────
+    if(elapsed>500){
+      const bp=easeOut(Math.min((elapsed-500)/1200,1));
+      beams.forEach(b=>{
+        b.angle+=.0008;b.alpha=Math.min(b.alpha+.008,bp*.4);
+        const maxL=Math.min(W,H)*.42*bp;
+        const x1=cx+Math.cos(b.angle)*20,y1=cy+Math.sin(b.angle)*20;
+        const x2=cx+Math.cos(b.angle)*maxL,y2=cy+Math.sin(b.angle)*maxL;
+        const grad=ctx.createLinearGradient(x1,y1,x2,y2);
+        grad.addColorStop(0,b.color+'88');grad.addColorStop(1,b.color+'00');
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
+        ctx.strokeStyle=grad;ctx.lineWidth=1;ctx.globalAlpha=b.alpha;ctx.stroke();
+        // Travelling dot
+        const dp=((t*b.speed*8)%1);
+        const dx=x1+(x2-x1)*dp,dy=y1+(y2-y1)*dp;
+        ctx.beginPath();ctx.arc(dx,dy,2,0,Math.PI*2);
+        ctx.fillStyle=b.color;ctx.globalAlpha=b.alpha*.9;ctx.fill();
+        ctx.globalAlpha=1;
+      });
+    }
+
+    // ── Central orb with inner rings ─────────────────────────
+    {
+      const orbP=easeOut(Math.min(elapsed/700,1));
+      const orbR=Math.min(W,H)*.075*orbP*(1+.04*Math.sin(t*2));
+
+      // Outer glow halos
+      [[5,.04],[3.5,.07],[2.5,.13],[1.8,.2]].forEach(([m,a])=>{
+        const g=ctx.createRadialGradient(cx,cy,0,cx,cy,orbR*m);
+        g.addColorStop(0,`rgba(59,130,246,${a})`);g.addColorStop(1,'rgba(59,130,246,0)');
+        ctx.beginPath();ctx.arc(cx,cy,orbR*m,0,Math.PI*2);ctx.fillStyle=g;ctx.fill();
+      });
+
+      // Inner ring
+      ctx.beginPath();ctx.arc(cx,cy,orbR*1.35,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(99,156,255,${.15*orbP})`;ctx.lineWidth=.8;ctx.stroke();
+      ctx.beginPath();ctx.arc(cx,cy,orbR*1.7,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(99,156,255,${.08*orbP})`;ctx.lineWidth=.5;ctx.stroke();
+
+      // Core gradient
+      const cg=ctx.createRadialGradient(cx-orbR*.25,cy-orbR*.25,0,cx,cy,orbR);
+      cg.addColorStop(0,'#BFDBFE');cg.addColorStop(.35,'#60A5FA');
+      cg.addColorStop(.7,'#2563EB');cg.addColorStop(1,'#1E40AF');
+      ctx.beginPath();ctx.arc(cx,cy,orbR,0,Math.PI*2);
+      ctx.fillStyle=cg;ctx.fill();
+
+      // Stellify text on orb
+      if(orbP>.4){
+        const tp=easeOut(Math.min((orbP-.4)/.6,1));
+        const fs=Math.max(Math.round(orbR*.42),12);
+        ctx.save();
+        ctx.font=`400 ${fs}px "Instrument Serif",Georgia,serif`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillStyle=`rgba(255,255,255,${tp*.95})`;
+        ctx.shadowColor='rgba(255,255,255,.3)';ctx.shadowBlur=6;
+        ctx.fillText('Stellify',cx,cy);
+        ctx.restore();
+      }
+    }
+
+    // ── Floating words ────────────────────────────────────────
+    ctx.save();
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    floaters.forEach(fw=>{
+      if(elapsed<fw.delay)return;
+      const fp=easeOut(Math.min((elapsed-fw.delay)/900,1));
+      fw.alpha+=(fw.targetAlpha*fp-fw.alpha)*.04;
+      fw.x+=fw.vx;fw.y+=fw.vy;
+      if(fw.x<.04||fw.x>.96)fw.vx*=-1;
+      if(fw.y<.06||fw.y>.94)fw.vy*=-1;
+      const breath=1+.04*Math.sin(t*.8+fw.phase);
+      const px=fw.x*W,py=fw.y*H;
+      // Keep away from center orb
+      const dcx=px-W/2,dcy=py-H/2;
+      const distOrb=Math.sqrt(dcx*dcx+dcy*dcy);
+      const minOrb=Math.min(W,H)*.15;
+      if(distOrb<minOrb){fw.x+=dcx/distOrb*.003;fw.y+=dcy/distOrb*.003;}
+      if(fw.alpha<.01)return;
+      ctx.font=`300 ${Math.round(fw.size*breath)}px "DM Sans",system-ui,sans-serif`;
+      ctx.shadowColor=fw.c;ctx.shadowBlur=fw.c==='#ffffff'?12:6;
+      ctx.fillStyle=fw.c;ctx.globalAlpha=fw.alpha;
+      ctx.fillText(fw.t,px,py);
+    });
+    ctx.shadowBlur=0;ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    ctx.globalAlpha=1;ctx.restore();
+
+    // ── Scan line ─────────────────────────────────────────────
+    if(elapsed>200&&elapsed<3200){
+      const sy=((elapsed-200)/3000)*H;
+      const sg=ctx.createLinearGradient(0,sy-40,0,sy+2);
+      sg.addColorStop(0,'rgba(99,156,255,0)');sg.addColorStop(1,'rgba(99,156,255,0.05)');
+      ctx.fillStyle=sg;ctx.fillRect(0,sy-40,W,42);
+      ctx.beginPath();ctx.moveTo(0,sy);ctx.lineTo(W,sy);
+      ctx.strokeStyle='rgba(99,156,255,0.14)';ctx.lineWidth=1;ctx.stroke();
+    }
+
+    if(elapsed>=DURATION){cancelAnimationFrame(animId);skipIntro();}
+  }
+  requestAnimationFrame(draw);
+});
+
+function openModal(tab){document.getElementById('modal').classList.add('open');switchTab(tab||'login');document.body.style.overflow='hidden';}
+function closeModal(){document.getElementById('modal').classList.remove('open');document.body.style.overflow='';}
+function closeModalOutside(e){if(e.target===document.getElementById('modal'))closeModal();}
+function switchTab(tab){document.getElementById('login-form').style.display=tab==='login'?'block':'none';document.getElementById('register-form').style.display=tab==='register'?'block':'none';document.getElementById('tab-login').className='tab-btn'+(tab==='login'?' active':'');document.getElementById('tab-register').className='tab-btn'+(tab==='register'?' active':'');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeStella();}});
+
+const obs=new IntersectionObserver((entries)=>{entries.forEach((entry,i)=>{if(entry.isIntersecting){setTimeout(()=>entry.target.classList.add('visible'),i*60);obs.unobserve(entry.target);}});},{threshold:.1,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+function openStella(){document.getElementById('stella-overlay').classList.add('open');document.body.style.overflow='hidden';}
+function closeStella(){document.getElementById('stella-overlay').classList.remove('open');document.body.style.overflow='';}
+function closeStellaOutside(e){if(e.target===document.getElementById('stella-overlay'))closeStella();}
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
+function stellaKeydown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendStella();}}
+function sendSuggestion(text){document.getElementById('stella-input').value=text;document.getElementById('stella-suggestions').style.display='none';sendStella();}
+
+const sR={cv:'Gerne analysiere ich dein CV! Lade es in deinem Profil hoch (PDF oder Word). Ich schaue auf Struktur, Keywords und Schweizer Markt-Standards. Hast du bereits ein CV?',lehr:'Super, dass du eine Lehrstelle suchst!\n\n1. CV auf Schulnoten und Praktika fokussieren\n2. Persönliches Motivationsschreiben pro Betrieb\n3. Frühzeitig bewerben \u2013 idealerweise 1 Jahr voraus\n\nIn welchem Beruf möchtest du eine Lehre machen?',mot:'Für ein starkes Motivationsschreiben brauche ich: Betrieb, Stelle und 2-3 Punkte warum du dich interessierst. Dann erstelle ich ein massgeschneidertes Schreiben auf Schweizer Standard.',int:'Wir üben typische Fragen wie "Warum wollen Sie bei uns arbeiten?" und ich gebe dir direktes Feedback. Willst du gleich starten?',def:'Ich helfe dir gerne! Frag mich zu CV-Optimierung, Lehrstellen, Motivationsschreiben, Interview-Vorbereitung oder Lohn-Benchmarking.'};
+
+let isTyping=false;
+async function sendStella(){
+  if(isTyping)return;
+  const inp=document.getElementById('stella-input');
+  const text=inp.value.trim();if(!text)return;
+  const msgs=document.getElementById('stella-msgs');
+  const um=document.createElement('div');um.className='smsg smsg-user';um.textContent=text;msgs.appendChild(um);
+  inp.value='';inp.style.height='auto';
+  document.getElementById('stella-send-btn').disabled=true;isTyping=true;
+  const td=document.createElement('div');td.className='stella-typing';td.innerHTML='<div class="stella-typing-dot"></div><div class="stella-typing-dot"></div><div class="stella-typing-dot"></div>';
+  msgs.appendChild(td);msgs.scrollTop=msgs.scrollHeight;
+  await new Promise(r=>setTimeout(r,900+Math.random()*700));
+  td.remove();
+  const l=text.toLowerCase();
+  let r=sR.def;
+  if(l.includes('cv')||l.includes('lebenslauf'))r=sR.cv;
+  else if(l.includes('lehr')||l.includes('ausbildung'))r=sR.lehr;
+  else if(l.includes('motivat')||l.includes('schreiben')||l.includes('bewerbung'))r=sR.mot;
+  else if(l.includes('interview')||l.includes('tipps'))r=sR.int;
+  const am=document.createElement('div');am.className='smsg smsg-ai';am.innerHTML=r.replace(/\n/g,'<br>');
+  msgs.appendChild(am);msgs.scrollTop=msgs.scrollHeight;
+  document.getElementById('stella-send-btn').disabled=false;isTyping=false;
+}
+
+// DARK MODE
+function toggleDarkMode(){
+  const html=document.documentElement;
+  const dark=html.getAttribute('data-theme')==='dark';
+  html.setAttribute('data-theme',dark?'light':'dark');
+  localStorage.setItem('theme',dark?'light':'dark');
+  updateDarkIcon();
+}
+function updateDarkIcon(){
+  const dark=document.documentElement.getAttribute('data-theme')==='dark';
+  const btn=document.getElementById('dark-toggle');
+  if(!btn)return;
+  btn.innerHTML=dark
+    ?'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+    :'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+}
+(function(){const t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);updateDarkIcon();})();
+
+// HAMBURGER / MOBILE NAV
+function toggleMobileNav(){
+  const nav=document.getElementById('mobile-nav');
+  const btn=document.getElementById('hamburger-btn');
+  const open=nav.classList.toggle('open');
+  btn.classList.toggle('open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+function closeMobileNav(){
+  document.getElementById('mobile-nav').classList.remove('open');
+  document.getElementById('hamburger-btn').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+// FAQ ACCORDION
+function toggleFaq(el){
+  const wasOpen=el.classList.contains('open');
+  document.querySelectorAll('.faq-item.open').forEach(i=>i.classList.remove('open'));
+  if(!wasOpen)el.classList.add('open');
+}
+
+// SCROLL TO TOP
+(function(){
+  const btn = document.getElementById('scroll-top-btn');
+  window.addEventListener('scroll', ()=>{
+    btn.classList.toggle('visible', window.scrollY > 400);
+  }, {passive: true});
+})();
+
+// COOKIE BANNER
+function dismissCookie(accept){
+  document.getElementById('cookie-banner').classList.add('hidden');
+  try { localStorage.setItem('cookie_consent', accept ? 'accepted' : 'declined'); } catch(e){}
+}
+(function(){
+  try {
+    if(localStorage.getItem('cookie_consent')) {
+      document.getElementById('cookie-banner').classList.add('hidden');
+    }
+  } catch(e){}
+})();
+
+// ANIMATED STAT COUNTERS
+(function(){
+  const stats = document.querySelectorAll('.hero-stat-num[data-count]');
+  if(!stats.length) return;
+  let animated = false;
+  function formatNum(n, sep){
+    if(!sep) return String(n);
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+  }
+  function runCounters(){
+    stats.forEach(el => {
+      const target = parseInt(el.dataset.count, 10);
+      const suffix = el.dataset.suffix || '';
+      const sep = el.dataset.sep || '';
+      const duration = 1400;
+      let startTime = null;
+      function step(ts){
+        if(!startTime) startTime = ts;
+        const progress = Math.min((ts - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = formatNum(Math.floor(eased * target), sep) + suffix;
+        if(progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+  const heroObs = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting && !animated){ animated = true; runCounters(); heroObs.disconnect(); }
+    });
+  }, {threshold: 0.4});
+  const heroStats = document.querySelector('.hero-stats');
+  if(heroStats) heroObs.observe(heroStats);
+})();
+
+function setBilling(mode){
+  const yearly = mode==='yearly';
+  document.getElementById('tog-monthly').className='ptog-btn'+(yearly?'':' active');
+  document.getElementById('tog-yearly').className='ptog-btn'+(yearly?' active':'');
+  const prices = yearly
+    ? {schueler:'90.00', pro:'190.00', team:'490.00', ps:'/ Jahr', pp:'/ Jahr', pt:'/ Jahr'}
+    : {schueler:'9.90', pro:'19.90', team:'49.90', ps:'/ Monat', pp:'/ Monat', pt:'/ Monat'};
+  document.getElementById('p-schueler').textContent = prices.schueler;
+  document.getElementById('p-pro').textContent = prices.pro;
+  document.getElementById('p-team').textContent = prices.team;
+  document.getElementById('pp-schueler').textContent = prices.ps;
+  document.getElementById('pp-pro').textContent = prices.pp;
+  document.getElementById('pp-team').textContent = prices.pt;
+}
+</script>
+
+</body>
+</html>
