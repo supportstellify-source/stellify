@@ -402,23 +402,113 @@
     margin-bottom: 28px;
   }
 
-  .logos-row {
+  .logos-marquee-wrap {
+    overflow: hidden;
+    position: relative;
+  }
+  .logos-marquee-wrap::before,
+  .logos-marquee-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 80px;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .logos-marquee-wrap::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
+  .logos-marquee-wrap::after { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+
+  .logos-marquee {
     display: flex;
-    justify-content: center;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 36px;
+    gap: 56px;
+    width: max-content;
+    animation: marquee-scroll 24s linear infinite;
+  }
+  .logos-marquee:hover { animation-play-state: paused; }
+
+  @keyframes marquee-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
   }
 
   .logo-item {
     font-family: var(--font-display);
     font-size: 17px;
     color: var(--text-muted);
-    opacity: 0.5;
+    opacity: 0.45;
     transition: opacity 0.2s;
+    white-space: nowrap;
+    user-select: none;
   }
 
-  .logo-item:hover { opacity: 0.9; }
+  .logo-item:hover { opacity: 0.85; }
+
+  /* SCROLL TO TOP */
+  .scroll-top-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    color: var(--bg);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 90;
+    opacity: 0; pointer-events: none;
+    transform: translateY(12px);
+    transition: opacity 0.25s, transform 0.25s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  }
+  .scroll-top-btn.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .scroll-top-btn:hover { transform: translateY(-3px); }
+
+  /* COOKIE BANNER */
+  .cookie-banner {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border-md);
+    padding: 16px max(24px, calc((100% - 1120px) / 2));
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    z-index: 195;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.07);
+    transition: transform 0.35s cubic-bezier(.4,0,.2,1);
+  }
+  .cookie-banner.hidden { transform: translateY(110%); }
+  .cookie-text {
+    flex: 1;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    min-width: 220px;
+  }
+  .cookie-text a { color: var(--accent); text-decoration: none; }
+  .cookie-text a:hover { text-decoration: underline; }
+  .cookie-actions { display: flex; gap: 10px; flex-shrink: 0; }
+  .cookie-btn-accept {
+    font-family: var(--font-body); font-size: 14px; font-weight: 500;
+    background: var(--accent); color: #fff; border: none;
+    padding: 9px 20px; border-radius: var(--radius-md); cursor: pointer;
+    transition: background 0.15s;
+  }
+  .cookie-btn-accept:hover { background: var(--accent-hover); }
+  .cookie-btn-decline {
+    font-family: var(--font-body); font-size: 14px;
+    background: none; color: var(--text-muted);
+    border: 1px solid var(--border-md);
+    padding: 9px 16px; border-radius: var(--radius-md); cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .cookie-btn-decline:hover { color: var(--text-secondary); border-color: rgba(0,0,0,0.2); }
+
+  /* COUNTER ANIMATION */
+  .hero-stat-num { display: block; }
 
   /* FEATURES */
   .section-label {
@@ -1576,15 +1666,15 @@
     </div>
     <div class="hero-stats">
       <div>
-        <span class="hero-stat-num">4'200+</span>
+        <span class="hero-stat-num" data-count="4200" data-suffix="+" data-sep="'">4'200+</span>
         <span class="hero-stat-label" data-t="stat1">aktive Nutzer</span>
       </div>
       <div>
-        <span class="hero-stat-num">89%</span>
+        <span class="hero-stat-num" data-count="89" data-suffix="%">89%</span>
         <span class="hero-stat-label" data-t="stat2">höhere Rücklaufquote</span>
       </div>
       <div>
-        <span class="hero-stat-num">3×</span>
+        <span class="hero-stat-num" data-count="3" data-suffix="×">3×</span>
         <span class="hero-stat-label" data-t="stat3">mehr Interviews</span>
       </div>
     </div>
@@ -1628,15 +1718,32 @@
 </section>
 
 <!-- LOGOS -->
-<div class="logos-section" style="padding: 40px max(24px, calc((100% - 1120px) / 2));">
+<div class="logos-section" style="padding: 40px 0;">
   <p class="logos-label">Vertrauen von Jobsuchenden bei</p>
-  <div class="logos-row">
-    <span class="logo-item">Swisscom</span>
-    <span class="logo-item">Migros</span>
-    <span class="logo-item">UBS</span>
-    <span class="logo-item">Nestlé</span>
-    <span class="logo-item">Roche</span>
-    <span class="logo-item">SBB</span>
+  <div class="logos-marquee-wrap">
+    <div class="logos-marquee" aria-hidden="true">
+      <span class="logo-item">Swisscom</span>
+      <span class="logo-item">Migros</span>
+      <span class="logo-item">UBS</span>
+      <span class="logo-item">Nestlé</span>
+      <span class="logo-item">Roche</span>
+      <span class="logo-item">SBB</span>
+      <span class="logo-item">ABB</span>
+      <span class="logo-item">Zurich</span>
+      <span class="logo-item">Novartis</span>
+      <span class="logo-item">PostFinance</span>
+      <!-- duplicate for seamless loop -->
+      <span class="logo-item">Swisscom</span>
+      <span class="logo-item">Migros</span>
+      <span class="logo-item">UBS</span>
+      <span class="logo-item">Nestlé</span>
+      <span class="logo-item">Roche</span>
+      <span class="logo-item">SBB</span>
+      <span class="logo-item">ABB</span>
+      <span class="logo-item">Zurich</span>
+      <span class="logo-item">Novartis</span>
+      <span class="logo-item">PostFinance</span>
+    </div>
   </div>
 </div>
 
@@ -2044,6 +2151,20 @@
   </div>
 </footer>
 
+<!-- SCROLL TO TOP -->
+<button class="scroll-top-btn" id="scroll-top-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" aria-label="Nach oben scrollen">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+</button>
+
+<!-- COOKIE BANNER -->
+<div class="cookie-banner" id="cookie-banner">
+  <p class="cookie-text">Wir verwenden Cookies, um dein Erlebnis zu verbessern und unsere Dienste zu optimieren. Mit «Akzeptieren» stimmst du unserer <a href="#">Datenschutzrichtlinie</a> zu.</p>
+  <div class="cookie-actions">
+    <button class="cookie-btn-decline" onclick="dismissCookie(false)">Ablehnen</button>
+    <button class="cookie-btn-accept" onclick="dismissCookie(true)">Akzeptieren</button>
+  </div>
+</div>
+
 <!-- AUTH MODAL -->
 <div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
   <div class="modal">
@@ -2409,6 +2530,62 @@ function toggleFaq(el){
   document.querySelectorAll('.faq-item.open').forEach(i=>i.classList.remove('open'));
   if(!wasOpen)el.classList.add('open');
 }
+
+// SCROLL TO TOP
+(function(){
+  const btn = document.getElementById('scroll-top-btn');
+  window.addEventListener('scroll', ()=>{
+    btn.classList.toggle('visible', window.scrollY > 400);
+  }, {passive: true});
+})();
+
+// COOKIE BANNER
+function dismissCookie(accept){
+  document.getElementById('cookie-banner').classList.add('hidden');
+  try { localStorage.setItem('cookie_consent', accept ? 'accepted' : 'declined'); } catch(e){}
+}
+(function(){
+  try {
+    if(localStorage.getItem('cookie_consent')) {
+      document.getElementById('cookie-banner').classList.add('hidden');
+    }
+  } catch(e){}
+})();
+
+// ANIMATED STAT COUNTERS
+(function(){
+  const stats = document.querySelectorAll('.hero-stat-num[data-count]');
+  if(!stats.length) return;
+  let animated = false;
+  function formatNum(n, sep){
+    if(!sep) return String(n);
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+  }
+  function runCounters(){
+    stats.forEach(el => {
+      const target = parseInt(el.dataset.count, 10);
+      const suffix = el.dataset.suffix || '';
+      const sep = el.dataset.sep || '';
+      const duration = 1400;
+      let startTime = null;
+      function step(ts){
+        if(!startTime) startTime = ts;
+        const progress = Math.min((ts - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = formatNum(Math.floor(eased * target), sep) + suffix;
+        if(progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    });
+  }
+  const heroObs = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting && !animated){ animated = true; runCounters(); heroObs.disconnect(); }
+    });
+  }, {threshold: 0.4});
+  const heroStats = document.querySelector('.hero-stats');
+  if(heroStats) heroObs.observe(heroStats);
+})();
 
 function setBilling(mode){
   const yearly = mode==='yearly';
