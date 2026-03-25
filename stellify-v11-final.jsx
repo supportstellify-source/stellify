@@ -23,6 +23,7 @@ const C = {
   stripeUltimateYearly: "https://buy.stripe.com/14A9ASfMU95nbSEdj72B203",
 
   priceUltimate: "49.90",
+  priceUltimateYearly: "39.90",
 
   ADMIN_EMAIL: "admin@stellify.ch",
   ADMIN_PW: "Stellify2025!",
@@ -425,12 +426,12 @@ h1.hh em{font-style:normal;color:var(--em)}
 .cta-sec{background:linear-gradient(135deg,var(--dk),#0a1810);padding:92px 0;text-align:center;position:relative;overflow:hidden}
 .cta-sec::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 60% at 50% 50%,rgba(16,185,129,.1),transparent);pointer-events:none}
 /* TOOL PAGES */
-.page-hdr{padding:48px 28px 0;text-align:center}
-.page-hdr.dk{background:var(--dk)}.page-hdr.bl{background:linear-gradient(135deg,#0a66c2,#0077b5)}.page-hdr.am{background:linear-gradient(135deg,#92400e,#b45309)}.page-hdr.vi{background:linear-gradient(135deg,#4c1d95,#6d28d9)}
-.page-hdr h1{font-family:var(--hd);font-size:32px;font-weight:800;color:white;margin-bottom:7px;letter-spacing:-1px}.page-hdr p{font-size:14px;color:rgba(255,255,255,.4)}
-.asteps{max-width:640px;margin:28px auto 0;display:flex;border-bottom:2px solid rgba(255,255,255,.07)}
-.as{flex:1;text-align:center;padding:10px 5px;font-size:12px;font-weight:600;color:rgba(255,255,255,.22);transition:all .25s;border-radius:10px;-webkit-tap-highlight-color:transparent}.as.on:not(.complete){background:rgba(16,185,129,.08);border-radius:10px}.as:hover{background:rgba(255,255,255,.04);border-radius:10px}
-.as.on{color:var(--em);border-bottom:2px solid var(--em);margin-bottom:-2px}.as.done{color:rgba(255,255,255,.4)}
+.page-hdr{padding:52px 28px 28px;text-align:center;background:var(--bg);border-bottom:1.5px solid var(--bo)}
+.page-hdr.dk,.page-hdr.bl,.page-hdr.am,.page-hdr.vi{background:var(--bg)}
+.page-hdr h1{font-family:var(--hd);font-size:32px;font-weight:400;color:var(--ink);margin-bottom:7px;letter-spacing:-1px}.page-hdr p{font-size:14px;color:var(--mu)}
+.asteps{max-width:640px;margin:28px auto 0;display:flex;border-bottom:2px solid var(--bo)}
+.as{flex:1;text-align:center;padding:10px 5px;font-size:12px;font-weight:600;color:var(--mu);transition:all .25s;border-radius:10px;-webkit-tap-highlight-color:transparent}.as.on:not(.complete){background:rgba(37,99,235,.06);border-radius:10px}.as:hover{background:rgba(37,99,235,.04);border-radius:10px}
+.as.on{color:var(--em);border-bottom:2px solid var(--em);margin-bottom:-2px}.as.done{color:var(--mu)}
 .abody{max-width:740px;margin:0 auto;padding:38px 28px 80px}
 /* CARDS */
 .card{background:white;border:1.5px solid var(--bo);border-radius:var(--r2);padding:32px;box-shadow:0 4px 20px rgba(11,11,18,.06)}
@@ -601,7 +602,7 @@ footer{background:var(--dk);padding:50px 28px 24px}
   .con,.csm{padding:0 14px}
   .stat-n{font-size:26px}
   .eyebrow{font-size:10px}
-  .page-hdr{padding:28px 14px 0}
+  .page-hdr{padding:28px 14px 14px}
   .page-hdr h1{font-size:22px;letter-spacing:-.5px}
   .page-hdr p{font-size:12px}
   .asteps{margin:18px 0 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -3307,20 +3308,28 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
   };
 
   const renderMsg = (text) => {
-    const parts = [];
     let remaining = text;
     Object.entries(TOOL_MAP).forEach(([key,[label,page]])=>{
       remaining = remaining.replace(new RegExp(`(${label.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")})`, "gi"),
         `<TOOL:${page}:${label}>`);
     });
     const segments = remaining.split(/(<TOOL:[^>]+>)/);
-    return segments.map((seg,i)=>{
-      const m = seg.match(/^<TOOL:([^:]+):(.+)>$/);
-      if(m) return <button key={i} onClick={()=>{setOpen(false);navTo(m[1]);}}
-        style={{display:"inline-flex",alignItems:"center",gap:4,background:"rgba(16,185,129,.15)",border:"1px solid rgba(16,185,129,.3)",borderRadius:8,padding:"2px 9px",fontSize:12,fontWeight:700,color:"var(--em)",cursor:"pointer",margin:"1px 2px"}}>
-        {m[2]} →</button>;
-      return <span key={i}>{seg}</span>;
-    });
+    const hasUpgradeCue = !pro && /Pro\b|upgraden|upgrade|CHF 14[\.,]90|CHF 19[\.,]90|Pro schalte|benötigst.*Pro|Pro.*freischalten/i.test(text);
+    return <>
+      {segments.map((seg,i)=>{
+        const m = seg.match(/^<TOOL:([^:]+):(.+)>$/);
+        if(m) return <button key={i} onClick={()=>{setOpen(false);navTo(m[1]);}}
+          style={{display:"inline-flex",alignItems:"center",gap:4,background:"rgba(16,185,129,.15)",border:"1px solid rgba(16,185,129,.3)",borderRadius:8,padding:"2px 9px",fontSize:12,fontWeight:700,color:"var(--em)",cursor:"pointer",margin:"1px 2px"}}>
+          {m[2]} →</button>;
+        return <span key={i}>{seg}</span>;
+      })}
+      {hasUpgradeCue&&<div style={{marginTop:10}}>
+        <button onClick={()=>{setOpen(false);window.open(C.stripeMonthly,"_blank");}}
+          style={{display:"inline-flex",alignItems:"center",gap:6,background:"linear-gradient(135deg,#10b981,#059669)",color:"white",border:"none",borderRadius:10,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(16,185,129,.35)"}}>
+          🚀 {L("Pro upgraden – CHF 19.90/Mo.","Upgrade to Pro – CHF 19.90/mo","Passer Pro – CHF 19.90/mo","Aggiorna Pro – CHF 19.90/me")} →
+        </button>
+      </div>}
+    </>;
   };
 
   const send = async () => {
@@ -3621,7 +3630,7 @@ Pflichtfelder gemäss ALV Art. 17: Datum, Firma, Ort, Funktion, Art der Bewerbun
       <div className="page-hdr dk" style={{paddingBottom:32}}>
         <div className="con" style={{maxWidth:900}}>
           <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-            <button onClick={()=>navTo("landing")} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.15)",color:"rgba(255,255,255,.7)",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontFamily:"var(--bd)"}}>← {L("Zurück","Back","Retour","Indietro")}</button>
+            <button onClick={()=>navTo("landing")} style={{background:"rgba(0,0,0,.06)",border:"1px solid var(--bo)",color:"var(--mu)",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontFamily:"var(--bd)"}}>← {L("Zurück","Back","Retour","Indietro")}</button>
             {!pro && <span style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20}}>PRO</span>}
           </div>
           <h1>📋 {L("Bewerbungs-Tracker","Application Tracker","Suivi des candidatures","Tracker candidature")}</h1>
@@ -4596,8 +4605,8 @@ export default function App() {
     if(!canGen()){setPw(true);return;} setStreaming(true); setErr(""); setEditing(false);
     const toGen=docType==="beide"?["motivation","lebenslauf"]:[docType];
     try{
-      const res={...results};
-      for(const tp of toGen){ res[tp]=""; setResults({...res});
+      for(const tp of toGen){
+        setResults(r=>({...r,[tp]:""}));
         await streamAI(tp==="motivation"?t.motivPrompt(job,prof):t.cvPrompt(job,prof),
           chunk=>setResults(r=>tp==="motivation"?{...r,motivation:chunk}:{...r,lebenslauf:chunk}),
           null, pro ? "" : "free");
@@ -6063,12 +6072,12 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                   </div>
                 </div>
                 <div className="lp-msgs">
-                  <div className="lp-msg-u">{lang==="de"?"Kannst du mein CV für eine UX Designer Stelle optimieren?":lang==="fr"?"Peux-tu optimiser mon CV pour un poste UX Designer ?":"Can you optimize my CV for a UX Designer role?"}</div>
+                  <div className="lp-msg-u">{lang==="de"?"Kannst du mein Motivationsschreiben für Swisscom optimieren?":lang==="fr"?"Peux-tu optimiser ma lettre de motivation pour Swisscom ?":"Can you optimize my cover letter for Swisscom?"}</div>
                   <div className="lp-msg-a">
                     <strong>{lang==="de"?"Natürlich!":lang==="fr"?"Bien sûr !":"Of course!"}</strong>
-                    {lang==="de"?" Ich habe dein CV analysiert und 3 Verbesserungen gefunden:":lang==="fr"?" J'ai analysé ton CV et trouvé 3 améliorations :":" I've analysed your CV and found 3 improvements:"}
-                    <br/><br/>
-                    {lang==="de"?"1. Portfolio-Projekte · 2. ATS-Keywords · 3. CH-Format":lang==="fr"?"1. Portfolio · 2. Mots-clés ATS · 3. Format CH":"1. Portfolio · 2. ATS keywords · 3. CH format"}
+                    {lang==="de"?" Ich habe dein Schreiben analysiert – hier sind die 3 wichtigsten Optimierungen:":lang==="fr"?" J'ai analysé ta lettre – voici les 3 améliorations clés :":" I've analysed your letter – here are the 3 key improvements:"}
+                    <br/>
+                    {lang==="de"?"✓ ATS-Keywords · ✓ CH-Format · ✓ Firmen-Bezug":lang==="fr"?"✓ Mots-clés ATS · ✓ Format CH · ✓ Lien entreprise":"✓ ATS keywords · ✓ CH format · ✓ Company reference"}
                   </div>
                   <div className="lp-typing"><div className="lp-typing-dot"/><div className="lp-typing-dot"/><div className="lp-typing-dot"/></div>
                 </div>
@@ -6207,15 +6216,25 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                       </li>
                     ))}
                   </ul>
-                  {isPro&&<button onClick={()=>window.open(yearly?C.stripeYearly:C.stripeMonthly,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"var(--em)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:600,cursor:"pointer",transition:"all .2s"}}>
-                    {lang==="de"?"Jetzt upgraden →":lang==="fr"?"Passer Pro →":lang==="it"?"Aggiorna ora →":"Upgrade now →"}
-                  </button>}
+                  {isPro&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <button onClick={()=>window.open(C.stripeMonthly,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"var(--em)",color:"white",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s"}}>
+                      {lang==="de"?"Monatlich – CHF "+C.priceM+"/Mo. →":lang==="fr"?"Mensuel – CHF "+C.priceM+"/mo →":"Monthly – CHF "+C.priceM+"/mo →"}
+                    </button>
+                    <button onClick={()=>window.open(C.stripeYearly,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid var(--em)",background:"transparent",color:"var(--em)",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer",transition:"all .2s"}}>
+                      {lang==="de"?"Jährlich – CHF "+C.priceY+"/Mo. →":lang==="fr"?"Annuel – CHF "+C.priceY+"/mo →":"Yearly – CHF "+C.priceY+"/mo →"}<span style={{marginLeft:6,background:"rgba(37,99,235,.12)",borderRadius:99,padding:"1px 7px",fontSize:11}}>–17%</span>
+                    </button>
+                  </div>}
                   {isFree&&<button onClick={()=>navTo("app")} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid rgba(255,255,255,.12)",background:"transparent",color:"rgba(255,255,255,.7)",fontFamily:"var(--bd)",fontSize:14,fontWeight:500,cursor:"pointer",transition:"all .2s"}}>
                     {lang==="de"?"Kostenlos starten":lang==="fr"?"Commencer gratuitement":lang==="it"?"Inizia gratis":"Start for free"}
                   </button>}
-                  {isUlt&&<button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:600,cursor:"pointer"}}>
-                    Ultimate – CHF {C.priceUltimate}/Mo.
-                  </button>}
+                  {isUlt&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                      {lang==="de"?"Monatlich – CHF "+C.priceUltimate+"/Mo. →":lang==="fr"?"Mensuel – CHF "+C.priceUltimate+"/mo →":"Monthly – CHF "+C.priceUltimate+"/mo →"}
+                    </button>
+                    <button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid #f59e0b",background:"transparent",color:"#f59e0b",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                      {lang==="de"?"Jährlich – CHF "+C.priceUltimateYearly+"/Mo. →":lang==="fr"?"Annuel – CHF "+C.priceUltimateYearly+"/mo →":"Yearly – CHF "+C.priceUltimateYearly+"/mo →"}<span style={{marginLeft:6,background:"rgba(245,158,11,.12)",borderRadius:99,padding:"1px 7px",fontSize:11}}>–20%</span>
+                    </button>
+                  </div>}
                   {isStarter&&<button onClick={()=>window.open(C.stripeStarter,"_blank")} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"white",fontFamily:"var(--bd)",fontSize:14,fontWeight:600,cursor:"pointer"}}>
                     {tier.btn||`Starter – CHF ${C.priceStarter}`}
                   </button>}
@@ -6272,7 +6291,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
             <div className="lp-cv-card">
               <div className="lp-cv-hdr bad">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                {lang==="de"?"Vorher – Ohne Optimierung":lang==="fr"?"Avant – Sans optimisation":"Before – Without optimisation"}
+                {lang==="de"?"Vorher – ChatGPT / Claude / andere KI":lang==="fr"?"Avant – ChatGPT / Claude / autre IA":"Before – ChatGPT / Claude / other AI"}
               </div>
               <div className="lp-cv-body">
                 {[
@@ -6799,9 +6818,9 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     {authModals}
     {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
     <Nav dark/>
-    <div className="page-hdr" style={{background:"linear-gradient(135deg,#166534,#15803d)",padding:"48px 28px 0",textAlign:"center"}}>
-      <h1 style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>📊 {t.nav.excel}</h1>
-      <p style={{fontSize:14,color:"rgba(255,255,255,.4)",paddingBottom:34}}>{L("Professionelle Excel-Tabellen mit Formeln – für jeden Bereich.","Professional Excel spreadsheets with formulas – for any purpose.","Tableaux Excel professionnels avec formules – pour tous.","Fogli Excel professionali con formule – per tutti.")}</p>
+    <div className="page-hdr">
+      <h1>📊 {t.nav.excel}</h1>
+      <p>{L("Professionelle Excel-Tabellen mit Formeln – für jeden Bereich.","Professional Excel spreadsheets with formulas – for any purpose.","Tableaux Excel professionnels avec formules – pour tous.","Fogli Excel professionali con formule – per tutti.")}</p>
     </div>
     <div className="abody">
       <ToolBanner pageId="excel"/>
@@ -6915,9 +6934,9 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     {authModals}
     {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
     <Nav dark/>
-    <div className="page-hdr" style={{background:"linear-gradient(135deg,#1e3a5f,#2563eb)",padding:"48px 28px 0",textAlign:"center"}}>
-      <h1 style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>📽️ {t.nav.pptx}</h1>
-      <p style={{fontSize:14,color:"rgba(255,255,255,.4)",paddingBottom:34}}>{L("Professionelle Präsentationen für Schule, Uni & Arbeit.","Professional presentations for school, uni & work.","Présentations professionnelles pour école, université & travail.","Presentazioni professionali per scuola, università e lavoro.")}</p>
+    <div className="page-hdr">
+      <h1>📽️ {t.nav.pptx}</h1>
+      <p>{L("Professionelle Präsentationen für Schule, Uni & Arbeit.","Professional presentations for school, uni & work.","Présentations professionnelles pour école, université & travail.","Presentazioni professionali per scuola, università e lavoro.")}</p>
     </div>
     <div className="abody">
       <ToolBanner pageId="pptx"/>
