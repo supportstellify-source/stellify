@@ -870,10 +870,10 @@ const mkT = (lang) => {
       label:L("Marktpotenzial","Potentiel marché","Potenziale mercato","Market potential"),
       title:L("Warum jetzt. Warum Schweiz.","Pourquoi maintenant. Pourquoi la Suisse.","Perché adesso. Perché la Svizzera.","Why now. Why Switzerland."),
       points:L(
-        [{ico:"📈",t:"Jobwechsel nehmen zu",p:"Durchschnittlich alle 3 Jahre wechseln Arbeitnehmer in der Schweiz ihren Job."},{ico:"⏰",t:"Bewerbungen kosten Zeit",p:"Eine gute Bewerbung dauert 3–5 Stunden. Mit KI: 3 Minuten."},{ico:"",t:"KI wird akzeptiert",p:"78% der Schweizer Arbeitnehmer würden KI für Karrierehilfe nutzen."},{ico:"🇨🇭",t:"Kein gutes CH-Tool",p:"Keine Lösung versteht das Schweizer Zeugnis-System, ATS-Anforderungen und 4 Sprachen."}],
-        [{ico:"📈",t:"Changements de poste croissants",p:"En moyenne, les salariés changent d'emploi tous les 3 ans en Suisse."},{ico:"⏰",t:"Candidatures chronophages",p:"Une bonne candidature prend 3-5h. Avec l'IA: 3 minutes."},{ico:"",t:"IA de plus en plus acceptée",p:"78% des salariés suisses utiliseraient l'IA pour leur carrière."},{ico:"🇨🇭",t:"Aucun bon outil suisse",p:"Aucune solution comprend le système de certificats CH, l'ATS et 4 langues."}],
-        [{ico:"📈",t:"Cambi di lavoro in crescita",p:"In media i lavoratori svizzeri cambiano lavoro ogni 3 anni."},{ico:"⏰",t:"Candidature richiedono tempo",p:"Una buona candidatura richiede 3-5 ore. Con l'IA: 3 minuti."},{ico:"",t:"IA sempre più accettata",p:"Il 78% dei lavoratori svizzeri userebbe l'IA per la carriera."},{ico:"🇨🇭",t:"Nessun buon tool svizzero",p:"Nessuna soluzione capisce i certificati svizzeri, ATS e 4 lingue."}],
-        [{ico:"📈",t:"Job changes increasing",p:"On average, Swiss employees change jobs every 3 years."},{ico:"⏰",t:"Applications take time",p:"A good application takes 3–5 hours. With AI: 3 minutes."},{ico:"",t:"AI increasingly accepted",p:"78% of Swiss employees would use AI for career help."},{ico:"🇨🇭",t:"No good Swiss tool",p:"No solution understands Swiss work references, ATS requirements and 4 languages."}]
+        [{ico:"",t:"Jobwechsel nehmen zu",p:"Durchschnittlich alle 3 Jahre wechseln Arbeitnehmer in der Schweiz ihren Job."},{ico:"",t:"Bewerbungen kosten Zeit",p:"Eine gute Bewerbung dauert 3–5 Stunden. Mit KI: 3 Minuten."},{ico:"",t:"KI wird akzeptiert",p:"78% der Schweizer Arbeitnehmer würden KI für Karrierehilfe nutzen."},{ico:"",t:"Kein gutes CH-Tool",p:"Keine Lösung versteht das Schweizer Zeugnis-System, ATS-Anforderungen und 4 Sprachen."}],
+        [{ico:"",t:"Changements de poste croissants",p:"En moyenne, les salariés changent d'emploi tous les 3 ans en Suisse."},{ico:"",t:"Candidatures chronophages",p:"Une bonne candidature prend 3-5h. Avec l'IA: 3 minutes."},{ico:"",t:"IA de plus en plus acceptée",p:"78% des salariés suisses utiliseraient l'IA pour leur carrière."},{ico:"",t:"Aucun bon outil suisse",p:"Aucune solution comprend le système de certificats CH, l'ATS et 4 langues."}],
+        [{ico:"",t:"Cambi di lavoro in crescita",p:"In media i lavoratori svizzeri cambiano lavoro ogni 3 anni."},{ico:"",t:"Candidature richiedono tempo",p:"Una buona candidatura richiede 3-5 ore. Con l'IA: 3 minuti."},{ico:"",t:"IA sempre più accettata",p:"Il 78% dei lavoratori svizzeri userebbe l'IA per la carriera."},{ico:"",t:"Nessun buon tool svizzero",p:"Nessuna soluzione capisce i certificati svizzeri, ATS e 4 lingue."}],
+        [{ico:"",t:"Job changes increasing",p:"On average, Swiss employees change jobs every 3 years."},{ico:"",t:"Applications take time",p:"A good application takes 3–5 hours. With AI: 3 minutes."},{ico:"",t:"AI increasingly accepted",p:"78% of Swiss employees would use AI for career help."},{ico:"",t:"No good Swiss tool",p:"No solution understands Swiss work references, ATS requirements and 4 languages."}]
       ),
     },
     testi:{
@@ -978,7 +978,7 @@ const mkT = (lang) => {
       back:L("← Zurück","← Retour","← Indietro","← Back"),
       next:L("Weiter →","Suivant →","Avanti →","Next →"),
       copy:L("Kopieren","Copier","Copia","Copy"),
-      copied:L("✓ Kopiert!","✓ Copié!","✓ Copiato!","✓ Copied!"),
+      copied:L("Kopiert!","Copié!","Copiato!","Copied!"),
       edit:L("Bearbeiten","Modifier","Modifica","Edit"),
       prev:L("Vorschau","Aperçu","Anteprima","Preview"),
       pdf:L("PDF","PDF","PDF","PDF"),
@@ -1838,20 +1838,20 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
             </div>
             <p style={{fontSize:14,color:"var(--mu)",marginBottom:16}}>{d.zusammenfassung}</p>
             {d.probleme?.length>0&&<div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#dc2626",marginBottom:8}}>⚠️ Gefundene Probleme</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#dc2626",marginBottom:8}}>Gefundene Probleme</div>
               {d.probleme.map((p,i)=>(
                 <div key={i} style={{background:"rgba(239,68,68,.05)",border:"1px solid rgba(239,68,68,.15)",borderRadius:10,padding:"12px",marginBottom:8}}>
                   <div style={{fontSize:12,fontWeight:600,color:"#dc2626",marginBottom:4}}>«{p.phrase}»</div>
                   <div style={{fontSize:12,color:"var(--mu)",marginBottom:6}}>{p.problem}</div>
-                  <div style={{fontSize:12,color:"#059669",fontWeight:600}}>✓ Besser: {p.besser}</div>
+                  <div style={{fontSize:12,color:"#059669",fontWeight:600}}>Besser: {p.besser}</div>
                 </div>
               ))}
             </div>}
             {d.staerken?.length>0&&<div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#059669",marginBottom:8}}>✅ Stärken</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#059669",marginBottom:8}}>Stärken</div>
               {d.staerken.map((s,i)=><div key={i} style={{fontSize:13,color:"var(--mu)",padding:"4px 0"}}>✓ {s}</div>)}
             </div>}
-            {d.empfehlung&&<div style={{background:"rgba(16,185,129,.08)",borderRadius:10,padding:"12px",fontSize:13,color:"var(--ink)"}}><strong>💡 Empfehlung:</strong> {d.empfehlung}</div>}
+            {d.empfehlung&&<div style={{background:"rgba(16,185,129,.08)",borderRadius:10,padding:"12px",fontSize:13,color:"var(--ink)"}}><strong>Empfehlung:</strong> {d.empfehlung}</div>}
           </div>
         );
       }
@@ -1869,19 +1869,19 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
             </div>
             <p style={{fontSize:14,color:"var(--mu)",marginBottom:16}}>{d.zusammenfassung}</p>
             {d.luecken?.length>0&&<div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#dc2626",marginBottom:8}}>📚 Zu schliessende Lücken</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#dc2626",marginBottom:8}}>Zu schliessende Lücken</div>
               {d.luecken.map((l,i)=>(
                 <div key={i} style={{background:"rgba(239,68,68,.05)",border:"1px solid rgba(239,68,68,.12)",borderRadius:10,padding:"12px",marginBottom:8}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                     <div style={{fontSize:13,fontWeight:700}}>{l.skill}</div>
                     <div style={{fontSize:10,padding:"2px 8px",borderRadius:20,background:"rgba(239,68,68,.12)",color:"#dc2626"}}>{l.relevanz}</div>
                   </div>
-                  <div style={{fontSize:12,color:"var(--mu)"}}>⏱ {l.lernzeit} · 📖 {l.ressource}</div>
+                  <div style={{fontSize:12,color:"var(--mu)"}}>{l.lernzeit} · {l.ressource}</div>
                 </div>
               ))}
             </div>}
             {d.sofort_machbar?.length>0&&<div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:"#059669",marginBottom:8}}>⚡ Sofort umsetzbar</div>
+              <div style={{fontSize:12,fontWeight:700,color:"#059669",marginBottom:8}}>Sofort umsetzbar</div>
               {d.sofort_machbar.map((s,i)=><div key={i} style={{fontSize:13,color:"var(--mu)",padding:"4px 0"}}>→ {s}</div>)}
             </div>}
             {d.fazit&&<div style={{background:"rgba(16,185,129,.08)",borderRadius:10,padding:"12px",fontSize:13,color:"var(--ink)"}}><strong>Fazit:</strong> {d.fazit}</div>}
@@ -2042,7 +2042,7 @@ Con Pro ottieni il tuo risultato personale in secondi.`)}
                       onDragLeave={e=>{e.currentTarget.style.borderColor="rgba(16,185,129,.3)";e.currentTarget.style.background="rgba(16,185,129,.02)"}}
                       onDrop={e=>{e.preventDefault();e.currentTarget.style.borderColor="rgba(16,185,129,.3)";e.currentTarget.style.background="rgba(16,185,129,.02)";const f=e.dataTransfer.files[0];if(f)handleDoc(f);}}>
                       {docLoading ? <div style={{fontSize:13,color:"var(--em)"}}>{L("Lese Datei…","Reading file…","Lecture…","Lettura…")}</div> : <>
-                        <div style={{fontSize:24,marginBottom:4}}>📎</div>
+                        
                         <div style={{fontSize:13,fontWeight:600,color:"var(--mu)",marginBottom:2}}>{L("PDF, Word oder Bild hier ablegen","Drop PDF, Word or image here","Déposez PDF, Word ou image ici","Rilascia PDF, Word o immagine qui")}</div>
                         <div style={{fontSize:11,color:"rgba(11,11,18,.3)"}}>{L("oder klicken zum Auswählen · PDF, .docx, JPG, PNG","or click to select · PDF, .docx, JPG, PNG","ou cliquer pour sélectionner · PDF, .docx, JPG, PNG","o clicca per selezionare · PDF, .docx, JPG, PNG")}</div>
                       </>}
@@ -2081,7 +2081,7 @@ Con Pro ottieni il tuo risultato personale in secondi.`)}
                 </div>}
                 <div style={{display:"flex",gap:7,justifyContent:"flex-end",marginBottom:10,flexWrap:"wrap"}}>
                   {copied&&<span className="ok" style={{margin:0,padding:"4px 11px"}}>✓ {L("Kopiert!","Copied!","Copié!","Copiato!")}</span>}
-                  <button className="btn b-outd b-sm" onClick={()=>{navigator.clipboard.writeText(result);setCopied(true);setTimeout(()=>setCopied(false),2000);}}>📋 {L("Kopieren","Copy","Copier","Copia")}</button>
+                  <button className="btn b-outd b-sm" onClick={()=>{navigator.clipboard.writeText(result);setCopied(true);setTimeout(()=>setCopied(false),2000);}}>{L("Kopieren","Copy","Copier","Copia")}</button>
                   {!streaming&&<button className="btn b-outd b-sm" onClick={()=>downloadTxt(result, page)}>📄 TXT</button>}
                   {!streaming&&<button className="btn b-outd b-sm" onClick={()=>downloadHtmlAsPdf(result, page)}>📕 PDF</button>}
                   {!streaming&&<button className="btn b-outd b-sm" onClick={()=>downloadAsWord(result, page)}>📘 Word</button>}
@@ -3364,7 +3364,7 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
     }
   };
 
-  const remaining = pro ? "∞" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage);
+  const remaining = pro ? "–" : Math.max(0, C.CHAT_FREE_LIMIT - chatUsage);
   const openChat = () => {
     setBubble(false);
     if (!open && msgs.length === 0 && !activeChatId) {
@@ -4165,7 +4165,7 @@ function AdminDashboard({ lang, onClose }) {
 
         {/* Stats */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
-          {[["👥","Total",stats.total,"rgba(255,255,255,.06)"],["✦","Pro",stats.pro,"rgba(16,185,129,.1)"],["♾️","Ultimate",stats.ultimate,"rgba(245,158,11,.1)"],["🆓","Free",stats.free,"rgba(255,255,255,.04)"]].map(([ico,lbl,val,bg])=>(
+          {[["👥","Total",stats.total,"rgba(255,255,255,.06)"],["✦","Pro",stats.pro,"rgba(16,185,129,.1)"],["U","Ultimate",stats.ultimate,"rgba(245,158,11,.1)"],["🆓","Free",stats.free,"rgba(255,255,255,.04)"]].map(([ico,lbl,val,bg])=>(
             <div key={lbl} style={{background:bg,border:"1px solid rgba(255,255,255,.08)",borderRadius:12,padding:"12px 14px",textAlign:"center"}}>
               <div style={{fontSize:20}}>{ico}</div>
               <div style={{fontFamily:"var(--hd)",fontSize:22,fontWeight:800,color:"white",lineHeight:1}}>{val}</div>
@@ -4190,7 +4190,7 @@ function AdminDashboard({ lang, onClose }) {
           {filtered.map(u=>(
             <div key={u.email} style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.07)",borderRadius:12,padding:"12px 14px",marginBottom:8,display:"flex",alignItems:"center",gap:12}}>
               <div style={{width:36,height:36,borderRadius:"50%",background:"rgba(255,255,255,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0}}>
-                {u.plan==="ultimate"?"♾️":u.plan==="pro"?"✦":"👤"}
+                {u.plan==="ultimate"?"U":u.plan==="pro"?"✦":"👤"}
               </div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:13,fontWeight:700,color:"white",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
@@ -4780,7 +4780,7 @@ Antworte NUR mit JSON:
       <div style={{borderBottom:"1px solid rgba(255,255,255,.05)",padding:"12px 24px",marginBottom:40}}>
         <div style={{display:"flex",flexWrap:"wrap",justifyContent:"center",gap:"8px 36px",maxWidth:900,margin:"0 auto"}}>
           {[{ico:"🔒",txt:lang==="de"?"Keine Datenspeicherung":"No data storage"},
-            {ico:"🇨🇭",txt:lang==="de"?"Schweizer Unternehmen · Zug":"Swiss company · Zug"},
+            {ico:"",txt:lang==="de"?"Schweizer Unternehmen · Zug":"Swiss company · Zug"},
             {ico:"🔐",txt:lang==="de"?"Sichere Zahlung via Stripe":"Secure payment via Stripe"},
           ].map((tr,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"rgba(255,255,255,.32)",fontWeight:500}}>
@@ -4871,7 +4871,7 @@ Antworte NUR mit JSON:
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8,flexShrink:0}}>
         <button onClick={()=>window.open(C.stripeUltimate,"_blank")} className="btn" style={{background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",border:"none",padding:"10px 20px",fontSize:13,fontWeight:700,borderRadius:10,cursor:"pointer",boxShadow:"0 4px 14px rgba(245,158,11,.4)"}}>
-          ♾️ {L("Ultimate holen →","Get Ultimate →","Obtenir Ultimate →","Ottieni Ultimate →")}
+          {L("Ultimate holen →","Get Ultimate →","Obtenir Ultimate →","Ottieni Ultimate →")}
         </button>
         <div style={{fontSize:10,color:"rgba(255,255,255,.25)",textAlign:"center"}}>CHF 39.90/Mo. · {L("2 Monate gratis","2 months free","2 mois offerts","2 mesi gratis")}</div>
       </div>
@@ -5702,7 +5702,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
       {/* Block 3: Top-Argumente */}
       <div style={{padding:"14px 16px"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-          <span style={{background:"#f0fdf4",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,color:"#15803d"}}>💡 Deine 3 stärksten Argumente</span>
+          <span style={{background:"#f0fdf4",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,color:"#15803d"}}>Deine 3 stärksten Argumente</span>
           <div style={{height:1,flex:1,background:"#e2e8f0"}}/>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:6}}>
@@ -5822,9 +5822,9 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,color:"#1a1a1a"}}>{L("Highlights Q1 2025","Highlights Q1 2025","Points forts Q1 2025","Punti salienti Q1 2025")}</div>
          </div>
          {[
-           {ico:"📈",kpi:L("Umsatz","Revenue","Chiffre d'affaires","Fatturato"),val:"CHF 2.4M",delta:"+18%",ok:true},
+           {ico:"",kpi:L("Umsatz","Revenue","Chiffre d'affaires","Fatturato"),val:"CHF 2.4M",delta:"+18%",ok:true},
            {ico:"👥",kpi:L("Neue Kunden","New Customers","Nouveaux Clients","Nuovi Clienti"),val:"127",delta:"+34%",ok:true},
-           {ico:"⭐",kpi:"NPS Score",val:"72",delta:L("Branche Ø 45","Industry avg. 45","Secteur moy. 45","Media sett. 45"),ok:true},
+           {ico:"",kpi:"NPS Score",val:"72",delta:L("Branche Ø 45","Industry avg. 45","Secteur moy. 45","Media sett. 45"),ok:true},
          ].map((r,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"9px 12px",background:i%2===0?"#fafafa":"white",borderRadius:8,marginBottom:6,border:"1px solid #f0f0f0"}}>
            <div style={{fontSize:18,flexShrink:0}}>{r.ico}</div>
            <div style={{flex:1}}>
@@ -6223,10 +6223,10 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                     {lang==="de"?"Kostenlos starten":lang==="fr"?"Commencer gratuitement":lang==="it"?"Inizia gratis":"Start for free"}
                   </button>}
                   {isUlt&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    <button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                    <button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
                       {lang==="de"?"Monatlich – CHF "+C.priceUltimate+"/Mo. →":lang==="fr"?"Mensuel – CHF "+C.priceUltimate+"/mo →":"Monthly – CHF "+C.priceUltimate+"/mo →"}
                     </button>
-                    <button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid #f59e0b",background:"transparent",color:"#f59e0b",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                    <button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid #f59e0b",background:"transparent",color:"#f59e0b",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
                       {lang==="de"?"Jährlich – CHF "+C.priceUltimateYearly+"/Mo. →":lang==="fr"?"Annuel – CHF "+C.priceUltimateYearly+"/mo →":"Yearly – CHF "+C.priceUltimateYearly+"/mo →"}<span style={{marginLeft:6,background:"rgba(245,158,11,.12)",borderRadius:99,padding:"1px 7px",fontSize:11}}>–20%</span>
                     </button>
                   </div>}
@@ -6602,7 +6602,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                 <div className={`z-grade ${ph.rating}`} style={{fontSize:14,width:36,height:36}}>{ph.rating}</div>
                 <div className="z-content">
                   <div className="z-phrase">«{ph.original}»</div>
-                  <div className="z-meaning">💡 {ph.decoded}</div>
+                  <div className="z-meaning">{ph.decoded}</div>
                 </div>
               </div>
             ))}
@@ -6895,7 +6895,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
 
           {/* General tips */}
           <div className="card">
-            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700,marginBottom:12}}>💡 {L("Excel-Profi-Tipps","Excel pro tips","Conseils Excel pro","Consigli Excel pro")}</div>
+            <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:700,marginBottom:12}}>{L("Excel-Profi-Tipps","Excel pro tips","Conseils Excel pro","Consigli Excel pro")}</div>
             {(xlRes.excel_tips||[]).map((tip,i)=><div key={i} style={{display:"flex",gap:9,padding:"9px 0",borderBottom:"1px solid var(--bos)",fontSize:13,color:"var(--mu)",lineHeight:1.65}}>
               <span style={{color:"#166534",flexShrink:0}}>✓</span>{tip}
             </div>)}
@@ -6992,7 +6992,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                   <div style={{fontFamily:"var(--hd)",fontSize:15,fontWeight:700,color:"white"}}>{slide.title}</div>
                   <div style={{fontSize:11,color:"rgba(255,255,255,.4)",textTransform:"uppercase",letterSpacing:"1px",marginTop:2}}>{slide.layout}</div>
                 </div>
-                {slide.design_tip&&<div style={{fontSize:11,color:"rgba(255,255,255,.4)",maxWidth:160,textAlign:"right",lineHeight:1.4}}>💡 {slide.design_tip}</div>}
+                {slide.design_tip&&<div style={{fontSize:11,color:"rgba(255,255,255,.4)",maxWidth:160,textAlign:"right",lineHeight:1.4}}>{slide.design_tip}</div>}
               </div>
               <div style={{padding:"16px 20px"}}>
                 {(slide.content||[]).map((item,ci)=>(
@@ -7023,7 +7023,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
             <div style={{marginTop:10,display:"flex",gap:9,flexWrap:"wrap"}}>
               <button className="btn b-outd b-sm" onClick={()=>{
                 const txt=`${ppRes.title}\n${ppRes.subtitle||""}\n\n`+(ppRes.slides||[]).map(s=>`FOLIE ${s.slide}: ${s.title}\n${(s.content||[]).map(c=>`• ${c}`).join("\n")}\n[Sprechernotiz: ${s.speaker_note||""}]`).join("\n\n");
-                navigator.clipboard.writeText(txt);}}>📋 {L("Kopieren","Copy","Copier","Copia")}</button>
+                navigator.clipboard.writeText(txt);}}>{L("Kopieren","Copy","Copier","Copia")}</button>
               <button className="btn b-outd b-sm" onClick={()=>{
                 const txt=`${ppRes.title}\n${ppRes.subtitle||""}\n\n`+(ppRes.slides||[]).map(s=>`FOLIE ${s.slide}: ${s.title}\n${(s.content||[]).map(c=>`• ${c}`).join("\n")}\n[Sprechernotiz: ${s.speaker_note||""}]`).join("\n\n");
                 downloadTxt(txt,"pptx");}}>📄 TXT</button>
