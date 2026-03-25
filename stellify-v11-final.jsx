@@ -826,22 +826,22 @@ const mkT = (lang) => {
       title: L("Alles für deine Karriere in der Schweiz.","Tout pour votre carrière en Suisse.","Tutto per la tua carriera in Svizzera.","Everything for your career in Switzerland."),
       sub:   L("Kein Hin-und-Her zwischen verschiedenen Apps. Alles an einem Ort.","Fini les allers-retours entre apps. Tout en un endroit.","Niente avanti e indietro tra app. Tutto in un posto.","No more switching between apps. Everything in one place."),
       items:[
-        {page:"app",  ico:"✍️",t:L("Bewerbungen","Applications","Candidatures","Candidature"),p:L("Motivationsschreiben & Lebenslauf in 60 Sekunden, live generiert. 1× gratis testen.","Cover letter & CV in 60 seconds, live generated. Try 1× for free.","Lettre & CV en 60 secondes, génération en direct. 1× gratuit.","Lettera & CV in 60 secondi, generazione live. 1× gratuito."),badge:"1× Gratis",bc:"tc-em",col:""},
-        {page:"linkedin",ico:"💼",t:"LinkedIn",p:L("Profil analysieren & optimieren – Headline, About, Skills für Recruiter.","Analyze & optimize – headline, about, skills for recruiters.","Analyser & optimiser – Titre, About, compétences pour recruteurs.","Analizzare & ottimizzare – Headline, About, skills per recruiter."),badge:"PRO",bc:"tc-bl",col:"bl"},
-        {page:"ats",  ico:"🤖",t:L("ATS-Simulation","ATS Simulation","Simulation ATS","Simulazione ATS"),p:L("Prüft ob dein Lebenslauf durch Recruiter-Software kommt. Mit Score & Tipps.","Checks if your CV passes recruiter software. With score & tips.","Vérifie si votre CV passe les logiciels RH. Avec score & conseils.","Controlla se il tuo CV passa i software HR. Con score & consigli."),badge:"PRO",bc:"tc-bl",col:"bl"},
-        {page:"zeugnis",ico:"📜",t:L("Zeugnis-Analyse","Reference Analysis","Analyse certificat","Analisi certificato"),p:L("Schweizer Arbeitszeugnis-Code entschlüsselt. Was steht wirklich drin?","Decodes Swiss work references. What do they really say?","Décode le certificat de travail suisse. Que dit-il vraiment?","Decodifica il certificato svizzero. Cosa dice davvero?"),badge:"PRO",bc:"tc-am",col:"am"},
-        {page:"jobmatch",ico:"🎯",t:L("Job-Matching","Job Matching","Matching emploi","Job Matching"),p:L("KI findet deine Top 5 passenden Stellenprofile mit Fit-Score.","AI finds your top 5 matching job profiles with fit score.","L'IA trouve vos 5 postes idéaux avec score d'adéquation.","L'IA trova i tuoi 5 profili di lavoro con score di compatibilità."),badge:"PRO",bc:"tc-em",col:""},
-        {page:"coach", ico:"🎤",t:L("Interview-Coach","Interview Coach","Coach entretien","Coach colloquio"),p:L("KI simuliert 5 echte Fragen, bewertet Antworten, gibt Note 0–100.","AI simulates 5 real questions, evaluates answers, gives score 0–100.","L'IA simule 5 vraies questions, évalue et note de 0 à 100.","L'IA simula 5 domande reali, valuta e dà voto 0–100."),badge:"PRO",bc:"tc-em",col:""},
-        {page:"excel", ico:"📊",t:L("Excel-Generator","Excel Generator","Générateur Excel","Generatore Excel"),p:L("KI erstellt professionelle Excel-Tabellen mit Formeln – für jeden Bereich. Nicht nur für Jobsuchende.","AI creates professional Excel spreadsheets with formulas – for any purpose. Not just for job seekers.","L'IA crée des tableaux Excel avec formules – pour tous. Pas seulement pour les chercheurs d'emploi.","L'IA crea fogli Excel professionali con formule – per tutti. Non solo per chi cerca lavoro."),badge:"PRO",bc:"tc-em",col:""},
-        {page:"pptx",  ico:"📽️",t:L("PowerPoint-Maker","PowerPoint Maker","Créateur PowerPoint","Creatore PowerPoint"),p:L("KI erstellt strukturierte Präsentationen mit professionellem Inhalt – für Schule, Uni, Arbeit.","AI creates structured presentations with professional content – for school, uni, work.","L'IA crée des présentations structurées – pour l'école, l'université, le travail.","L'IA crea presentazioni strutturate – per scuola, università, lavoro."),badge:"PRO",bc:"tc-bl",col:"bl"},
+        {page:"app",  ico:"",t:L("Bewerbungen","Applications","Candidatures","Candidature"),p:L("Motivationsschreiben & Lebenslauf in 60 Sekunden, live generiert. 1× gratis testen.","Cover letter & CV in 60 seconds, live generated. Try 1× for free.","Lettre & CV en 60 secondes, génération en direct. 1× gratuit.","Lettera & CV in 60 secondi, generazione live. 1× gratuito."),badge:"1× Gratis",bc:"tc-em",col:""},
+        {page:"linkedin",ico:"",t:"LinkedIn",p:L("Profil analysieren & optimieren – Headline, About, Skills für Recruiter.","Analyze & optimize – headline, about, skills for recruiters.","Analyser & optimiser – Titre, About, compétences pour recruteurs.","Analizzare & ottimizzare – Headline, About, skills per recruiter."),badge:"PRO",bc:"tc-bl",col:"bl"},
+        {page:"ats",  ico:"",t:L("ATS-Simulation","ATS Simulation","Simulation ATS","Simulazione ATS"),p:L("Prüft ob dein Lebenslauf durch Recruiter-Software kommt. Mit Score & Tipps.","Checks if your CV passes recruiter software. With score & tips.","Vérifie si votre CV passe les logiciels RH. Avec score & conseils.","Controlla se il tuo CV passa i software HR. Con score & consigli."),badge:"PRO",bc:"tc-bl",col:"bl"},
+        {page:"zeugnis",ico:"",t:L("Zeugnis-Analyse","Reference Analysis","Analyse certificat","Analisi certificato"),p:L("Schweizer Arbeitszeugnis-Code entschlüsselt. Was steht wirklich drin?","Decodes Swiss work references. What do they really say?","Décode le certificat de travail suisse. Que dit-il vraiment?","Decodifica il certificato svizzero. Cosa dice davvero?"),badge:"PRO",bc:"tc-am",col:"am"},
+        {page:"jobmatch",ico:"",t:L("Job-Matching","Job Matching","Matching emploi","Job Matching"),p:L("KI findet deine Top 5 passenden Stellenprofile mit Fit-Score.","AI finds your top 5 matching job profiles with fit score.","L'IA trouve vos 5 postes idéaux avec score d'adéquation.","L'IA trova i tuoi 5 profili di lavoro con score di compatibilità."),badge:"PRO",bc:"tc-em",col:""},
+        {page:"coach", ico:"",t:L("Interview-Coach","Interview Coach","Coach entretien","Coach colloquio"),p:L("KI simuliert 5 echte Fragen, bewertet Antworten, gibt Note 0–100.","AI simulates 5 real questions, evaluates answers, gives score 0–100.","L'IA simule 5 vraies questions, évalue et note de 0 à 100.","L'IA simula 5 domande reali, valuta e dà voto 0–100."),badge:"PRO",bc:"tc-em",col:""},
+        {page:"excel", ico:"",t:L("Excel-Generator","Excel Generator","Générateur Excel","Generatore Excel"),p:L("KI erstellt professionelle Excel-Tabellen mit Formeln – für jeden Bereich. Nicht nur für Jobsuchende.","AI creates professional Excel spreadsheets with formulas – for any purpose. Not just for job seekers.","L'IA crée des tableaux Excel avec formules – pour tous. Pas seulement pour les chercheurs d'emploi.","L'IA crea fogli Excel professionali con formule – per tutti. Non solo per chi cerca lavoro."),badge:"PRO",bc:"tc-em",col:""},
+        {page:"pptx",  ico:"",t:L("PowerPoint-Maker","PowerPoint Maker","Créateur PowerPoint","Creatore PowerPoint"),p:L("KI erstellt strukturierte Präsentationen mit professionellem Inhalt – für Schule, Uni, Arbeit.","AI creates structured presentations with professional content – for school, uni, work.","L'IA crée des présentations structurées – pour l'école, l'université, le travail.","L'IA crea presentazioni strutturate – per scuola, università, lavoro."),badge:"PRO",bc:"tc-bl",col:"bl"},
       ],
     },
     why:{
       label:L("Warum Stellify?","Pourquoi Stellify?","Perché Stellify?","Why Stellify?"),
       title:L("Der erste echte AI Career Copilot für die Schweiz.","Le premier vrai copilote IA carrière pour la Suisse.","Il primo vero AI career copilot per la Svizzera.","The first real AI career copilot for Switzerland."),
       sub:  L("Andere Tools machen eines. Stellify macht alles – und versteht den Schweizer Markt.","D'autres font une chose. Stellify fait tout – et comprend le marché suisse.","Altri strumenti fanno una cosa. Stellify fa tutto – e capisce il mercato svizzero.","Other tools do one thing. Stellify does all – and understands the Swiss market."),
-      badH: L("❌ ChatGPT / einzelne Tools","❌ ChatGPT / outils séparés","❌ ChatGPT / strumenti separati","❌ ChatGPT / separate tools"),
-      goodH:"✅ Stellify",
+      badH: L("ChatGPT / einzelne Tools","ChatGPT / outils séparés","ChatGPT / strumenti separati","ChatGPT / separate tools"),
+      goodH:"Stellify",
       badL: L(
         ["Leeres Chatfenster, du weisst nicht was eingeben","Kein Schweizer Format/Standard","Kein ATS-Check – du weisst nicht ob dein CV gelesen wird","Kein Zeugnis-Decoder – Schweizer Code bleibt ein Rätsel","Kein Job-Matching – du bewirbst dich ins Blaue","6 verschiedene Apps, kein roter Faden"],
         ["Champ vide, on ne sait pas quoi écrire","Pas de format suisse","Pas d'ATS – vous ne savez pas si votre CV est lu","Pas de décodeur de certificat","Pas de matching – vous postulez au hasard","6 apps différentes, pas de fil rouge"],
@@ -870,10 +870,10 @@ const mkT = (lang) => {
       label:L("Marktpotenzial","Potentiel marché","Potenziale mercato","Market potential"),
       title:L("Warum jetzt. Warum Schweiz.","Pourquoi maintenant. Pourquoi la Suisse.","Perché adesso. Perché la Svizzera.","Why now. Why Switzerland."),
       points:L(
-        [{ico:"📈",t:"Jobwechsel nehmen zu",p:"Durchschnittlich alle 3 Jahre wechseln Arbeitnehmer in der Schweiz ihren Job."},{ico:"⏰",t:"Bewerbungen kosten Zeit",p:"Eine gute Bewerbung dauert 3–5 Stunden. Mit KI: 3 Minuten."},{ico:"🤖",t:"KI wird akzeptiert",p:"78% der Schweizer Arbeitnehmer würden KI für Karrierehilfe nutzen."},{ico:"🇨🇭",t:"Kein gutes CH-Tool",p:"Keine Lösung versteht das Schweizer Zeugnis-System, ATS-Anforderungen und 4 Sprachen."}],
-        [{ico:"📈",t:"Changements de poste croissants",p:"En moyenne, les salariés changent d'emploi tous les 3 ans en Suisse."},{ico:"⏰",t:"Candidatures chronophages",p:"Une bonne candidature prend 3-5h. Avec l'IA: 3 minutes."},{ico:"🤖",t:"IA de plus en plus acceptée",p:"78% des salariés suisses utiliseraient l'IA pour leur carrière."},{ico:"🇨🇭",t:"Aucun bon outil suisse",p:"Aucune solution comprend le système de certificats CH, l'ATS et 4 langues."}],
-        [{ico:"📈",t:"Cambi di lavoro in crescita",p:"In media i lavoratori svizzeri cambiano lavoro ogni 3 anni."},{ico:"⏰",t:"Candidature richiedono tempo",p:"Una buona candidatura richiede 3-5 ore. Con l'IA: 3 minuti."},{ico:"🤖",t:"IA sempre più accettata",p:"Il 78% dei lavoratori svizzeri userebbe l'IA per la carriera."},{ico:"🇨🇭",t:"Nessun buon tool svizzero",p:"Nessuna soluzione capisce i certificati svizzeri, ATS e 4 lingue."}],
-        [{ico:"📈",t:"Job changes increasing",p:"On average, Swiss employees change jobs every 3 years."},{ico:"⏰",t:"Applications take time",p:"A good application takes 3–5 hours. With AI: 3 minutes."},{ico:"🤖",t:"AI increasingly accepted",p:"78% of Swiss employees would use AI for career help."},{ico:"🇨🇭",t:"No good Swiss tool",p:"No solution understands Swiss work references, ATS requirements and 4 languages."}]
+        [{ico:"📈",t:"Jobwechsel nehmen zu",p:"Durchschnittlich alle 3 Jahre wechseln Arbeitnehmer in der Schweiz ihren Job."},{ico:"⏰",t:"Bewerbungen kosten Zeit",p:"Eine gute Bewerbung dauert 3–5 Stunden. Mit KI: 3 Minuten."},{ico:"",t:"KI wird akzeptiert",p:"78% der Schweizer Arbeitnehmer würden KI für Karrierehilfe nutzen."},{ico:"🇨🇭",t:"Kein gutes CH-Tool",p:"Keine Lösung versteht das Schweizer Zeugnis-System, ATS-Anforderungen und 4 Sprachen."}],
+        [{ico:"📈",t:"Changements de poste croissants",p:"En moyenne, les salariés changent d'emploi tous les 3 ans en Suisse."},{ico:"⏰",t:"Candidatures chronophages",p:"Une bonne candidature prend 3-5h. Avec l'IA: 3 minutes."},{ico:"",t:"IA de plus en plus acceptée",p:"78% des salariés suisses utiliseraient l'IA pour leur carrière."},{ico:"🇨🇭",t:"Aucun bon outil suisse",p:"Aucune solution comprend le système de certificats CH, l'ATS et 4 langues."}],
+        [{ico:"📈",t:"Cambi di lavoro in crescita",p:"In media i lavoratori svizzeri cambiano lavoro ogni 3 anni."},{ico:"⏰",t:"Candidature richiedono tempo",p:"Una buona candidatura richiede 3-5 ore. Con l'IA: 3 minuti."},{ico:"",t:"IA sempre più accettata",p:"Il 78% dei lavoratori svizzeri userebbe l'IA per la carriera."},{ico:"🇨🇭",t:"Nessun buon tool svizzero",p:"Nessuna soluzione capisce i certificati svizzeri, ATS e 4 lingue."}],
+        [{ico:"📈",t:"Job changes increasing",p:"On average, Swiss employees change jobs every 3 years."},{ico:"⏰",t:"Applications take time",p:"A good application takes 3–5 hours. With AI: 3 minutes."},{ico:"",t:"AI increasingly accepted",p:"78% of Swiss employees would use AI for career help."},{ico:"🇨🇭",t:"No good Swiss tool",p:"No solution understands Swiss work references, ATS requirements and 4 languages."}]
       ),
     },
     testi:{
@@ -891,7 +891,7 @@ const mkT = (lang) => {
       title: L("Ein Preis. 19+ Tools.","One price. 19+ tools.","Un prix. 19+ outils.","Un prezzo. 19+ strumenti."),
       sub:   L("Jederzeit kündbar. Keine versteckten Kosten.","Résiliable à tout moment.","Cancellabile in qualsiasi momento.","Cancel anytime. No hidden costs."),
       monthly:L("Monatlich","Mensuel","Mensile","Monthly"),
-      yearly: L("Jährlich 🎁","Annuel 🎁","Annuale 🎁","Yearly 🎁"),
+      yearly: L("Jährlich","Annuel","Annuale","Yearly"),
       save:   L("2 Monate gratis","2 mois offerts","2 mesi gratis","2 months free"),
       recom:  L("Empfohlen","Recommandé","Consigliato","Recommended"),
       tiers:[
@@ -913,7 +913,7 @@ const mkT = (lang) => {
          btn:L("Kostenlos starten","Commencer gratuitement","Inizia gratis","Start for free"),btnS:"b-out"},
         {id:"pro",name:"Pro",priceM:19.90,priceY:14.90,best:true,
          note:L("Monatlich kündbar · Erneuerung jeden Montag 07:00","Monthly · Erneuerung every Monday 07:00","Mensuel · Rechargement lundi 07:00","Mensile · Ricarica lunedì 07:00"),
-         yearNote:L("🎁 Jahresabo – 2 Monate gratis · CHF 14.90/Mo.","🎁 Annual plan – 2 months free · CHF 14.90/mo","🔥 CHF 14.90/mois avec abonnement annuel","🔥 CHF 14.90/mese con abbonamento annuale"),
+         yearNote:L("Jahresabo – CHF 14.90/Mo.","Jahresabo – CHF 14.90/mo","CHF 14.90/mois avec abonnement annuel","CHF 14.90/mese con abbonamento annuale"),
          desc:L(
            "Pro gibt dir vollen Zugriff auf alle 20+ Tools. Du erhältst täglich ein festes Nutzungsvolumen – perfekt für regelmässige Bewerbungen und Karriere-Optimierungen.",
            "Pro is limited – you have a weekly volume that erneuerungs automatically every Monday.",
@@ -927,9 +927,9 @@ const mkT = (lang) => {
            ["Tutti i 20+ strumenti completamente sbloccati – senza restrizioni.","Il tuo profilo mostra sempre quanto del tuo volume settimanale rimane.","Ogni lunedì alle 07:00 il tuo volume viene ricaricato automaticamente.","L'IA ottimizza il tuo profilo LinkedIn per i recruiter svizzeri.","Il controllo ATS verifica se il tuo CV supera i software HR e ti dà un punteggio.","L'analisi del certificato decodifica il linguaggio nascosto dei certificati svizzeri.","Il job matching mostra i cinque posti che si adattano meglio al tuo profilo.","Il coach colloquio simula domande reali e valuta le tue risposte da 0 a 100.","Il tracker candidature ti dà una panoramica di tutte le candidature in corso.","Il controllo bias svizzero esamina le tue formulazioni inconsce.","L'analisi skill gap mostra cosa ti manca per un posto e come colmare il divario."]
          ),
          btn:L("Pro werden → CHF 19.90/Mo.","Become Pro → CHF 19.90/mo","Devenir Pro → CHF 19.90/mois","Diventa Pro → CHF 19.90/mese"),btnS:"b-em"},
-        {id:"ultimate",name:L("Ultimate ♾️","Ultimate ♾️","Ultimate ♾️","Ultimate ♾️"),priceM:49.90,priceY:39.90,best:false,
+        {id:"ultimate",name:L("Ultimate","Ultimate","Ultimate","Ultimate"),priceM:49.90,priceY:39.90,best:false,
          note:L("Absolut keine Limits – für tägliche Intensivnutzung.","Absolutely no limits – for daily intensive use.","Aucune limite – pour une utilisation quotidienne intensive.","Nessun limite – per un uso intensivo quotidiano."),
-         yearNote:L("🎁 Jahresabo – 2 Monate gratis · CHF 39.90/Mo.","🎁 Annual plan – 2 months free · CHF 39.90/mo","🔥 CHF 39.90/mois avec abonnement annuel","🔥 CHF 39.90/mese con abbonamento annuale"),
+         yearNote:L("Jahresabo – CHF 39.90/Mo.","Jahresabo – CHF 39.90/mo","CHF 39.90/mois avec abonnement annuel","CHF 39.90/mese con abbonamento annuale"),
          desc:L(
            "Ultimate ist unlimitiert – keine Limits, kein Nutzungsvolumen, kein Warten.",
            "Ultimate is your personal career copilot without any restrictions. Unlimited use of all tools, 24/7, for maximum career success.",
@@ -955,7 +955,7 @@ const mkT = (lang) => {
     payments:{
       label:L("Bezahle wie du willst","Payez comme vous voulez","Paga come vuoi","Pay your way"),
       sub:L("Sicher via Stripe verarbeitet.","Traitement sécurisé via Stripe.","Elaborazione sicura via Stripe.","Securely processed via Stripe."),
-      methods:["🇨🇭 Twint","💳 Visa","💳 Mastercard","💳 Amex","🍎 Apple Pay","🤖 Google Pay","🏦 SEPA","🏦 PostFinance","🛒 Klarna"],
+      methods:["Twint","Visa","Mastercard","Amex","Apple Pay","Google Pay","SEPA","PostFinance","Klarna"],
     },
     cta:{
       title:L("Deine Karriere verdient","Votre carrière mérite","La tua carriera merita","Your career deserves"),
@@ -984,14 +984,14 @@ const mkT = (lang) => {
       pdf:L("PDF","PDF","PDF","PDF"),
       regen:L("Neu","Nouveau","Nuovo","New"),
       stream:L("KI schreibt live…","L'IA rédige en direct…","L'IA scrive live…","AI writing live…"),
-      genBtn:L("✨ Jetzt erstellen","✨ Créer maintenant","✨ Crea ora","✨ Create now"),
+      genBtn:L("Jetzt erstellen","Créer maintenant","Crea ora","Create now"),
       genLoad:L("Generiere…","Génération…","Generando…","Generating…"),
-      goCoach:L("🎤 Interview-Coach →","🎤 Coach →","🎤 Coach →","🎤 Interview Coach →"),
-      goAts:L("🤖 ATS-Check →","🤖 ATS →","🤖 ATS →","🤖 ATS Check →"),
-      goCl:L("✅ Checkliste →","✅ Check-liste →","✅ Checklist →","✅ Checklist →"),
-      goLi:L("💼 LinkedIn →","💼 LinkedIn →","💼 LinkedIn →","💼 LinkedIn →"),
+      goCoach:L("Interview-Coach →","Coach →","Coach →","Interview Coach →"),
+      goAts:L("ATS-Check →","ATS →","ATS →","ATS Check →"),
+      goCl:L("Checkliste →","Check-liste →","Checklist →","Checklist →"),
+      goLi:L("LinkedIn →","LinkedIn →","LinkedIn →","LinkedIn →"),
       pw:{
-        title:L("Noch mehr mit Pro ✦","Plus avec Pro ✦","Di più con Pro ✦","More with Pro ✦"),
+        title:L("Noch mehr mit Pro","Plus avec Pro","Di più con Pro","More with Pro"),
         sub:L("Du siehst wie gut es funktioniert.","Vous voyez comment ça marche.","Vedi come funziona bene.","You see how well it works."),
         feats:L(["LinkedIn","ATS","Zeugnis","Coach","Matching"],["LinkedIn","ATS","Certificat","Coach","Matching"],["LinkedIn","ATS","Certificato","Coach","Matching"],["LinkedIn","ATS","Reference","Coach","Matching"]),
         btn:L(`Pro werden → CHF ${C.priceM}/Mo.`,`Devenir Pro → CHF ${C.priceM}/Mo.`,`Diventa Pro → CHF ${C.priceM}/Mo.`,`Become Pro → CHF ${C.priceM}/mo`),
@@ -999,18 +999,18 @@ const mkT = (lang) => {
       },
     },
     email:{
-      title:L("✉️ Direkt per E-Mail senden","✉️ Envoi direct par e-mail","✉️ Invio diretto per e-mail","✉️ Send directly by email"),
+      title:L("Direkt per E-Mail senden","Envoi direct par e-mail","Invio diretto per e-mail","Send directly by email"),
       toLbl:L("E-Mail des Unternehmens *","E-mail de l'entreprise *","E-mail dell'azienda *","Company email *"),
       subjLbl:L("Betreff","Objet","Oggetto","Subject"),
       msgPh:L("Mit freundlichen Grüssen…","Cordiales salutations…","Cordiali saluti…","Kind regards…"),
-      btn:L("✉️ E-Mail öffnen","✉️ Ouvrir e-mail","✉️ Apri e-mail","✉️ Open email"),
+      btn:L("E-Mail öffnen","Ouvrir e-mail","Apri e-mail","Open email"),
       note:L("Öffnet deinen E-Mail-Client mit dem Anschreiben.","Ouvre votre client avec la lettre.","Apre il client con la lettera.","Opens your email client with the cover letter."),
     },
     checklist:{
-      title:L("✅ Bewerbungs-Checkliste","✅ Check-liste candidature","✅ Checklist candidatura","✅ Application Checklist"),
+      title:L("Bewerbungs-Checkliste","Check-liste candidature","Checklist candidatura","Application Checklist"),
       sub:L("Hake ab was erledigt ist.","Cochez ce qui est fait.","Spunta cosa è fatto.","Tick off what's done."),
       score:(n,t)=>L(`${n}/${t} erledigt`,`${n}/${t} effectués`,`${n}/${t} completati`,`${n} of ${t} done`),
-      perfect:L("🎉 Vollständig! Bereit.","🎉 Complet! Prêt.","🎉 Completo! Pronto.","🎉 Complete! Ready."),
+      perfect:L("Vollständig! Bereit.","Complet! Prêt.","Completo! Pronto.","Complete! Ready."),
       items:L(
         [{id:"m",t:"Motivationsschreiben",d:"Persönlich, fehlerfrei, auf die Stelle zugeschnitten"},{id:"cv",t:"Lebenslauf",d:"Aktuell, max. 2 Seiten, Schweizer Format"},{id:"ats",t:"ATS-Check gemacht",d:"Score 70%+ – Lebenslauf kommt durch Recruiting-Software"},{id:"foto",t:"Bewerbungsfoto",d:"Professionell, aktuell, neutraler Hintergrund"},{id:"zeug",t:"Arbeitszeugnisse",d:"Letzte 2–3 Stellen, Original oder zertifiziert"},{id:"dipl",t:"Diplome & Zertifikate",d:"Relevante Abschlüsse"},{id:"ref",t:"Referenzpersonen",d:"2–3 Personen, kontaktiert"},{id:"mail",t:"Professionelle E-Mail",d:"vorname.nachname@..."},{id:"spell",t:"Rechtschreibung geprüft",d:"Alles gelesen, null Fehler"},{id:"fu",t:"Follow-up geplant",d:"Wann rufst du nach?"}],
         [{id:"m",t:"Lettre de motivation",d:"Personnelle, sans fautes"},{id:"cv",t:"Curriculum vitae",d:"À jour, max. 2 pages"},{id:"ats",t:"ATS effectué",d:"Score 70%+ – CV passe les logiciels"},{id:"foto",t:"Photo",d:"Professionnelle, fond neutre"},{id:"zeug",t:"Certificats",d:"2–3 derniers postes"},{id:"dipl",t:"Diplômes",d:"Formations pertinentes"},{id:"ref",t:"Références",d:"2–3 personnes contactées"},{id:"mail",t:"E-mail pro",d:"prenom.nom@..."},{id:"spell",t:"Orthographe",d:"Tout relu"},{id:"fu",t:"Suivi planifié",d:"Quand relancez-vous?"}],
@@ -1019,19 +1019,19 @@ const mkT = (lang) => {
       ),
     },
     ats:{
-      title:L("🤖 ATS-Simulation","🤖 Simulation ATS","🤖 Simulazione ATS","🤖 ATS Simulation"),
+      title:L("ATS-Simulation","Simulation ATS","Simulazione ATS","ATS Simulation"),
       sub:L("Prüft ob dein Lebenslauf durch Recruiter-Software kommt.","Vérifie si votre CV passe les logiciels RH.","Controlla se il tuo CV passa i software HR.","Checks if your CV passes recruiter software."),
       cvLbl:L("Dein Lebenslauf (Text einfügen) *","Votre CV (coller le texte) *","Il tuo CV (incolla il testo) *","Your CV (paste text) *"),
       cvPh:L("Lebenslauf-Text einfügen…","Collez votre CV…","Incolla il tuo CV…","Paste your CV text here…"),
       jobLbl:L("Stellenbezeichnung *","Intitulé du poste *","Titolo del posto *","Job title *"),
       jobDescLbl:L("Stellenbeschreibung (empfohlen)","Description du poste (recommandé)","Descrizione (consigliato)","Job description (recommended)"),
       jobDescPh:L("Inserat einfügen für bessere Keyword-Analyse…","Collez l'annonce pour une meilleure analyse…","Incolla l'annuncio per un'analisi migliore…","Paste job ad for better keyword analysis…"),
-      btn:L("🤖 ATS-Check starten","🤖 Lancer l'ATS","🤖 Avvia ATS","🤖 Run ATS check"),
+      btn:L("ATS-Check starten","Lancer l'ATS","Avvia ATS","Run ATS check"),
       loading:L("Simuliere ATS…","Simulation ATS…","Simulando ATS…","Simulating ATS…"),
       scoreLabel:L("ATS-Score","Score ATS","Score ATS","ATS Score"),
-      found:L("✓ Gefundene Keywords","✓ Mots-clés trouvés","✓ Keywords trovati","✓ Keywords found"),
-      miss:L("✗ Fehlende Keywords","✗ Mots-clés manquants","✗ Keywords mancanti","✗ Missing keywords"),
-      tips:L("💡 Optimierungstipps","💡 Conseils d'optimisation","💡 Consigli di ottimizzazione","💡 Optimization tips"),
+      found:L("Gefundene Keywords","Mots-clés trouvés","Keywords trovati","Keywords found"),
+      miss:L("Fehlende Keywords","Mots-clés manquants","Keywords mancanti","Missing keywords"),
+      tips:L("Optimierungstipps","Conseils d'optimisation","Consigli di ottimizzazione","Optimization tips"),
       prompt:(cv,job,desc)=>L(
         `Du bist ein KI-Simulator für ATS-Systeme (Applicant Tracking Software). Analysiere diesen Lebenslauf für die Stelle "${job}" auf Keyword-Match und Vollständigkeit. Hinweis: Score ist KI-Schätzung, kein offizieller Wert. Antworte NUR mit JSON:\n{"score":82,"grade":"Gut","summary":"2 Sätze zur Gesamtbewertung","keywords_found":["Python","Projektmanagement","Deutsch"],"keywords_missing":["Scrum","SQL","Englisch"],"tips":["Tipp 1 (konkret)","Tipp 2","Tipp 3"]}\nStelle: ${job}\nInserat: ${desc||"nicht angegeben"}\nLebenslauf:\n${cv}`,
         `Tu es un système ATS pour RH suisses. Analyse ce CV pour le poste "${job}". Réponds UNIQUEMENT avec JSON:\n{"score":82,"grade":"Bien","summary":"2 phrases","keywords_found":["Python"],"keywords_missing":["Scrum"],"tips":["Conseil 1","Conseil 2","Conseil 3"]}\nPoste: ${job}\nAnnonce: ${desc||"non fournie"}\nCV:\n${cv}`,
@@ -1040,15 +1040,15 @@ const mkT = (lang) => {
       ),
     },
     zeugnis:{
-      title:L("📜 Zeugnis-Analyse","📜 Analyse certificat","📜 Analisi certificato","📜 Reference Analysis"),
+      title:L("Zeugnis-Analyse","Analyse certificat","Analisi certificato","Reference Analysis"),
       sub:L("Entschlüssle den Schweizer Zeugnis-Code. Was steht wirklich drin?","Déchiffrez le code suisse. Que dit vraiment votre certificat?","Decodifica il codice svizzero. Cosa dice davvero il tuo certificato?","Decode the Swiss reference code. What does it really say?"),
       textLbl:L("Zeugnis-Text einfügen *","Texte du certificat *","Testo del certificato *","Reference text *"),
       textPh:L("Ganzen Zeugnistext hier einfügen…","Collez ici le texte complet du certificat…","Incolla qui il testo completo del certificato…","Paste the full reference text here…"),
-      btn:L("📜 Zeugnis analysieren","📜 Analyser le certificat","📜 Analizza il certificato","📜 Analyse reference"),
+      btn:L("Zeugnis analysieren","Analyser le certificat","Analizza il certificato","Analyse reference"),
       loading:L("Analysiere…","Analyse…","Analizzando…","Analysing…"),
       overall:L("Gesamtbewertung","Évaluation globale","Valutazione globale","Overall assessment"),
       phrases:L("Entschlüsselte Formulierungen","Formulations déchiffrées","Formulazioni decifrate","Decoded phrases"),
-      tips:L("💡 Was du tun solltest","💡 Ce que vous devriez faire","💡 Cosa dovresti fare","💡 What you should do"),
+      tips:L("Was du tun solltest","Ce que vous devriez faire","Cosa dovresti fare","What you should do"),
       prompt:(text)=>L(
         `Du bist Schweizer HR-Experte und kennst den vollständigen Zeugnis-Code des Schweizerischen Obligationenrechts (OR). Analysiere dieses Zeugnis und entschlüssle jede Formulierung gemäss dem offiziellen Schweizer Zeugnis-Decoder ("stets zu unserer vollsten Zufriedenheit" = sehr gut, "zu unserer vollsten Zufriedenheit" = gut, "zu unserer Zufriedenheit" = befriedigend, "im Grossen und Ganzen" = genügend, "war bemüht" = ungenügend). Antworte NUR mit JSON:\n{"grade":"A","grade_text":"Sehr gut","overall":"2-3 Sätze zur Gesamtbewertung","phrases":[{"original":"hat die ihm übertragenen Aufgaben stets zu unserer vollsten Zufriedenheit erledigt","decoded":"Bestnote – entspricht einer 6","rating":"A"},{"original":"war bemüht","decoded":"Schwache Formulierung – bedeutet mangelhafte Leistung","rating":"D"}],"tips":["Tipp 1","Tipp 2"]}\nZeugnis:\n${text}`,
         `Tu es expert en certificats de travail suisses. Analyse ce certificat. Réponds UNIQUEMENT avec JSON:\n{"grade":"A","grade_text":"Très bien","overall":"2-3 phrases","phrases":[{"original":"phrase originale","decoded":"sens réel","rating":"A"}],"tips":["Conseil"]}\nCertificat:\n${text}`,
@@ -1057,7 +1057,7 @@ const mkT = (lang) => {
       ),
     },
     jobmatch:{
-      title:L("🎯 Job-Matching","🎯 Matching emploi","🎯 Job Matching","🎯 Job Matching"),
+      title:L("Job-Matching","Matching emploi","Job Matching","Job Matching"),
       sub:L("Die KI analysiert dein Profil und findet die Top 5 passenden Stellen.","L'IA analyse votre profil et trouve les 5 postes les mieux adaptés.","L'IA analizza il tuo profilo e trova i 5 posti più adatti.","AI analyzes your profile and finds your top 5 matching positions."),
       skillsLbl:L("Skills & Erfahrung *","Compétences & expérience *","Competenze & esperienza *","Skills & experience *"),
       skillsPh:L("z.B. 5 Jahre Projektmanagement, Python, Teamführung, Finanzen…","ex. 5 ans gestion de projet, Python, management…","es. 5 anni gestione progetti, Python, management…","e.g. 5 years project management, Python, team leadership, finance…"),
@@ -1065,7 +1065,7 @@ const mkT = (lang) => {
       eduPh:L("z.B. BSc Wirtschaftsinformatik, Uni Bern","ex. BSc Informatique, Uni Berne","es. BSc Informatica, Uni Berna","e.g. BSc Business Informatics, Uni Berne"),
       prefLbl:L("Präferenzen (optional)","Préférences (optionnel)","Preferenze (opzionale)","Preferences (optional)"),
       prefPh:L("z.B. Homeoffice, Startup, Zürich, 100%…","ex. Télétravail, startup, Zurich…","es. Telelavoro, startup, Zurigo…","e.g. Home office, startup, Zurich, 100%…"),
-      btn:L("🎯 Matching starten","🎯 Lancer le matching","🎯 Avvia matching","🎯 Start matching"),
+      btn:L("Matching starten","Lancer le matching","Avvia matching","Start matching"),
       loading:L("Analysiere Profil…","Analyse du profil…","Analizzando profilo…","Analysing profile…"),
       fitScore:L("Fit-Score","Score d'adéquation","Score compatibilità","Fit score"),
       applyBtn:L("Bewerben →","Postuler →","Candidarsi →","Apply →"),
@@ -1077,7 +1077,7 @@ const mkT = (lang) => {
       ),
     },
     coach:{
-      title:L("🎤 Interview-Coach","🎤 Coach d'entretien","🎤 Coach colloquio","🎤 Interview Coach"),
+      title:L("Interview-Coach","Coach d'entretien","Coach colloquio","Interview Coach"),
       sub:L("KI simuliert 5 echte Fragen, bewertet Antworten, gibt Note 0–100.","L'IA simule 5 vraies questions, évalue et note de 0 à 100.","L'IA simula 5 domande reali, valuta e dà voto 0–100.","AI simulates 5 real questions, evaluates answers, gives score 0–100."),
       ready:L("Bereit für dein Interview?","Prêt pour votre entretien?","Pronto per il colloquio?","Ready for your interview?"),
       readySub:L("5 Fragen · KI-Bewertung · Konkrete Tipps","5 questions · Évaluation · Conseils","5 domande · Valutazione · Consigli","5 questions · AI evaluation · Concrete tips"),
@@ -1087,7 +1087,7 @@ const mkT = (lang) => {
       qOf:(n)=>L(`Frage ${n}/5`,`Question ${n}/5`,`Domanda ${n}/5`,`Question ${n}/5`),
       ph:L("Deine Antwort…","Votre réponse…","La tua risposta…","Your answer…"),
       send:L("Senden","Envoyer","Invia","Send"),
-      newIC:L("🔄 Neues Interview","🔄 Nouvel entretien","🔄 Nuovo colloquio","🔄 New interview"),
+      newIC:L("Neues Interview","Nouvel entretien","Nuovo colloquio","New interview"),
       result:L("Dein Ergebnis","Votre résultat","Il tuo risultato","Your result"),
       strengths:L("Stärken:","Points forts:","Punti di forza:","Strengths:"),
       tip:L("Tipp:","Conseil:","Consiglio:","Tip:"),
@@ -1111,10 +1111,10 @@ const mkT = (lang) => {
         `Analizza questo colloquio. SOLO JSON: {"score":75,"feedback":"2-3 frasi","staerken":["P1"],"verbesserung":"1 consiglio"}\n${h}`,
         `Analyse this interview. ONLY JSON: {"score":75,"feedback":"2-3 sentences","staerken":["S1"],"verbesserung":"1 tip"}\n${h}`
       ),
-      icDone:(s)=>L(`🎯 Fertig! Dein Score: ${s}/100`,`🎯 Terminé! Score: ${s}/100`,`🎯 Finito! Score: ${s}/100`,`🎯 Done! Score: ${s}/100`),
+      icDone:(s)=>L(`Fertig! Dein Score: ${s}/100`,`Terminé. Score: ${s}/100`,`Finito. Score: ${s}/100`,`Done! Score: ${s}/100`),
     },
     linkedin:{
-      title:L("💼 LinkedIn Analyse & Optimierung","💼 LinkedIn Analyse & Optimisation","💼 LinkedIn Analisi & Ottimizzazione","💼 LinkedIn Analysis & Optimization"),
+      title:L("LinkedIn Analyse & Optimierung","LinkedIn Analyse & Optimisation","LinkedIn Analisi & Ottimizzazione","LinkedIn Analysis & Optimization"),
       sub:L("Die KI macht dein Profil für Recruiter unwiderstehlich.","L'IA rend votre profil irrésistible pour les recruteurs.","L'IA rende il tuo profilo irresistibile per i recruiter.","The AI makes your profile irresistible to recruiters."),
       analyzeLabel:L("LinkedIn-Profil Text (About + Erfahrung)","Texte profil LinkedIn (About + Expérience)","Testo profilo LinkedIn (About + Esperienza)","LinkedIn profile text (About + Experience)"),
       analyzePh:L("Füge deinen aktuellen LinkedIn-Text ein oder beschreibe dein Profil…","Collez votre texte LinkedIn ou décrivez votre profil…","Incolla il tuo testo LinkedIn o descrivi il tuo profilo…","Paste your current LinkedIn text or describe your profile…"),
@@ -1122,21 +1122,21 @@ const mkT = (lang) => {
       rolePh:L("z.B. Senior Product Manager","ex. Chef de produit senior","es. Senior Product Manager","e.g. Senior Product Manager"),
       achLbl:L("Top 3 Erfolge","3 meilleures réalisations","Top 3 successi","Top 3 achievements"),
       achPh:L("z.B. Team von 10 geführt…","ex. Équipe de 10 gérée…","es. Team di 10 gestito…","e.g. Led team of 10…"),
-      btn:L("💼 LinkedIn optimieren →","💼 Optimiser →","💼 Ottimizzare →","💼 Optimize →"),
+      btn:L("LinkedIn optimieren →","Optimiser →","Ottimizzare →","Optimize →"),
       load:L("Optimiere…","Optimisation…","Ottimizzando…","Optimizing…"),
-      resH:L("🚀 Optimierter Headline","🚀 Titre optimisé","🚀 Headline ottimizzato","🚀 Optimized headline"),
-      resA:L("📝 About-Sektion","📝 Section About","📝 Sezione About","📝 About section"),
-      resS:L("🏷️ Empfohlene Skills","🏷️ Compétences","🏷️ Skills consigliati","🏷️ Recommended skills"),
+      resH:L("Optimierter Headline","Titre optimisé","Headline ottimizzato","Optimized headline"),
+      resA:L("About-Sektion","Section About","Sezione About","About section"),
+      resS:L("Empfohlene Skills","Compétences","Skills consigliati","Recommended skills"),
       copy:L("Kopieren","Copier","Copia","Copy"),
       prompt:(d)=>`You are a LinkedIn career coach for the Swiss job market. Optimize this profile. Reply ONLY with valid JSON. Write the headline and about section in ${L("Schweizer Hochdeutsch (kein ß)","français","italiano","English")}.\nCurrent text: ${d.text||"not provided"}\nTarget role: ${d.role||"not provided"}\nAchievements: ${d.ach||"not provided"}\nCurrent job: ${d.beruf||"not provided"} | Experience: ${d.erfahrung||0} years | Skills: ${d.skills||"not provided"}\nRequired JSON: {"headline":"max 220 chars","about":"3-4 paragraphs first person ~250 words","skills":["Skill1","Skill2","Skill3","Skill4","Skill5","Skill6","Skill7","Skill8","Skill9","Skill10"]}`,
     },
     modal:{
       title:`${C.name} Pro`,
       sub:L("Alle 20+ KI-Tools freischalten.","Débloquer les 20+ outils IA.","Sblocca i 20+ strumenti IA.","Unlock all 20+ AI tools."),
-      feats:L([["✍️","Bewerbungen"],["🤖","ATS"],["📜","Zeugnis"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
-              [["✍️","Candidatures"],["🤖","ATS"],["📜","Certificat"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
-              [["✍️","Candidature"],["🤖","ATS"],["📜","Certificato"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]],
-              [["✍️","Applications"],["🤖","ATS"],["📜","Reference"],["🎯","Matching"],["💼","LinkedIn"],["🎤","Coach"]]),
+      feats:L([["","Bewerbungen"],["","ATS"],["","Zeugnis"],["","Matching"],["","LinkedIn"],["","Coach"]],
+              [["","Candidatures"],["","ATS"],["","Certificat"],["","Matching"],["","LinkedIn"],["","Coach"]],
+              [["","Candidature"],["","ATS"],["","Certificato"],["","Matching"],["","LinkedIn"],["","Coach"]],
+              [["","Applications"],["","ATS"],["","Reference"],["","Matching"],["","LinkedIn"],["","Coach"]]),
       btn:L("Jetzt Pro werden →","Devenir Pro →","Diventa Pro →","Become Pro →"),
       close:L("Schliessen","Fermer","Chiudi","Close"),
       note:L("Stripe · Twint · Kreditkarte · PayPal · Apple Pay · Jederzeit kündbar","Stripe · Twint · CB · PayPal · Apple Pay · Résiliable","Stripe · Twint · CC · PayPal · Apple Pay · Cancellabile","Stripe · Twint · Credit card · PayPal · Apple Pay · Cancel anytime"),
@@ -1351,7 +1351,7 @@ Dati: Mestiere: ${v.beruf} | Azienda: ${v.firma} | Nome: ${v.name} | Età: ${v.a
       it:`Scrivi un'e-mail professionale di tipo ${v.typ} in italiano. Tono: ${v.ton||"professionale & fattuale"}.\nA: ${v.an} | Argomento: ${v.thema}\nCon oggetto. Chiara, precisa.`,
     }[l]),
   },
-  { id:"protokoll", ico:"📋", color:"#0891b2", cat:"produktivitaet",
+  { id:"protokoll", ico:"", color:"#0891b2", cat:"produktivitaet",
     t:{de:"Meeting-Protokoll",en:"Meeting Minutes",fr:"Procès-verbal",it:"Verbale riunione"},
     sub:{de:"Stichworte eingeben → fertiges Protokoll im Schweizer Format.",en:"Enter bullet points → complete meeting minutes.",fr:"Entrez des notes → procès-verbal complet.",it:"Inserisci appunti → verbale completo."},
     inputs:[
@@ -1535,7 +1535,7 @@ Profilo: Titolo: ${v.job} | Settore: ${v.branche||"n/d"} | Cantone: ${v.kanton||
     })[l]),
   },
   // ── SKILL GAP ANALYSE ──
-  { id:"skillgap", ico:"📊", color:"#0891b2", cat:"karriere",
+  { id:"skillgap", ico:"", color:"#0891b2", cat:"karriere",
     t:{de:"Skill-Gap-Analyse",en:"Skill Gap Analysis",fr:"Analyse des lacunes",it:"Analisi skill gap"},
     sub:{de:"Vergleicht dein Profil mit dem Stelleninserat und zeigt was dir noch fehlt.",en:"Compares your profile with the job ad and shows what you're missing.",fr:"Compare votre profil avec l'annonce et montre ce qui manque.",it:"Confronta il tuo profilo con l'annuncio e mostra cosa manca."},
     inputs:[
@@ -1551,7 +1551,7 @@ Profilo: Titolo: ${v.job} | Settore: ${v.branche||"n/d"} | Cantone: ${v.kanton||
   },
   // ── LINKEDIN POST GENERATOR ──
 
-  { id:"lipost", ico:"✍️", color:"#0a66c2", cat:"karriere",
+  { id:"lipost", ico:"", color:"#0a66c2", cat:"karriere",
     t:{de:"LinkedIn-Post Generator",en:"LinkedIn Post Generator",fr:"Générateur post LinkedIn",it:"Generatore post LinkedIn"},
     sub:{de:"3 massgeschneiderte Posts – Swiss-Style, keine Corporate-Floskeln, sofort kopierbar.",en:"3 tailored posts – Swiss style, no corporate clichés, ready to copy.",fr:"3 posts sur mesure – style suisse, sans clichés d'entreprise, prêts à copier.",it:"3 post su misura – stile svizzero, senza cliché aziendali, pronti da copiare."},
     inputs:[
@@ -1884,7 +1884,7 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
               <div style={{fontSize:12,fontWeight:700,color:"#059669",marginBottom:8}}>⚡ Sofort umsetzbar</div>
               {d.sofort_machbar.map((s,i)=><div key={i} style={{fontSize:13,color:"var(--mu)",padding:"4px 0"}}>→ {s}</div>)}
             </div>}
-            {d.fazit&&<div style={{background:"rgba(16,185,129,.08)",borderRadius:10,padding:"12px",fontSize:13,color:"var(--ink)"}}><strong>🎯 Fazit:</strong> {d.fazit}</div>}
+            {d.fazit&&<div style={{background:"rgba(16,185,129,.08)",borderRadius:10,padding:"12px",fontSize:13,color:"var(--ink)"}}><strong>Fazit:</strong> {d.fazit}</div>}
           </div>
         );
       }
@@ -1892,16 +1892,14 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
     return null;
   };
 
-  const hdrColor = tool.color || "#10b981";
-
   return (
     <>
-      <div style={{background:`linear-gradient(135deg,${hdrColor}cc,${hdrColor}ee)`,padding:"52px 28px 36px",textAlign:"center",position:"relative",overflow:"hidden"}}>
-        <div style={{fontFamily:"var(--hd)",fontSize:32,fontWeight:800,color:"white",marginBottom:7,letterSpacing:"-1px"}}>{tool.ico} {tool.t[lang]}</div>
-        <div style={{fontSize:14,color:"rgba(255,255,255,.5)"}}>{tool.sub[lang]}</div>
+      <div className="page-hdr">
+        <h1>{tool.t[lang]}</h1>
+        <p>{tool.sub[lang]}</p>
       </div>
       <div style={{maxWidth:740,margin:"0 auto",padding:"36px 28px 80px"}}>
-        {err&&<div className="err">⚠️ {err}</div>}
+        {err&&<div className="err">{err}</div>}
         {limitHit&&(
           <div style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",borderRadius:12,padding:"16px 20px",marginBottom:16,textAlign:"center"}}>
             <div style={{fontSize:24,marginBottom:6}}>⏳</div>
@@ -1919,70 +1917,70 @@ function GenericToolPage({ tool, lang, pro, setPw, setPage, yearly, C, proUsage,
               </div>
               <div style={{background:"white",borderRadius:12,padding:"16px",border:"1px solid rgba(16,185,129,.12)",fontSize:13,color:"var(--ink)",lineHeight:1.85,whiteSpace:"pre-wrap",maxHeight:260,overflow:"hidden",maskImage:"linear-gradient(to bottom,black 55%,transparent 100%)",WebkitMaskImage:"linear-gradient(to bottom,black 55%,transparent 100%)"}}>
                 {tool.id==="li2job" ? L(
-`✍️ MOTIVATIONSSCHREIBEN
+`MOTIVATIONSSCHREIBEN
 
 Sehr geehrte Damen und Herren,
 
 als ETH-Absolvent mit 4 Jahren Erfahrung in Python und React bewerbe ich mich mit grossem Interesse auf die Position als Senior Developer bei Google Zürich. Meine Expertise in skalierbaren Cloud-Architekturen (GCP, AWS) deckt sich direkt mit Ihren Anforderungen.
 
-📄 LEBENSLAUF-HIGHLIGHTS
+LEBENSLAUF
 • ETH Zürich – B.Sc. Informatik (2020), Note: 5.4
 • 4 Jahre Full-Stack (Python, React, Node.js, GCP)
 • Projektleitung für 3 Enterprise-Anwendungen (50k+ Nutzer)
 • Open-Source-Contributor: 800+ GitHub Stars
 
-💡 DEINE 3 STÄRKSTEN ARGUMENTE
+3 STÄRKSTE ARGUMENTE
 1. ETH-Abschluss → Google priorisiert Top-Hochschulen weltweit
 2. Python + GCP → exakt die gesuchte Tech-Stack-Kombination
 3. Schweizer Arbeitserlaubnis → kein Visum, sofort verfügbar`,
-`✍️ COVER LETTER
+`COVER LETTER
 
 Dear Hiring Team,
 
 As an ETH graduate with 4 years of Python and React experience, I'm excited to apply for the Senior Developer position at Google Zürich. My expertise in scalable cloud architectures (GCP, AWS) directly matches your requirements.
 
-📄 CV HIGHLIGHTS
+CV HIGHLIGHTS
 • ETH Zürich – B.Sc. Computer Science (2020), GPA: 5.4
 • 4 years Full-Stack (Python, React, Node.js, GCP)
 • Led 3 enterprise applications (50k+ users)
 • Open-Source contributor: 800+ GitHub Stars
 
-💡 YOUR 3 STRONGEST ARGUMENTS
+3 STRONGEST ARGUMENTS
 1. ETH degree → Google prioritizes top universities worldwide
 2. Python + GCP → exactly the tech stack combination sought
 3. Swiss work permit → no visa needed, immediately available`,
-`✍️ LETTRE DE MOTIVATION
+`LETTRE DE MOTIVATION
 
 Madame, Monsieur,
 
 Diplômé de l'ETH avec 4 ans d'expérience Python et React, je postule avec enthousiasme au poste de Senior Developer chez Google Zürich. Mon expertise en architectures cloud (GCP, AWS) correspond directement à vos besoins.
 
-📄 POINTS FORTS CV
+POINTS FORTS CV
 • ETH Zurich – B.Sc. Informatique (2020), Note: 5.4
 • 4 ans Full-Stack (Python, React, Node.js, GCP)
 • Conduite de 3 applications enterprise (50k+ utilisateurs)
 
-💡 VOS 3 MEILLEURS ARGUMENTS
+3 MEILLEURS ARGUMENTS
 1. Diplôme ETH → Google priorise les meilleures universités
 2. Python + GCP → exactement la stack technique recherchée
 3. Permis de travail suisse → disponible immédiatement`,
-`✍️ LETTERA DI MOTIVAZIONE
+`LETTERA DI MOTIVAZIONE
 
 Gentili Signori,
 
 Come laureato ETH con 4 anni di esperienza Python e React, mi candido con entusiasmo per la posizione di Senior Developer presso Google Zürich.
 
-📄 PUNTI DI FORZA CV
+PUNTI DI FORZA CV
 • ETH Zurigo – B.Sc. Informatica (2020), Voto: 5.4
 • 4 anni Full-Stack (Python, React, Node.js, GCP)
 • Gestione di 3 applicazioni enterprise (50k+ utenti)
 
-💡 I TUOI 3 ARGOMENTI PIÙ FORTI
+I TUOI 3 ARGOMENTI PIÙ FORTI
 1. Laurea ETH → Google priorizza le migliori università
 2. Python + GCP → esattamente la tech stack cercata
 3. Permesso di lavoro svizzero → disponibile subito`) :
                 L(
-`⚡ KI-Ergebnis – Beispiel
+`KI-Ergebnis – Beispiel
 
 Dies ist ein Beispiel-Output für dieses Tool.
 Mit Pro erhältst du dein persönliches, auf dich
@@ -1991,7 +1989,7 @@ zugeschnittenes Ergebnis in Sekunden.
 ✓ Professionell formuliert
 ✓ Auf deine Eingaben zugeschnitten  
 ✓ Sofort kopierbar & verwendbar`,
-`⚡ AI result – Example
+`AI result – Example
 
 This is a sample output for this tool.
 With Pro you get your personal, tailored
@@ -2000,12 +1998,12 @@ result in seconds.
 ✓ Professionally written
 ✓ Tailored to your inputs
 ✓ Ready to copy & use`,
-`⚡ Résultat IA – Exemple
+`Résultat IA – Exemple
 
 Ceci est un exemple de résultat pour cet outil.
 Avec Pro vous obtenez votre résultat personnel
 en quelques secondes.`,
-`⚡ Risultato IA – Esempio
+`Risultato IA – Esempio
 
 Questo è un esempio di output per questo strumento.
 Con Pro ottieni il tuo risultato personale in secondi.`)}
@@ -2013,8 +2011,7 @@ Con Pro ottieni il tuo risultato personale in secondi.`)}
             </div>
             {/* Upgrade CTA */}
             <div className="card" style={{textAlign:"center",padding:"24px"}}>
-              <div style={{fontSize:32,marginBottom:8}}>🚀</div>
-              <div style={{fontFamily:"var(--hd)",fontSize:18,fontWeight:800,marginBottom:6}}>{L("Bereit für dein Ergebnis?","Ready for your result?","Prêt pour votre résultat?","Pronto per il tuo risultato?")}</div>
+              <div style={{fontFamily:"var(--hd)",fontSize:18,fontWeight:400,marginBottom:6}}>{L("Bereit für dein Ergebnis?","Ready for your result?","Prêt pour votre résultat?","Pronto per il tuo risultato?")}</div>
               <p style={{fontSize:13,color:"var(--mu)",marginBottom:18,lineHeight:1.7}}>
                 {L(`Pro – CHF ${C.priceM}/Mo. · Alle Tools · Jederzeit kündbar`,`Pro – CHF ${C.priceM}/mo · All tools · Cancel anytime`,`Pro – CHF ${C.priceM}/mois · Tous les outils · Résiliable`,`Pro – CHF ${C.priceM}/mese · Tutti gli strumenti`)}
               </p>
@@ -2028,10 +2025,10 @@ Con Pro ottieni il tuo risultato personale in secondi.`)}
             <div className="card">
               {/* ── Universeller Dokument-Upload ── */}
               <div style={{marginBottom:16}}>
-                <div style={{fontSize:11,fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase",color:"var(--mu)",marginBottom:8}}>{L("📎 Dokument hochladen (optional)","📎 Upload document (optional)","📎 Joindre un document (optionnel)","📎 Carica documento (opzionale)")}</div>
+                <div style={{fontSize:11,fontWeight:700,letterSpacing:"1.5px",textTransform:"uppercase",color:"var(--mu)",marginBottom:8}}>{L("Dokument hochladen (optional)","Upload document (optional)","Joindre un document (optionnel)","Carica documento (opzionale)")}</div>
                 {docFile ? (
                   <div style={{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:10,padding:"10px 14px",display:"flex",alignItems:"center",gap:10}}>
-                    <span style={{fontSize:18}}>{docFile.type==="text"?"📄":docFile.type?.startsWith("image/")?"🖼️":"📄"}</span>
+                    <span style={{fontSize:18}}>{docFile.type==="text"?"":docFile.type?.startsWith("image/")?"":""}</span>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:600,fontSize:13,color:"#15803d",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{docFile.name}</div>
                       <div style={{fontSize:11,color:"#16a34a"}}>{docFile.type==="text"?L("Word-Dokument – Text extrahiert ✓","Word document – text extracted ✓","Document Word – texte extrait ✓","Documento Word – testo estratto ✓"):L("Bereit zur Analyse ✓","Ready for analysis ✓","Prêt pour l'analyse ✓","Pronto per l'analisi ✓")}</div>
@@ -2136,7 +2133,7 @@ Anna Müller
 Beilagen: Lebenslauf mit Foto, Arbeitszeugnisse (UBS, Coop Digital), Diplome
 
 ─────────────────────────────
-✅ ATS-Score: 91/100 · ✅ Schweizer Format · ✅ Keywords aus Inserat ✓`,
+ATS-Score: 91/100 · Schweizer Format · Keywords aus Inserat`,
 `Dear Sir or Madam,
 
 I read your advertisement for the Product Manager position at Migros Zürich with great interest. With five years of FMCG experience I bring strategic thinking and operational strength.
@@ -2168,7 +2165,7 @@ Cordiali saluti, [Il suo nome]`);
       {/* Beispiel – aufklappbar */}
       {open&&<div style={{background:"white",padding:"16px 18px",borderTop:"1px solid rgba(16,185,129,.1)"}}>
         <div style={{display:"flex",gap:16,marginBottom:12,flexWrap:"wrap"}}>
-          {[{ico:"✍️",t:L("Motivationsschreiben","Cover letter","Lettre de motivation","Lettera")},{ico:"📄",t:L("Lebenslauf-Struktur","CV structure","Structure CV","Struttura CV")},{ico:"💡",t:L("3 Killer-Argumente","3 key arguments","3 arguments clés","3 argomenti")}].map((x,i)=>(
+          {[{ico:"",t:L("Motivationsschreiben","Cover letter","Lettre de motivation","Lettera")},{ico:"📄",t:L("Lebenslauf-Struktur","CV structure","Structure CV","Struttura CV")},{ico:"💡",t:L("3 Killer-Argumente","3 key arguments","3 arguments clés","3 argomenti")}].map((x,i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"var(--mu)"}}>
               <span>{x.ico}</span><span style={{fontWeight:600,color:"var(--tx)"}}>{x.t}</span>
             </div>
@@ -2186,7 +2183,7 @@ function DemoSection({lang, navTo}) {
   const L=(d,e,f,i)=>({de:d,en:e,fr:f,it:i}[lang]||d);
   const demos = [
     {
-      id:"app", ico:"✍️",
+      id:"app", ico:"",
       label: L("Bewerbung","Application","Candidature","Candidatura"),
       badge: L("1× Gratis","1× Free","1× Gratuit","1× Gratis"), badgeCol:"#10b981",
       input:[{l:L("Stelle","Position","Poste","Posizione"),v:"Product Manager, Migros Zürich"},{l:L("Erfahrung","Experience","Expérience","Esperienza"),v:L("5 Jahre PM, FMCG, DE/EN/FR","5 years PM, FMCG, DE/EN/FR","5 ans PM, FMCG, DE/EN/FR","5 anni PM, FMCG, DE/EN/FR")}],
@@ -2223,63 +2220,63 @@ Cordiali saluti, [Il suo nome]`)
       badge:"PRO", badgeCol:"#0a66c2",
       input:[{l:"LinkedIn-Profil",v:L("Software Engineer, 4 J. Erfahrung, ETH Zürich, Python/React","Software Engineer, 4y exp, ETH Zürich, Python/React","Ingénieur logiciel, 4 ans exp, ETH Zurich","Ingegnere SW, 4 anni, ETH Zurigo")},{l:L("Stelle","Job posting","Offre","Offerta"),v:"Senior Dev, Google Zürich"}],
       output:L(
-`✍️ MOTIVATIONSSCHREIBEN
+`MOTIVATIONSSCHREIBEN
 
 Sehr geehrte Damen und Herren,
 als ETH-Absolvent mit 4 Jahren Erfahrung in Python und React bin ich begeistert von der Senior Developer Position bei Google Zürich...
 
-📄 LEBENSLAUF-HIGHLIGHTS
+LEBENSLAUF
 • ETH Zürich – B.Sc. Informatik (2020)
 • 4 Jahre Full-Stack-Entwicklung (Python, React, Node.js)
 • Projektleitung für 3 Enterprise-Anwendungen
 
-💡 DEINE 3 STÄRKSTEN ARGUMENTE
+3 STÄRKSTE ARGUMENTE
 1. ETH-Abschluss → Google legt grossen Wert auf Top-Hochschulen
 2. Python-Expertise → Kernsprache bei Google
 3. Schweizer Arbeitsmarkterfahrung → kein Visum nötig`,
-`✍️ COVER LETTER
+`COVER LETTER
 
 Dear Hiring Team,
 As an ETH graduate with 4 years of Python and React experience, I'm excited about the Senior Developer role at Google Zürich...
 
-📄 CV HIGHLIGHTS
+CV HIGHLIGHTS
 • ETH Zürich – B.Sc. Computer Science (2020)
 • 4 years Full-Stack (Python, React, Node.js)
 • Led 3 enterprise application projects
 
-💡 YOUR 3 STRONGEST ARGUMENTS
+3 STRONGEST ARGUMENTS
 1. ETH degree → Google values top universities
 2. Python expertise → Google's core language
 3. Swiss work experience → no visa required`,
-`✍️ LETTRE DE MOTIVATION
+`LETTRE DE MOTIVATION
 
 Madame, Monsieur,
 En tant que diplômé de l'ETH avec 4 ans d'expérience Python et React, je suis enthousiaste pour ce poste...
 
-📄 POINTS FORTS CV
+POINTS FORTS CV
 • ETH Zurich – B.Sc. Informatique (2020)
 • 4 ans Full-Stack (Python, React, Node.js)
 
-💡 VOS 3 MEILLEURS ARGUMENTS
+3 MEILLEURS ARGUMENTS
 1. Diplôme ETH → Google valorise les grandes écoles
 2. Expertise Python → langage clé chez Google
 3. Expérience suisse → pas de visa requis`,
-`✍️ LETTERA DI MOTIVAZIONE
+`LETTERA DI MOTIVAZIONE
 
 Gentili Signori,
 Come laureato all'ETH con 4 anni di esperienza in Python e React, sono entusiasta di questa posizione...
 
-📄 PUNTI DI FORZA CV
+PUNTI DI FORZA CV
 • ETH Zurigo – B.Sc. Informatica (2020)
 • 4 anni Full-Stack (Python, React, Node.js)
 
-💡 I TUOI 3 ARGOMENTI PIÙ FORTI
+I TUOI 3 ARGOMENTI PIÙ FORTI
 1. Laurea ETH → Google valorizza le top università
 2. Competenza Python → linguaggio chiave di Google
 3. Esperienza svizzera → nessun visto necessario`)
     },
     {
-      id:"linkedin", ico:"💼",
+      id:"linkedin", ico:"",
       label:L("LinkedIn Optimierung","LinkedIn Optimization","Optimisation LinkedIn","Ottimizzazione LinkedIn"),
       badge:"PRO", badgeCol:"#3b82f6",
       input:[{l:L("Aktuelle Headline","Current headline","Headline actuelle","Headline attuale"),v:L("Software Engineer at Startup Zürich","Software Engineer at Startup Zürich","Software Engineer chez Startup Zurich","Software Engineer presso Startup Zurigo")},{l:L("Zielposition","Target role","Poste cible","Posizione target"),v:L("Senior Dev bei Google / Microsoft","Senior Dev at Google / Microsoft","Senior Dev chez Google / Microsoft","Senior Dev presso Google / Microsoft")}],
@@ -2418,7 +2415,7 @@ Python · React · Node.js · Cloud · Agile · System Design
 → Con adeguamenti: Score 84/100 ✅`)
     },
     {
-      id:"zeugnis", ico:"📜",
+      id:"zeugnis", ico:"",
       label:L("Zeugnis-Analyse","Reference","Analyse certificat","Analisi certificato"),
       badge:"PRO", badgeCol:"#f59e0b",
       input:[{l:L("Zeugnis-Auszug","Reference extract","Extrait certificat","Estratto certificato"),v:L("«Herr Müller erledigte die Aufgaben zu unserer Zufriedenheit und zeigte stets Verständnis für Kollegen.»","«Mr. Müller completed tasks to our satisfaction and always showed understanding for colleagues.»","«M. Müller a exécuté les tâches à notre satisfaction et a toujours fait preuve de compréhension.»","«Il Sig. Müller ha svolto i compiti a nostra soddisfazione e ha sempre mostrato comprensione.»")}],
@@ -2479,7 +2476,7 @@ Valutazione complessiva: 2.5/5 ⚠️
 → NON presentare questo certificato!`)
     },
     {
-      id:"jobmatch", ico:"🎯",
+      id:"jobmatch", ico:"",
       label:L("Job-Matching","Job Matching","Matching emploi","Job Matching"),
       badge:"PRO", badgeCol:"#10b981",
       input:[{l:L("Dein Profil","Your profile","Votre profil","Il tuo profilo"),v:L("Marketing Manager, 6 J., FMCG, Zürich, 100k+","Marketing Manager, 6y, FMCG, Zürich, 100k+","Responsable Marketing, 6 ans, FMCG, Zurich","Marketing Manager, 6 anni, FMCG, Zurigo")}],
@@ -2540,7 +2537,7 @@ Next step: Apply for Nestlé →`,
 ✓ Posizione Vevey: 1h da Zurigo`)
     },
     {
-      id:"coach", ico:"🎤",
+      id:"coach", ico:"",
       label:L("Interview-Coach","Interview Coach","Coach entretien","Coach colloquio"),
       badge:"PRO", badgeCol:"#a78bfa",
       input:[{l:L("Simulierte Frage","Simulated question","Question simulée","Domanda simulata"),v:L("«Wo sehen Sie sich in 5 Jahren?»","«Where do you see yourself in 5 years?»","«Où vous voyez-vous dans 5 ans?»","«Dove si vede tra 5 anni?»")},{l:L("Deine Antwort","Your answer","Votre réponse","La sua risposta"),v:L("Ich möchte wachsen und mehr Verantwortung übernehmen.","I want to grow and take on more responsibility.","Je veux évoluer et prendre plus de responsabilités.","Voglio crescere e assumere più responsabilità.")}],
@@ -3243,7 +3240,7 @@ function ChatBot({ lang, pro, setPw, navTo, authSession, onAuthOpen }) {
   // System-Prompt für nicht eingeloggte User: nur Seiten-Infos
   const SYSTEM_PUBLIC = `Du bist Stella, die freundliche KI-Assistentin von Stellify – dem Schweizer AI Career Copilot. Du beantwortest NUR Fragen zu Stellify, seinen Tools, Funktionen und Abonnements.
 
-Stellify-Tools (20+): ✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung, 🗓️ 30-60-90-Plan, 📚 Lernplan, ✉️ E-Mail-Assistent und weitere.
+Stellify-Tools (20+): Bewerbungen (1× gratis), LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung, 🗓️ 30-60-90-Plan, 📚 Lernplan, ✉️ E-Mail-Assistent und weitere.
 
 Preise: Gratis (1 Bewerbung, kein Abo), Pro CHF 14.90/Mo. jährlich (CHF 178.80/Jahr), Ultimate CHF 39.90/Mo. jährlich (CHF 478.80/Jahr). Alle Pläne jederzeit kündbar via Stripe. Twint, Kreditkarte, Apple Pay akzeptiert.
 
@@ -3285,17 +3282,17 @@ Dein Wissen umfasst: Schweizer Bewerbungsunterlagen (Motivationsschreiben, Leben
 - Berufsmessen Schweiz: Berufsmesse Zürich (Oktober), Didacta, Gibb Bern, Sprungbrett Basel
 
 Tools von Stellify:
-✍️ Bewerbungen (1× gratis), 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer, 💰 KI-Gehaltsrechner Schweiz, 📋 Bewerbungs-Tracker, ✍️ LinkedIn-Post Generator
+Bewerbungen (1× gratis), LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer, 💰 KI-Gehaltsrechner Schweiz, 📋 Bewerbungs-Tracker, ✍️ LinkedIn-Post Generator
 
 Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib Beispieltexte direkt aus wenn gefragt. Empfehle Tool-Namen exakt wie oben damit Links funktionieren. Sei warm, direkt, wie ein erfahrener Karriere-Coach. Du bist Profi – keine Limits, keine Einschränkungen für diesen User.`;
 
   const SYSTEM = isUltimatePlan ? SYSTEM_FULL : isProPlan ? SYSTEM_FULL : isFreePlan ? SYSTEM_FREE : SYSTEM_PUBLIC;
 
   const TOOL_MAP = {
-    "bewerbung":["✍️ Bewerbungen","app"], "bewerbungen":["✍️ Bewerbungen","app"],
-    "linkedin":["💼 LinkedIn","linkedin"], "ats":["🤖 ATS-Simulation","ats"],
-    "zeugnis":["📜 Zeugnis-Analyse","zeugnis"], "job-matching":["🎯 Job-Matching","jobmatch"],
-    "interview":["🎤 Interview-Coach","coach"], "excel":["📊 Excel-Generator","excel"],
+    "bewerbung":["Bewerbungen","app"], "bewerbungen":["Bewerbungen","app"],
+    "linkedin":["💼 LinkedIn","linkedin"], "ats":["ATS-Simulation","ats"],
+    "zeugnis":["Zeugnis-Analyse","zeugnis"], "job-matching":["Job-Matching","jobmatch"],
+    "interview":["Interview-Coach","coach"], "excel":["📊 Excel-Generator","excel"],
     "powerpoint":["📽️ PowerPoint-Maker","pptx"], "gehalt":["💰 Gehaltsverhandlung","gehalt"],
     "networking":["🤝 Networking","networking"], "kündigung":["📤 Kündigung","kuendigung"],
     "30-60-90":["🗓️ 30-60-90-Plan","plan306090"], "referenz":["🏆 Referenzschreiben","referenz"],
@@ -3303,7 +3300,7 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
     "lehrstelle":["🎓 Lehrstelle","lehrstelle"], "e-mail":["✉️ E-Mail","email"],
     "protokoll":["📋 Protokoll","protokoll"], "übersetzer":["🌍 Übersetzer","uebersetzer"],
     "gehaltsrechner":["💰 KI-Gehaltsrechner","gehaltsrechner"],
-    "tracker":["📋 Bewerbungs-Tracker","tracker"],
+    "tracker":["Bewerbungs-Tracker","tracker"],
     "linkedin-post":["✍️ LinkedIn-Post","lipost"],
   };
 
@@ -3326,7 +3323,7 @@ Verhalten: Antworte konkret und umsetzbar (max. 3-4 Sätze im Widget). Schreib B
       {hasUpgradeCue&&<div style={{marginTop:10}}>
         <button onClick={()=>{setOpen(false);window.open(C.stripeMonthly,"_blank");}}
           style={{display:"inline-flex",alignItems:"center",gap:6,background:"linear-gradient(135deg,#10b981,#059669)",color:"white",border:"none",borderRadius:10,padding:"8px 16px",fontSize:12,fontWeight:700,cursor:"pointer",boxShadow:"0 4px 12px rgba(16,185,129,.35)"}}>
-          🚀 {L("Pro upgraden – CHF 19.90/Mo.","Upgrade to Pro – CHF 19.90/mo","Passer Pro – CHF 19.90/mo","Aggiorna Pro – CHF 19.90/me")} →
+          {L("Pro upgraden – CHF 19.90/Mo.","Upgrade to Pro – CHF 19.90/mo","Passer Pro – CHF 19.90/mo","Aggiorna Pro – CHF 19.90/me")} →
         </button>
       </div>}
     </>;
@@ -3633,7 +3630,7 @@ Pflichtfelder gemäss ALV Art. 17: Datum, Firma, Ort, Funktion, Art der Bewerbun
             <button onClick={()=>navTo("landing")} style={{background:"rgba(0,0,0,.06)",border:"1px solid var(--bo)",color:"var(--mu)",borderRadius:8,padding:"5px 12px",fontSize:12,cursor:"pointer",fontFamily:"var(--bd)"}}>← {L("Zurück","Back","Retour","Indietro")}</button>
             {!pro && <span style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"white",fontSize:10,fontWeight:700,padding:"3px 10px",borderRadius:20}}>PRO</span>}
           </div>
-          <h1>📋 {L("Bewerbungs-Tracker","Application Tracker","Suivi des candidatures","Tracker candidature")}</h1>
+          <h1>{L("Bewerbungs-Tracker","Application Tracker","Suivi des candidatures","Tracker candidature")}</h1>
           <p>{L("Alle Bewerbungen im Überblick – Status, Priorität, Notizen.","All applications at a glance – status, priority, notes.","Toutes les candidatures – statut, priorité, notes.","Tutte le candidature – stato, priorità, note.")}</p>
         </div>
       </div>
@@ -3645,9 +3642,9 @@ Pflichtfelder gemäss ALV Art. 17: Datum, Firma, Ort, Funktion, Art der Bewerbun
             <p>{L("Behalte alle Bewerbungen im Blick. Status, Priorität, Notizen – alles an einem Ort.","Keep all applications in view. Status, priority, notes – all in one place.","Suivez toutes vos candidatures. Statut, priorité, notes – tout en un.","Tieni traccia di tutte le candidature. Stato, priorità, note – tutto in un posto.")}</p>
             <div className="ipw-pr">CHF {C.priceM}<span>/Mo.</span></div>
             <div className="ipw-fts">
-              {["📋 Tracker","✍️ Bewerbungen","🤖 ATS","📜 Zeugnis","🎯 Matching"].map(f=><span key={f} className="ipw-ft">✓ {f}</span>)}
+              {["📋 Tracker","Bewerbungen","🤖 ATS","📜 Zeugnis","🎯 Matching"].map(f=><span key={f} className="ipw-ft">✓ {f}</span>)}
             </div>
-            <button className="btn b-em b-lg b-w" onClick={()=>setPw(true)}>✦ {L("Pro freischalten →","Unlock Pro →","Activer Pro →","Attiva Pro →")}</button>
+            <button className="btn b-em b-lg b-w" onClick={()=>setPw(true)}>{L("Pro freischalten →","Unlock Pro →","Activer Pro →","Attiva Pro →")}</button>
           </div>
         </div>
       ) : (
@@ -4739,7 +4736,7 @@ Antworte NUR mit JSON:
       {mOpen&&<div style={{background:"#0a0a16",borderTop:"1px solid rgba(255,255,255,.07)",padding:"8px 0 16px",display:"flex",flexDirection:"column"}}>
         {/* Nav links */}
         {[
-          {fn:()=>navTo("app"),ico:"✍️",lbl:lang==="de"?"Bewerbung":lang==="fr"?"Candidature":lang==="it"?"Candidatura":"Application"},
+          {fn:()=>navTo("app"),ico:"",lbl:lang==="de"?"Bewerbung":lang==="fr"?"Candidature":lang==="it"?"Candidatura":"Application"},
           {fn:()=>navTo("chat"),ico:"💬",lbl:"Stella AI",badge:lang==="de"?"Neu":"New"},
           {fn:()=>{navTo("landing");setTimeout(()=>document.getElementById("tools")?.scrollIntoView({behavior:"smooth"}),100);},ico:"🔧",lbl:lang==="de"?"Alle Tools":lang==="fr"?"Outils":lang==="it"?"Strumenti":"All Tools"},
           {fn:()=>{navTo("landing");setTimeout(()=>document.getElementById("preise")?.scrollIntoView({behavior:"smooth"}),100);},ico:"💶",lbl:lang==="de"?"Preise":lang==="fr"?"Tarifs":lang==="it"?"Prezzi":"Pricing"},
@@ -5671,7 +5668,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
       {/* Block 1: Motivationsschreiben */}
       <div style={{padding:"14px 16px",borderBottom:"1px solid #f1f5f9"}}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-          <span style={{background:"#fef3c7",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,color:"#92400e"}}>✍️ Motivationsschreiben</span>
+          <span style={{background:"#fef3c7",borderRadius:6,padding:"3px 8px",fontSize:11,fontWeight:700,color:"#92400e"}}>Motivationsschreiben</span>
           <div style={{height:1,flex:1,background:"#e2e8f0"}}/>
         </div>
         <div style={{background:"#f8fafc",borderRadius:9,padding:"12px 14px",border:"1px solid #e2e8f0",lineHeight:1.75,color:"#334155"}}>
@@ -5690,7 +5687,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
           {[
             {ico:"🎓",v:"ETH Zürich B.Sc. Informatik"},
-            {ico:"💼",v:"4 J. Full-Stack · Python, React"},
+            {ico:"",v:"4 J. Full-Stack · Python, React"},
             {ico:"☁️",v:"GCP · AWS Certified"},
             {ico:"🏆",v:"Ladezeit –40% · 3 Enterprise-Apps"},
           ].map((r,i)=>(
@@ -5987,20 +5984,19 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
   const LockMsg=({sub})=>(<ProDemo toolId={page} sub={sub}/>);
 
   const TOOL_INFO = {
-    app:      {ico:"✍️", title:L("Bewerbungen","Applications","Candidatures","Candidature"),       desc:L("Erstellt Motivationsschreiben & Lebenslauf in 60 Sekunden – live, auf dein Profil zugeschnitten.","Generates cover letter & CV in 60 seconds – live, tailored to your profile.","Génère lettre de motivation & CV en 60 secondes – en direct, adapté à votre profil.","Genera lettera di motivazione & CV in 60 secondi – live, su misura per il tuo profilo.")},
-    linkedin: {ico:"💼", title:"LinkedIn Optimierung",                                              desc:L("Analysiert dein LinkedIn-Profil und optimiert Headline, About & Skills für Recruiter.","Analyzes your LinkedIn profile and optimizes Headline, About & Skills for recruiters.","Analyse votre profil LinkedIn et optimise Headline, About & Skills pour les recruteurs.","Analizza il tuo profilo LinkedIn e ottimizza Headline, About & Skills per i recruiter.")},
-    ats:      {ico:"🤖", title:"ATS-Simulation",                                                   desc:L("Prüft ob dein Lebenslauf durch Recruiter-Software kommt – mit Score und konkreten Tipps.","Checks if your CV passes recruiting software – with score and concrete tips.","Vérifie si votre CV passe le logiciel de recrutement – avec score et conseils concrets.","Verifica se il tuo CV supera il software di recruiting – con punteggio e consigli concreti.")},
-    zeugnis:  {ico:"📜", title:L("Zeugnis-Analyse","Reference Analysis","Analyse de certificat","Analisi referenze"), desc:L("Entschlüsselt den Schweizer Zeugnis-Code und zeigt was dein Arbeitszeugnis wirklich bedeutet.","Decodes the Swiss reference code and shows what your work reference really means.","Décode le code suisse des certificats et montre ce que votre certificat signifie vraiment.","Decodifica il codice svizzero dei certificati e mostra cosa significa davvero il tuo certificato.")},
-    jobmatch: {ico:"🎯", title:"Job-Matching",                                                     desc:L("Findet deine Top 5 passenden Stellenprofile basierend auf deinen Skills und Wünschen.","Finds your top 5 matching job profiles based on your skills and preferences.","Trouve vos 5 postes idéaux basés sur vos compétences et préférences.","Trova i tuoi 5 profili di lavoro ideali basati sulle tue competenze e preferenze.")},
-    coach:    {ico:"🎤", title:"Interview-Coach",                                                  desc:L("Simuliert ein echtes Vorstellungsgespräch und gibt dir danach eine Bewertung mit Tipps.","Simulates a real job interview and gives you a rating with tips afterwards.","Simule un vrai entretien d'embauche et vous donne ensuite une évaluation avec des conseils.","Simula un vero colloquio di lavoro e ti dà poi una valutazione con consigli.")},
-    excel:    {ico:"📊", title:"Excel-Generator",                                                  desc:L("Beschreibe deine Tabelle – die KI erstellt Struktur, Spalten, Beispieldaten und Formeln.","Describe your spreadsheet – AI creates structure, columns, sample data and formulas.","Décrivez votre tableau – l'IA crée structure, colonnes, données d'exemple et formules.","Descrivi il tuo foglio – l'IA crea struttura, colonne, dati di esempio e formule.")},
-    pptx:     {ico:"📽️", title:"PowerPoint-Maker",                                                desc:L("Erstellt eine komplette Präsentation mit Folien, Bullet Points und Sprechernotizen.","Creates a complete presentation with slides, bullet points and speaker notes.","Crée une présentation complète avec diapositives, points clés et notes de présentateur.","Crea una presentazione completa con diapositive, punti chiave e note del presentatore.")},
+    app:      {ico:"", title:L("Bewerbungen","Applications","Candidatures","Candidature"),       desc:L("Erstellt Motivationsschreiben & Lebenslauf in 60 Sekunden – live, auf dein Profil zugeschnitten.","Generates cover letter & CV in 60 seconds – live, tailored to your profile.","Génère lettre de motivation & CV en 60 secondes – en direct, adapté à votre profil.","Genera lettera di motivazione & CV in 60 secondi – live, su misura per il tuo profilo.")},
+    linkedin: {ico:"", title:"LinkedIn Optimierung",                                              desc:L("Analysiert dein LinkedIn-Profil und optimiert Headline, About & Skills für Recruiter.","Analyzes your LinkedIn profile and optimizes Headline, About & Skills for recruiters.","Analyse votre profil LinkedIn et optimise Headline, About & Skills pour les recruteurs.","Analizza il tuo profilo LinkedIn e ottimizza Headline, About & Skills per i recruiter.")},
+    ats:      {ico:"", title:"ATS-Simulation",                                                   desc:L("Prüft ob dein Lebenslauf durch Recruiter-Software kommt – mit Score und konkreten Tipps.","Checks if your CV passes recruiting software – with score and concrete tips.","Vérifie si votre CV passe le logiciel de recrutement – avec score et conseils concrets.","Verifica se il tuo CV supera il software di recruiting – con punteggio e consigli concreti.")},
+    zeugnis:  {ico:"", title:L("Zeugnis-Analyse","Reference Analysis","Analyse de certificat","Analisi referenze"), desc:L("Entschlüsselt den Schweizer Zeugnis-Code und zeigt was dein Arbeitszeugnis wirklich bedeutet.","Decodes the Swiss reference code and shows what your work reference really means.","Décode le code suisse des certificats et montre ce que votre certificat signifie vraiment.","Decodifica il codice svizzero dei certificati e mostra cosa significa davvero il tuo certificato.")},
+    jobmatch: {ico:"", title:"Job-Matching",                                                     desc:L("Findet deine Top 5 passenden Stellenprofile basierend auf deinen Skills und Wünschen.","Finds your top 5 matching job profiles based on your skills and preferences.","Trouve vos 5 postes idéaux basés sur vos compétences et préférences.","Trova i tuoi 5 profili di lavoro ideali basati sulle tue competenze e preferenze.")},
+    coach:    {ico:"", title:"Interview-Coach",                                                  desc:L("Simuliert ein echtes Vorstellungsgespräch und gibt dir danach eine Bewertung mit Tipps.","Simulates a real job interview and gives you a rating with tips afterwards.","Simule un vrai entretien d'embauche et vous donne ensuite une évaluation avec des conseils.","Simula un vero colloquio di lavoro e ti dà poi una valutazione con consigli.")},
+    excel:    {ico:"", title:"Excel-Generator",                                                  desc:L("Beschreibe deine Tabelle – die KI erstellt Struktur, Spalten, Beispieldaten und Formeln.","Describe your spreadsheet – AI creates structure, columns, sample data and formulas.","Décrivez votre tableau – l'IA crée structure, colonnes, données d'exemple et formules.","Descrivi il tuo foglio – l'IA crea struttura, colonne, dati di esempio e formule.")},
+    pptx:     {ico:"", title:"PowerPoint-Maker",                                                desc:L("Erstellt eine komplette Präsentation mit Folien, Bullet Points und Sprechernotizen.","Creates a complete presentation with slides, bullet points and speaker notes.","Crée une présentation complète avec diapositives, points clés et notes de présentateur.","Crea una presentazione completa con diapositive, punti chiave e note del presentatore.")},
   };
   const ToolBanner=({pageId})=>{const info=TOOL_INFO[pageId];if(!info)return null;return(
-    <div style={{background:"linear-gradient(135deg,rgba(16,185,129,.08),rgba(16,185,129,.03))",border:"1px solid rgba(16,185,129,.2)",borderRadius:14,padding:"16px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:14}}>
-      <div style={{fontSize:32,flexShrink:0}}>{info.ico}</div>
-      <div><div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:800,marginBottom:3}}>{info.title}</div>
-      <div style={{fontSize:13,color:"var(--mu)",lineHeight:1.5}}>{info.desc}</div></div>
+    <div style={{background:"rgba(37,99,235,.04)",border:"1px solid rgba(37,99,235,.1)",borderRadius:14,padding:"16px 20px",marginBottom:20}}>
+      <div style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:400,marginBottom:3,color:"var(--ink)"}}>{info.title}</div>
+      <div style={{fontSize:13,color:"var(--mu)",lineHeight:1.5}}>{info.desc}</div>
     </div>
   );};
 
@@ -6126,7 +6122,6 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
             {t.tools.items.map((item,i)=>(
               <div key={i} className="lp-tool-card lp-reveal" style={{transitionDelay:`${i*.08}s`}} onClick={()=>navTo(item.page)}>
                 <span className={`lp-badge ${item.badge==="1× Gratis"||item.badge==="1× Free"||item.badge==="1× Gratuit"||item.badge==="1× Gratuito"?"lp-badge-free":"lp-badge-pro"}`}>{item.badge}</span>
-                <div className="lp-tool-ico">{item.ico}</div>
                 <div className="lp-tool-title">{item.t}</div>
                 <div className="lp-tool-desc">{item.p}</div>
               </div>
@@ -6139,7 +6134,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
               <button key={g.id} onClick={()=>navTo(g.id)} style={{display:"flex",alignItems:"center",gap:8,background:"white",border:"1.5px solid var(--bo)",borderRadius:30,padding:"8px 16px",fontSize:13,fontWeight:500,color:"var(--ink)",cursor:"pointer",transition:"all .18s",fontFamily:"var(--bd)"}}
                 onMouseEnter={e=>{e.currentTarget.style.borderColor="var(--em)";e.currentTarget.style.color="var(--em)";}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor="var(--bo)";e.currentTarget.style.color="var(--ink)";}}>
-                <span>{g.ico}</span><span>{g.t[lang]||g.t.de}</span>
+                <span>{g.t[lang]||g.t.de}</span>
               </button>
             ))}
           </div>}
@@ -6200,8 +6195,8 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                   transition:"transform .22s cubic-bezier(.34,1.56,.64,1)",transitionDelay:`${tierIdx*.1}s`
                 }} onMouseEnter={e=>e.currentTarget.style.transform="translateY(-4px)"} onMouseLeave={e=>e.currentTarget.style.transform="none"}>
                   {isPro&&<div style={{position:"absolute",top:-13,left:"50%",transform:"translateX(-50%)",background:"var(--em)",color:"white",fontSize:11,fontWeight:700,padding:"4px 16px",borderRadius:999,whiteSpace:"nowrap",letterSpacing:.3}}>{t.price.recom}</div>}
-                  {isStarter&&<div style={{position:"absolute",top:-13,left:"50%",transform:"translateX(-50%)",background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"white",fontSize:11,fontWeight:700,padding:"4px 16px",borderRadius:999,whiteSpace:"nowrap"}}>🎒 {lang==="de"?"Für Schüler":lang==="en"?"For Students":lang==="fr"?"Pour Élèves":"Per Studenti"}</div>}
-                  {isUlt&&<div style={{position:"absolute",top:-13,left:"50%",transform:"translateX(-50%)",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontSize:11,fontWeight:700,padding:"4px 16px",borderRadius:999,whiteSpace:"nowrap"}}>⭐ Ultimate</div>}
+                  {isStarter&&<div style={{position:"absolute",top:-13,left:"50%",transform:"translateX(-50%)",background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"white",fontSize:11,fontWeight:700,padding:"4px 16px",borderRadius:999,whiteSpace:"nowrap"}}>{lang==="de"?"Für Schüler":lang==="en"?"For Students":lang==="fr"?"Pour Élèves":"Per Studenti"}</div>}
+                  {isUlt&&<div style={{position:"absolute",top:-13,left:"50%",transform:"translateX(-50%)",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontSize:11,fontWeight:700,padding:"4px 16px",borderRadius:999,whiteSpace:"nowrap"}}>Ultimate</div>}
                   <div style={{fontSize:11,fontWeight:700,letterSpacing:2,textTransform:"uppercase",color:isPro?"var(--em)":isUlt?"#f59e0b":isStarter?"#ef4444":"rgba(255,255,255,.28)",marginBottom:10}}>{tier.name}</div>
                   <div style={{fontFamily:"var(--hd)",fontSize:36,fontWeight:400,color:"white",lineHeight:1,marginBottom:4,letterSpacing:"-1px"}}>
                     {tier.price===0?(lang==="de"?"Gratis":lang==="fr"?"Gratuit":"Free"):`CHF ${displayPrice}`}
@@ -6228,10 +6223,10 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
                     {lang==="de"?"Kostenlos starten":lang==="fr"?"Commencer gratuitement":lang==="it"?"Inizia gratis":"Start for free"}
                   </button>}
                   {isUlt&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    <button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                    <button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#f59e0b,#d97706)",color:"white",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
                       {lang==="de"?"Monatlich – CHF "+C.priceUltimate+"/Mo. →":lang==="fr"?"Mensuel – CHF "+C.priceUltimate+"/mo →":"Monthly – CHF "+C.priceUltimate+"/mo →"}
                     </button>
-                    <button onClick={()=>window.open(C.stripeUltimateYearly,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid #f59e0b",background:"transparent",color:"#f59e0b",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                    <button onClick={()=>window.open(C.stripeUltimate,"_blank")} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid #f59e0b",background:"transparent",color:"#f59e0b",fontFamily:"var(--bd)",fontSize:13,fontWeight:600,cursor:"pointer"}}>
                       {lang==="de"?"Jährlich – CHF "+C.priceUltimateYearly+"/Mo. →":lang==="fr"?"Annuel – CHF "+C.priceUltimateYearly+"/mo →":"Yearly – CHF "+C.priceUltimateYearly+"/mo →"}<span style={{marginLeft:6,background:"rgba(245,158,11,.12)",borderRadius:99,padding:"1px 7px",fontSize:11}}>–20%</span>
                     </button>
                   </div>}
@@ -6374,7 +6369,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
       {/* ✦ Beispiel-Vorschau direkt im Tool */}
       {step===0&&<AppDemo lang={lang}/>}
 
-      {err&&<div className="err">⚠️ {err}<button style={{float:"right",background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontWeight:700}} onClick={()=>setErr("")}>✕</button></div>}
+      {err&&<div className="err">{err}<button style={{float:"right",background:"none",border:"none",cursor:"pointer",color:"#dc2626",fontWeight:700}} onClick={()=>setErr("")}>✕</button></div>}
 
       {step===0&&<div className="card">
         <div className="ct">{lang==="de"?"Die Stelle":lang==="fr"?"Le poste":lang==="it"?"Il posto":"The position"}</div>
@@ -6434,7 +6429,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
       {step===2&&<div className="card">
         <div className="ct">{lang==="de"?"Dokument wählen":lang==="fr"?"Choisir le document":lang==="it"?"Scegli il documento":"Choose document"}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
-          {[{k:"motivation",ico:"✍️",t:lang==="de"?"Motivationsschreiben":lang==="fr"?"Lettre de motivation":lang==="it"?"Lettera di motivazione":"Cover letter",d:lang==="de"?"Persönlich, überzeugend.":lang==="fr"?"Personnelle, convaincante.":lang==="it"?"Personale, convincente.":"Personal, convincing."},
+          {[{k:"motivation",ico:"",t:lang==="de"?"Motivationsschreiben":lang==="fr"?"Lettre de motivation":lang==="it"?"Lettera di motivazione":"Cover letter",d:lang==="de"?"Persönlich, überzeugend.":lang==="fr"?"Personnelle, convaincante.":lang==="it"?"Personale, convincente.":"Personal, convincing."},
             {k:"lebenslauf",ico:"📄",t:"Curriculum Vitae",d:lang==="de"?"Schweizer Format.":lang==="fr"?"Format suisse.":lang==="it"?"Formato svizzero.":"Swiss format."},
             {k:"beide",ico:"🚀",t:lang==="de"?"Beides":lang==="fr"?"Les deux":lang==="it"?"Entrambi":"Both",d:lang==="de"?"Vollständiges Dossier.":lang==="fr"?"Dossier complet.":lang==="it"?"Dossier completo.":"Complete dossier.",full:true}
           ].map(d=><button key={d.k} className={`tool-card ${docType===d.k?"":""}`} style={{cursor:"pointer",border:`1.5px solid ${docType===d.k?"var(--em)":"var(--bo)"}`,background:docType===d.k?"var(--em3)":"white",gridColumn:d.full?"1/-1":"auto"}} onClick={()=>setDocType(d.k)}>
@@ -6451,16 +6446,16 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
           <div style={{width:9,height:9,background:"var(--em)",borderRadius:"50%",animation:"blink .8s step-end infinite"}}/>{t.app.stream}
         </div>}
         {docType==="beide"&&<div className="r-tabs">
-          <button className={`r-tab ${tab===0?"on":""}`} onClick={()=>{setTab(0);setEditing(false)}}>{lang==="de"?"✍️ Motivationsschreiben":lang==="fr"?"✍️ Lettre":lang==="it"?"✍️ Lettera":"✍️ Cover letter"}</button>
-          <button className={`r-tab ${tab===1?"on":""}`} onClick={()=>{setTab(1);setEditing(false)}}>{lang==="de"?"📋 Lebenslauf":"📋 CV"}</button>
+          <button className={`r-tab ${tab===0?"on":""}`} onClick={()=>{setTab(0);setEditing(false)}}>{lang==="de"?"Motivationsschreiben":lang==="fr"?"Lettre":lang==="it"?"Lettera":"✍️ Cover letter"}</button>
+          <button className={`r-tab ${tab===1?"on":""}`} onClick={()=>{setTab(1);setEditing(false)}}>{lang==="de"?"Lebenslauf":"CV"}</button>
         </div>}
         {!streaming&&<div className="r-bar">
           {copied&&<span className="ok" style={{margin:0,padding:"4px 11px"}}>{t.app.copied}</span>}
-          <button className="btn b-outd b-sm" onClick={copyDoc}>📋 {t.app.copy}</button>
+          <button className="btn b-outd b-sm" onClick={copyDoc}>{t.app.copy}</button>
           <button className="btn b-outd b-sm" onClick={()=>{if(!pro){setPw(true);return;}setEditing(!editing);}}>{editing?`👁 ${t.app.prev}`:`✏️ ${t.app.edit}`}{!pro&&<span className="pb" style={{fontSize:8,marginLeft:3}}>PRO</span>}</button>
-          <button className="btn b-outd b-sm" onClick={pdfDoc}>📥 PDF{!pro&&<span className="pb" style={{fontSize:8,marginLeft:3}}>PRO</span>}</button>
-                  <button className="btn b-outd b-sm" onClick={()=>navTo("checklist")}>✅ {lang==="de"?"Checkliste":lang==="en"?"Checklist":lang==="fr"?"Checklist":"Checklist"}</button>
-          <button className="btn b-outd b-sm" onClick={()=>{setStep(2);setResults({motivation:"",lebenslauf:""});setEditing(false);}}>🔄 {t.app.regen}</button>
+          <button className="btn b-outd b-sm" onClick={pdfDoc}>PDF{!pro&&<span className="pb" style={{fontSize:8,marginLeft:3}}>PRO</span>}</button>
+                  <button className="btn b-outd b-sm" onClick={()=>navTo("checklist")}>{lang==="de"?"Checkliste":lang==="en"?"Checklist":lang==="fr"?"Checklist":"Checklist"}</button>
+          <button className="btn b-outd b-sm" onClick={()=>{setStep(2);setResults({motivation:"",lebenslauf:""});setEditing(false);}}>{t.app.regen}</button>
         </div>}
         {editing&&!streaming?<textarea className="r-edit" value={curDoc()} onChange={e=>setCurDoc(e.target.value)}/>:<div className="r-doc">{curDoc()||(!streaming&&<span style={{color:"rgba(11,11,18,.25)",fontSize:13,fontStyle:"italic"}}>{lang==="de"?"Noch kein Inhalt – bitte erneut generieren.":lang==="fr"?"Pas encore de contenu – veuillez regénérer.":"No content yet – please generate again."}</span>)}{streaming&&<span className="cursor"/>}</div>}
       </div>}
@@ -6504,7 +6499,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     <div className="page-hdr dk"><h1>{t.ats.title}</h1><p>{t.ats.sub}</p></div>
     <div className="abody">
       <ToolBanner pageId="ats"/>
-      {err&&<div className="err">⚠️ {err}</div>}
+      {err&&<div className="err">{err}</div>}
       {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
         <div className="card">
           <div className="ct">{t.ats.title}</div><div className="cs">{t.ats.sub}</div>
@@ -6577,7 +6572,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     <div className="page-hdr am"><h1>{t.zeugnis.title}</h1><p>{t.zeugnis.sub}</p></div>
     <div className="abody">
       <ToolBanner pageId="zeugnis"/>
-      {err&&<div className="err">⚠️ {err}</div>}
+      {err&&<div className="err">{err}</div>}
       {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
         <div className="card">
           <div className="ct">{t.zeugnis.title}</div><div className="cs">{t.zeugnis.sub}</div>
@@ -6625,7 +6620,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
             <button className="btn b-outd b-sm" onClick={()=>downloadAsWord(`Zeugnis-Analyse\n\nBewertung: ${zRes.grade} – ${zRes.grade_text}\n${zRes.overall}\n\nPhrasen:\n${(zRes.phrases||[]).map(p=>`${p.rating}: «${p.original}» → ${p.decoded}`).join("\n")}\n\nTipps:\n${(zRes.tips||[]).map((t,i)=>`${i+1}. ${t}`).join("\n")}`,"zeugnis")}>📘 Word</button>
             <button className="btn b-outd b-sm" onClick={()=>downloadAsExcel((zRes.phrases||[]).map(p=>[p.rating,p.original,p.decoded]),["Bewertung","Original-Phrase","Bedeutung"],"Zeugnis-Analyse","zeugnis")}>📊 Excel</button>
             <button className="btn b-outd b-sm" onClick={()=>dlPptxFromText(`Zeugnis-Analyse\n\nBewertung: ${zRes.grade} – ${zRes.grade_text}\n\n${zRes.overall}\n\nTipps:\n${(zRes.tips||[]).map((t,i)=>`${i+1}. ${t}`).join("\n")}`,"Zeugnis-Analyse","zeugnis")}>📽️ PPTX</button>
-            <button className="btn b-outd b-sm" onClick={()=>{setZRes(null);setZText("");}}>🔄 {lang==="de"?"Neues Zeugnis":lang==="fr"?"Nouveau certificat":lang==="it"?"Nuovo certificato":"New reference"}</button>
+            <button className="btn b-outd b-sm" onClick={()=>{setZRes(null);setZText("");}}>{lang==="de"?"Neues Zeugnis":lang==="fr"?"Nouveau certificat":lang==="it"?"Nuovo certificato":"New reference"}</button>
           </div>
         </div>}
       </>}
@@ -6641,7 +6636,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     <div className="page-hdr vi"><h1>{t.jobmatch.title}</h1><p>{t.jobmatch.sub}</p></div>
     <div className="abody">
       <ToolBanner pageId="jobmatch"/>
-      {err&&<div className="err">⚠️ {err}</div>}
+      {err&&<div className="err">{err}</div>}
       {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
         <div className="card">
           <div className="ct">{t.jobmatch.title}</div><div className="cs">{t.jobmatch.sub}</div>
@@ -6694,7 +6689,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     <div className="page-hdr bl"><h1>{t.linkedin.title}</h1><p>{t.linkedin.sub}</p></div>
     <div className="abody">
       <ToolBanner pageId="linkedin"/>
-      {err&&<div className="err">⚠️ {err}</div>}
+      {err&&<div className="err">{err}</div>}
       {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:<>
         <div className="card">
           <div className="ct">{t.linkedin.title}</div><div className="cs">{t.linkedin.sub}</div>
@@ -6765,7 +6760,7 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     <div className="page-hdr dk"><h1>{t.coach.title}</h1><p>{t.coach.sub}</p></div>
     <div className="abody">
       <ToolBanner pageId="coach"/>
-      {err&&<div className="err">⚠️ {err}</div>}
+      {err&&<div className="err">{err}</div>}
       {!pro?<div className="card"><LockMsg sub={t.coach.lockedSub}/></div>:!icReady?(
         <div className="card">
           <div className="ct">{t.coach.ready}</div><div className="cs">{t.coach.readySub}</div>
@@ -6819,12 +6814,12 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
     <Nav dark/>
     <div className="page-hdr">
-      <h1>📊 {t.nav.excel}</h1>
+      <h1>{t.nav.excel}</h1>
       <p>{L("Professionelle Excel-Tabellen mit Formeln – für jeden Bereich.","Professional Excel spreadsheets with formulas – for any purpose.","Tableaux Excel professionnels avec formules – pour tous.","Fogli Excel professionali con formule – per tutti.")}</p>
     </div>
     <div className="abody">
       <ToolBanner pageId="excel"/>
-      {err&&<div className="err">⚠️ {err}</div>}
+      {err&&<div className="err">{err}</div>}
       {!pro?<div className="card"><LockMsg sub={L("Der Excel-Generator ist in Pro enthalten. CHF 19.90/Monat.","The Excel generator is included in Pro. CHF 19.90/month.","Le générateur Excel est inclus dans Pro. CHF 19.90/mois.","Il generatore Excel è incluso in Pro. CHF 19.90/mese.")}/></div>:<>
         <div className="card">
           <div className="ct">📊 {t.nav.excel}</div>
@@ -6935,12 +6930,12 @@ RISPOSTA: "Sarebbe possibile un bonus di CHF 15k se il budget è limitato?"`)
     {showProfiles&&<ProfileManager lang={lang} onClose={()=>setShowProfiles(false)} onSelect={p=>{if(p){setActiveProfile(p);setProf({name:p.name||"",beruf:p.beruf||"",erfahrung:p.erfahrung||"",skills:p.skills||"",sprachen:p.sprachen||"",ausbildung:p.ausbildung||""});}}}/>}
     <Nav dark/>
     <div className="page-hdr">
-      <h1>📽️ {t.nav.pptx}</h1>
+      <h1>{t.nav.pptx}</h1>
       <p>{L("Professionelle Präsentationen für Schule, Uni & Arbeit.","Professional presentations for school, uni & work.","Présentations professionnelles pour école, université & travail.","Presentazioni professionali per scuola, università e lavoro.")}</p>
     </div>
     <div className="abody">
       <ToolBanner pageId="pptx"/>
-      {err&&<div className="err">⚠️ {err}</div>}
+      {err&&<div className="err">{err}</div>}
       {!pro?<div className="card"><LockMsg sub={L("Der PowerPoint-Maker ist in Pro enthalten. CHF 19.90/Monat.","The PowerPoint maker is included in Pro. CHF 19.90/month.","Le créateur PowerPoint est inclus dans Pro. CHF 19.90/mois.","Il creatore PowerPoint è incluso in Pro. CHF 19.90/mese.")}/></div>:<>
         <div className="card">
           <div className="ct">📽️ {t.nav.pptx}</div>
@@ -7119,7 +7114,7 @@ Produktivität & Kommunikation:
 - Du erstellst strukturierte Excel-Vorlagen und PowerPoint-Präsentationen
 
 STELLIFY-TOOLS (empfehle passende Tools mit ihrem Namen):
-✍️ Bewerbungen, 💼 LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer
+Bewerbungen, LinkedIn Optimierung, 🤖 ATS-Simulation, 📜 Zeugnis-Analyse, 🎯 Job-Matching, 🎤 Interview-Coach, 📊 Excel-Generator, 📽️ PowerPoint-Maker, 💰 Gehaltsverhandlung, 🤝 Networking-Nachricht, 📤 Kündigung schreiben, 🗓️ 30-60-90-Tage-Plan, 🏆 Referenzschreiben, 📚 Lernplan, 📝 Zusammenfassung, 🎓 Lehrstelle, ✉️ E-Mail, 📋 Protokoll, 🌍 Übersetzer
 
 VERHALTEN:
 - Antworte in der Sprache des Nutzers (Standard: Deutsch/Schweizerdeutsch-freundlich)
@@ -7315,7 +7310,7 @@ Bleibe freundlich, motivierend und konsequent. Beantworte keine konkreten Karrie
             {/* Brand */}
             <div style={{padding:"16px 14px 10px",borderBottom:"1px solid rgba(255,255,255,.05)",flexShrink:0}}>
               <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-                <span style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:900,color:"var(--em)",letterSpacing:"-0.5px"}}>✦ Stellify</span>
+                <span style={{fontFamily:"var(--hd)",fontSize:16,fontWeight:900,color:"var(--em)",letterSpacing:"-0.5px"}}>Stellify</span>
                 <span style={{fontSize:10,color:"rgba(255,255,255,.2)",marginLeft:"auto",fontStyle:"italic"}}>AI Chat</span>
               </div>
               <button onClick={cp2NewChat} style={{width:"100%",background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.22)",borderRadius:10,padding:"9px 12px",color:"var(--em)",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8,transition:"background .2s"}}>
@@ -7408,7 +7403,7 @@ Bleibe freundlich, motivierend und konsequent. Beantworte keine konkreten Karrie
             {/* Quick prompts */}
             {activeMsgs.length<=1&&!chatLoad&&<div style={{padding:"0 20px 10px",display:"flex",gap:7,flexWrap:"wrap",justifyContent:"center",flexShrink:0}}>
               {[
-                L2("✍️ Motivationsschreiben","✍️ Cover letter","✍️ Lettre de motivation","✍️ Lettera motivazione"),
+                L2("Motivationsschreiben","✍️ Cover letter","Lettre de motivation","Lettera motivazione"),
                 L2("💰 Gehalt verhandeln","💰 Salary negotiation","💰 Salaire","💰 Stipendio"),
                 L2("💼 LinkedIn optimieren","💼 LinkedIn","💼 LinkedIn","💼 LinkedIn"),
                 L2("🎤 Interview vorbereiten","🎤 Interview tips","🎤 Entretien","🎤 Colloquio"),
